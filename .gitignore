@@ -1,0 +1,11 @@
+# Orchestration control plane. Mirrored to scuba-state/* branches, never to code
+# branches. (.scuba/.gitignore also self-ignores; this entry is here for legibility.)
+.scuba/
+
+# Evaluation exhaust: per-run inputs/outputs and copied-in snapshots of inspected
+# repositories. Preserved in full on the experiment/0.0.0 branch so no run data is
+# lost, but kept out of trunk history. Durable state (.devin/roadmap.md) stays tracked.
+.devin/eval/
+
+# macOS
+.DS_Store

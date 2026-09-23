@@ -1,0 +1,7 @@
+{
+  "name": "evidence-led-delivery",
+  "version": "0.1.0",
+  "description": "Agent skills for evidence-grounded intent and sequential human-in-the-loop delivery boundaries.",
+  "license": "MIT",
+  "skills": "./skills/"
+}
