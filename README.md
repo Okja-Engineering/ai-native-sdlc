@@ -36,6 +36,7 @@ Three human gates. Nothing advances a stage without a person deciding it should.
 
 | File | What it is | State |
 |---|---|---|
+| [`AGENTS.md`](AGENTS.md) | How to work here — commit and push conventions, enforced by `.githooks/` | built |
 | [`intent.md`](intent.md) | Why this repository exists and what we believe | drafted |
 | [`spec.md`](spec.md) | What V0 is, and what it is not yet | drafted |
 | [`STANDARDS.md`](STANDARDS.md) | How mature AI-native teams work, as of Q3 2026 | drafted |

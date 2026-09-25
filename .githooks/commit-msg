@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Conventional commit subject, and no attribution trailers.
+# Conventions: AGENTS.md § Commits
+set -u
+
+msg_file="$1"
+fail=0
+
+say() { printf '  %s\n' "$*" >&2; }
+
+# Strip comment lines git adds to the template.
+subject="$(grep -v '^#' "$msg_file" | sed '/^[[:space:]]*$/d' | head -1)"
+body="$(grep -v '^#' "$msg_file")"
+
+# --- subject shape -----------------------------------------------------------
+if ! printf '%s' "$subject" \
+  | grep -Eq '^(feat|fix|docs|refactor|test|chore)(\([a-z0-9._/-]+\))?!?: .+'; then
+  say "commit-msg: subject is not a conventional commit"
+  say "  got:    $subject"
+  say "  want:   type(scope): subject"
+  say "  types:  feat fix docs refactor test chore"
+  fail=1
+fi
+
+if [ "${#subject}" -gt 72 ]; then
+  say "commit-msg: subject is ${#subject} characters, limit is 72"
+  fail=1
+fi
+
+case "$subject" in
+  *.) say "commit-msg: subject ends with a period"; fail=1 ;;
+esac
+
+# Imperative-ish: reject the common gerund/third-person openings.
+verb="$(printf '%s' "$subject" | sed -E 's/^[a-z]+(\([^)]*\))?!?: //' | cut -d' ' -f1)"
+case "$verb" in
+  *ing|adds|added|fixes|fixed|updates|updated|removes|removed|changes|changed)
+    say "commit-msg: subject should be imperative — '$verb' is not"
+    fail=1 ;;
+esac
+
+# --- no attribution ----------------------------------------------------------
+if printf '%s' "$body" | grep -Eiq '^[[:space:]]*co-authored-by:'; then
+  say "commit-msg: Co-Authored-By trailer is not allowed (AGENTS.md § Commits)"
+  fail=1
+fi
+
+if printf '%s' "$body" | grep -Eiq 'generated with|🤖|noreply@anthropic\.com|claude\.com/claude-code'; then
+  say "commit-msg: tool or model attribution is not allowed (AGENTS.md § Commits)"
+  fail=1
+fi
+
+[ "$fail" -eq 0 ] || {
+  say ""
+  say "Message left in $msg_file — fix and re-commit."
+  exit 1
+}
+exit 0

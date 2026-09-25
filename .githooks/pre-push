@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# Three checks, run in parallel, before anything becomes public.
+# Conventions: AGENTS.md § Pushing
+#
+# 1  secrets            built-in patterns, plus gitleaks when installed
+# 2  commit messages    the conventions, across the whole pushed range
+# 3  publish disclosure what would become newly public; refuse never-publish paths
+#
+# Target: well under a second. Each check writes a report; the parent collects.
+set -u
+
+root="$(git rev-parse --show-toplevel)"
+never_publish="$root/.githooks/never-publish"
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+zero='0000000000000000000000000000000000000000'
+
+# ---- work out the commit range being pushed ---------------------------------
+# stdin: <local ref> <local sha> <remote ref> <remote sha>
+ranges=""
+while read -r _lref lsha _rref rsha; do
+  [ "$lsha" = "$zero" ] && continue                      # deletion, nothing to inspect
+  if [ "$rsha" = "$zero" ]; then
+    # New branch. "New" means not already reachable from any other remote ref.
+    ranges="$ranges $lsha --not --remotes"
+  else
+    ranges="$ranges $rsha..$lsha"
+  fi
+done
+[ -n "${ranges// /}" ] || exit 0
+
+commits="$(git rev-list $ranges 2>/dev/null)"
+[ -n "$commits" ] || exit 0
+count="$(printf '%s\n' "$commits" | wc -l | tr -d ' ')"
+
+# Added, copied, modified, renamed — deliberately NOT deleted. A push whose only
+# involvement with a never-publish path is removing it must not be refused: that
+# is someone fixing the mistake this guard exists to prevent.
+files="$(git diff --diff-filter=ACMR --name-only $ranges 2>/dev/null | sort -u)"
+# Disclosure counts every touched path, including deletions.
+files_all="$(git diff --name-only $ranges 2>/dev/null | sort -u)"
+
+# ---- 1 · secrets ------------------------------------------------------------
+check_secrets() {
+  local out="$tmp/secrets" hits=0
+  : > "$out"
+
+  # Built-in patterns. Always runs, so the guard is never simply absent.
+  local pat='(AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16})'
+  pat="$pat|(gh[pousr]_[A-Za-z0-9]{16,})"
+  pat="$pat|(sk-(ant|proj)-[A-Za-z0-9_-]{16,})"
+  pat="$pat|(-----BEGIN [A-Z ]*PRIVATE KEY-----)"
+  pat="$pat|(xox[baprs]-[A-Za-z0-9-]{10,})"
+  pat="$pat|((api[_-]?key|secret|passwd|password|token)[\"'\'' ]*[:=][\"'\'' ]*[A-Za-z0-9/+_-]{20,})"
+
+  if git diff $ranges -- . 2>/dev/null \
+     | grep -n '^+' | grep -Ei "$pat" > "$tmp/secrets.raw"; then
+    {
+      echo "SECRETS: built-in pattern scan matched"
+      sed -e 's/^/    /' -e 's/\(.\{110\}\).*/\1…/' "$tmp/secrets.raw" | head -10
+    } >> "$out"
+    hits=1
+  fi
+
+  if command -v gitleaks >/dev/null 2>&1; then
+    if ! gitleaks protect --staged --no-banner --redact -q >/dev/null 2>&1; then
+      echo "SECRETS: gitleaks reported findings — run 'gitleaks protect --staged -v'" >> "$out"
+      hits=1
+    fi
+    echo "mode=builtin+gitleaks" > "$tmp/secrets.mode"
+  else
+    echo "mode=builtin-only" > "$tmp/secrets.mode"
+  fi
+
+  return "$hits"
+}
+
+# ---- 2 · commit messages ----------------------------------------------------
+check_messages() {
+  local out="$tmp/messages" hits=0 c subject
+  : > "$out"
+  for c in $commits; do
+    subject="$(git log -1 --format=%s "$c")"
+    if ! printf '%s' "$subject" \
+      | grep -Eq '^(feat|fix|docs|refactor|test|chore)(\([a-z0-9._/-]+\))?!?: .+'; then
+      echo "MESSAGE: ${c:0:7} not a conventional commit — $subject" >> "$out"; hits=1
+    fi
+    if [ "${#subject}" -gt 72 ]; then
+      echo "MESSAGE: ${c:0:7} subject is ${#subject} chars (limit 72)" >> "$out"; hits=1
+    fi
+    if git log -1 --format=%B "$c" | grep -Eiq '^[[:space:]]*co-authored-by:|generated with|🤖|noreply@anthropic\.com'; then
+      echo "MESSAGE: ${c:0:7} carries an attribution trailer" >> "$out"; hits=1
+    fi
+  done
+  return "$hits"
+}
+
+# ---- 3 · publish disclosure + never-publish guard ---------------------------
+check_publish() {
+  local out="$tmp/publish" hits=0 pat f
+  : > "$out"
+  if [ -r "$never_publish" ]; then
+    while IFS= read -r pat; do
+      case "$pat" in ''|'#'*) continue ;; esac
+      printf '%s\n' "$files" | while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        case "$f" in
+          $pat) echo "NEVER-PUBLISH: $f matches '$pat'" >> "$out" ;;
+        esac
+      done
+    done < "$never_publish"
+    [ -s "$out" ] && hits=1
+  fi
+  return "$hits"
+}
+
+# ---- run all three in parallel ----------------------------------------------
+check_secrets  & p1=$!
+check_messages & p2=$!
+check_publish  & p3=$!
+wait "$p1"; r1=$?
+wait "$p2"; r2=$?
+wait "$p3"; r3=$?
+
+fail=$(( r1 + r2 + r3 ))
+mode="$(cat "$tmp/secrets.mode" 2>/dev/null || echo mode=unknown)"
+
+# ---- disclosure is printed whether or not anything failed -------------------
+{
+  echo ""
+  echo "pre-push — this push would newly publish:"
+  echo "    $count commit(s), $(printf '%s\n' "$files_all" | grep -c . ) file(s)"
+  git log --oneline --no-decorate $ranges 2>/dev/null | sed 's/^/      /' | head -12
+  echo "    secret scan: ${mode#mode=}"
+  [ "${mode#mode=}" = "builtin-only" ] && \
+    echo "      gitleaks not installed — coverage is reduced (brew install gitleaks)"
+  echo ""
+} >&2
+
+if [ "$fail" -ne 0 ]; then
+  for f in "$tmp/secrets" "$tmp/messages" "$tmp/publish"; do
+    [ -s "$f" ] && sed 's/^/  /' "$f" >&2
+  done
+  echo "" >&2
+  echo "  push refused. AGENTS.md § Pushing" >&2
+  echo "" >&2
+  exit 1
+fi
+exit 0
