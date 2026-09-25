@@ -1,122 +1,49 @@
-# AI-Native SDLC
+# ai-native-sdlc
 
-A research workspace for designing sequential, human-in-the-loop software delivery that turns cheap AI-generated code into small, reviewable, production-qualified chunks of value.
+How Okja builds software as an AI-native team — captured, kept current, and used on itself.
 
-This repository contains the research factory and the first slice of an installable plugin. The research defines the downstream product; the implemented `evidence-to-intent` skill turns explicitly supplied evidence into provisional intent and specification for human review.
+This repository does two things:
 
-## Thesis
+1. **States how mature AI-native teams work**, as of a date, with the evidence grade on every claim → [`STANDARDS.md`](STANDARDS.md)
+2. **Keeps that statement true**, through a scheduled process that looks for what changed, brings findings to a human, and proposes changes to our own way of working → [`process/`](process/)
 
-AI reduces the marginal cost of implementation but does not remove the cost of intent, verification, coordination, security, or production learning. An effective AI-native SDLC therefore augments human judgment with deterministic evidence instead of maximizing autonomous action.
+The second point is the one that matters. A standards document written once is wrong within a quarter. This repo is the loop that notices.
 
-## Method
+## The loop
 
-The workspace applies a 60/30/10 heuristic:
+```mermaid
+flowchart LR
+    S["<b>1 · Scan</b><br/>what changed since<br/>we last looked?"]
+    G1{{"human:<br/>interesting?"}}
+    A["<b>2 · Assess</b><br/>impact and<br/>blast radius for us"]
+    G2{{"human:<br/>explore it?"}}
+    P["<b>3 · Propose</b><br/>changes to our<br/>standards and skills"]
+    G3{{"human:<br/>adopt?"}}
+    U["<b>4 · Update</b><br/>STANDARDS.md<br/>and our skills"]
 
-- **60% deterministic actions:** exact sources, schemas, checks, commands, evidence formats, and pass conditions.
-- **30% orchestration:** stage routing, handoffs, checkpoints, risk tiers, and escalation.
-- **10% AI judgment:** claim classification, synthesis across conflicting evidence, and context-sensitive recommendations.
+    S --> G1 --> A --> G2 --> P --> G3 --> U
+    U -. "next cycle" .-> S
 
-The workflow is `discover → evaluate → synthesize → frame pilot`. Only stage `output/` directories hand work to another stage.
-
-## Current research question
-
-How should an engineering team move from AI automation pressure and cognitive dissonance toward sequential HITL augmentation, where the primary flow unit is the smallest independently valuable, human-reviewable, verifiable change?
-
-## Layout
-
-```text
-ai-native-sdlc/
-├── CLAUDE.md
-├── CONTEXT.md
-├── PRINCIPLES.md
-├── RESEARCH.md
-├── SOURCES.md
-├── PACKAGE-BUILDER-INTEGRATION.md
-├── PLUGIN-DESIGN.md
-├── EXTERNAL-IMPLEMENTATIONS.md
-├── _config/
-├── decisions/
-├── research/
-├── skills/
-│   ├── evidence-to-intent/
-│   ├── sdlc-scaffold/
-│   ├── shape-change/
-│   └── verify-change/
-├── examples/
-│   └── leaked-db-errors/   # worked example: compact + modular export forms
-├── tests/
-├── setup/
-├── shared/
-└── research/stages/
-    ├── 01-discover/
-    ├── 02-evaluate/
-    ├── 03-synthesize/
-    └── 04-frame-pilot/
+    classDef human fill:#fde68a,stroke:#b45309,color:#1c1917
+    classDef step fill:#e0f2fe,stroke:#0369a1,color:#0c1a2b
+    class G1,G2,G3 human
+    class S,A,P,U step
 ```
 
-## Design references
+Three human gates. Nothing advances a stage without a person deciding it should.
 
-- `PACKAGE-BUILDER-INTEGRATION.md` defines how research may inform a workflow package without replacing owner evidence or generating package-builder outputs.
-- `PLUGIN-DESIGN.md` proposes a thin research-to-pilot plugin, sibling-compatible manifests and tests, and handoff contracts for RLP and Skill Architect.
-- `EXTERNAL-IMPLEMENTATIONS.md` reviews two public article-derived implementations and records patterns to adopt, adapt cautiously, or reject.
-- `_config/research-card-schema.md` defines the atomic evidence format that prepares research for package selection.
-- `research/CONTEXT.md` routes a cold reader to five evaluated cards and their canonical source register.
-- `decisions/0001-thin-research-to-pilot-plugin.md` records the proposed plugin boundary awaiting owner acceptance.
-- `research/stages/03-synthesize/output/research-audit.md` and `cold-reader-walk-test.md` record the research-slice verification.
-- `research/stages/03-synthesize/output/workflow-specification.md` is the accepted research reference for intent-to-merge behavior.
-- `research/stages/03-synthesize/output/skill-system-options.md` compares four decompositions without treating skill names as final.
-- `skills/` contains installable skill drafts. Former `reference-implementation/` skills were promoted here; they remain research-backed until scripts and validators are added.
+## What's here
 
-## Plugin skills
-
-The repository packages the `evidence-led-delivery` plugin for Devin, Claude Code, Codex, and Cursor. The exported skills are:
-
-| Skill | Status | Purpose |
+| File | What it is | State |
 |---|---|---|
-| `evidence-to-intent` | Implemented with validators | Evaluate research into a provisional intent/specification for human review. |
-| `sdlc-scaffold` | Promoted; fixture tests added | Propose minimal project-local HITL workspace contracts; export an accepted contract to compact/modular proposal files under an isolated output root. |
-| `shape-change` | Promoted; validators and fixture tests | Turn a raw request into reviewed intent, value slice, and evidence plan. |
-| `verify-change` | Promoted; fixture tests added | Reconcile an implemented slice with accepted intent/evidence before merge review. |
-| `describe-workflow` | Implemented with validators | Inspect a repository into a versioned observation snapshot — claims with source locators, unresolved conflicts, gap report. Read-only on the inspected repo; not an accepted contract. |
-
-### First slice: `evidence-to-intent`
-
-```text
-explicit evidence
-    → deterministic shape validation
-    → applicability and contradiction review
-    → provisional intent/specification
-    → human accept | revise | reject
-```
-
-The skill never authorizes implementation. The deferred `reviewable-delivery` skill is deliberately absent from the first slice.
-
-### Install locally
-
-```bash
-# Devin
-devin plugins install .
-
-# Claude Code
-claude plugins install .
-```
-
-### Verify
-
-```bash
-tests/test_structure.sh
-tests/test_evidence_to_intent.sh
-tests/test_walk.sh
-tests/test_shape_change.sh
-tests/test_verify_change.sh
-tests/test_sdlc_scaffold.sh
-tests/test_workflow_contract.sh
-tests/test_export_equivalence.sh
-tests/test_loading_rules.sh
-tests/test_describe_workflow.sh
-tests/test_export_proposal.sh
-```
+| [`intent.md`](intent.md) | Why this repository exists and what we believe | drafted |
+| [`spec.md`](spec.md) | What V0 is, and what it is not yet | drafted |
+| [`STANDARDS.md`](STANDARDS.md) | How mature AI-native teams work, as of Q3 2026 | drafted |
+| [`process/01-scan/`](process/01-scan/) | Stage 1 — the scan | specified, not built |
+| Stages 2–4 | Assess, propose, update | named only |
 
 ## Status
 
-First plugin slice (`evidence-to-intent`) implemented locally and uncommitted; three additional skills promoted to `skills/` and hardened by fixture tests. Research outputs remain working insight rather than promoted repository learning. Pilot execution, `reviewable-delivery`, target-repository scaffolding, merge, deployment, and publication remain out of scope.
+**V0.** Nothing here is built yet — this is the intent, the spec, and the research it rests on. Stage 1 is specified so it can be argued with before it is written.
+
+The prototype this derives from is preserved on the `experiment/0.0.0` branch and will not be merged. It is reference: what we tried, and what an adversarial audit of it found.
