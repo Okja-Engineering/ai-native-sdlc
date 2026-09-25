@@ -1,0 +1,13 @@
+# Paths that must never reach a remote. One glob per line, matched against
+# every file in the range a push would newly publish.
+#
+# `.githooks/pre-push` refuses the push on a match. This is a hard refusal
+# rather than a warning: the whole point is that the local-to-remote boundary
+# is where a mistake stops being recoverable.
+#
+# Both entries below are also in .gitignore. They are repeated here because
+# .gitignore is advisory — `git add -f` defeats it, and a file already tracked
+# stays tracked. This list does not care how a path got into a commit.
+
+.scuba/*
+.devin/eval/*

@@ -1,40 +1,51 @@
-# Evidence-led delivery plugin router
+# Working in this repository
 
-This repository contains research and an installable plugin that turns evaluated evidence into owner-reviewed intent and specification. It never grants implementation, merge, deployment, RLP promotion, or skill-creation authority.
+The portable conventions. This file is the cross-tool standard and is read by agentic tools directly — there is deliberately no `CLAUDE.md`, because when both exist `CLAUDE.md` shadows this file rather than merging with it.
 
-## Route by task
+## Where things are
 
 | Task | Read |
 |---|---|
-| Resume work or report pilot readiness | `.devin/roadmap.md` |
-| Understand repository scope and research | `CONTEXT.md` |
-| Evaluate, filter, or synthesize explicit research into a provisional intent/specification | `skills/evidence-to-intent/SKILL.md` |
-| Change evidence fields or statuses | `skills/evidence-to-intent/references/evidence-contract.md` |
-| Change specification output or review rules | `skills/evidence-to-intent/references/specification-contract.md` |
-| Propose minimal project-local HITL workspace contracts | `skills/sdlc-scaffold/SKILL.md` |
-| Export an accepted workflow contract to compact/modular proposal files | `skills/sdlc-scaffold/scripts/export-proposal.sh` |
-| Turn a raw request into reviewed intent, value slice, and evidence plan | `skills/shape-change/SKILL.md` |
-| Reconcile an implemented slice with accepted intent/evidence before merge review | `skills/verify-change/SKILL.md` |
-| Understand the lifecycle through the worked example | `examples/leaked-db-errors/README.md` |
-| Describe a repository's current workflow as an observation snapshot | `skills/describe-workflow/SKILL.md` |
-| Select the smallest justified improvement from established owner facts | `skills/select-improvement/SKILL.md` |
-| Evaluate observed evidence against accepted outcome targets and emit a receipt | `skills/evaluate-outcome/SKILL.md` |
-| Change the workflow contract schema | `_config/workflow-contract-schema.md` |
-| Change the observation schema | `_config/workflow-observation-schema.md` |
-| Change the owner-facts selection view | `_config/owner-facts-schema.md` |
-| Check plugin structure | `tests/test_structure.sh` |
-| Run evidence-to-intent validator tests | `tests/test_evidence_to_intent.sh` |
-| Walk the first slice | `tests/test_walk.sh` |
-| Check workflow contracts, export equivalence, loading rules | `tests/test_workflow_contract.sh`, `tests/test_export_equivalence.sh`, `tests/test_loading_rules.sh` |
-| Check observation snapshots, interview input, snapshot behavior | `tests/test_describe_workflow.sh` |
-| Check improvement selection, fact states, dependency graph | `tests/test_select_improvement.sh` |
+| Why this repository exists | [`intent.md`](intent.md) |
+| What V0 is, and is not yet | [`spec.md`](spec.md) |
+| How mature AI-native teams work, Q3 2026 | [`STANDARDS.md`](STANDARDS.md) |
+| The scan stage, specified | [`process/01-scan/README.md`](process/01-scan/README.md) |
+| Commit and push conventions | this file, below |
 
-## Rules
+## Commits
 
-- Load this router, the selected skill, and only references named by that skill.
-- Preserve E, D, R, A, and Q provenance; owner corrections outrank summaries.
-- Mark missing required facts `NOT FOUND` and stop at the stated human boundary.
-- Deterministic checks validate shape, not truth, applicability, intent, or risk.
-- Do not create delivery, merge, deployment, RLP, or Skill Architect artifacts.
-- File existence is not approval; require explicit review fields.
-- Use Bash for repository scripts. Use Go only when logic is too complex to keep safe and readable in Bash. Do not add Python scripts.
+- **Conventional commits.** `type(scope): subject` — imperative, lower case, no trailing period.
+- Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
+- Subject ≤ 72 characters. Add a body only when the *why* isn't obvious from the subject.
+- **No attribution trailers.** No `Co-Authored-By`, no tool or model credit, in commit messages or pull request bodies. The author field is the author.
+- One logical change per commit.
+
+Enforced by `.githooks/commit-msg`.
+
+## Pushing
+
+A push is the moment work becomes public, and this repository is public. `.githooks/pre-push` runs three checks in parallel and is expected to finish in well under a second:
+
+1. **Secrets** — a built-in pattern scan over the commits being pushed, plus `gitleaks` when it is installed. The built-in check always runs, so the guard is never simply absent.
+2. **Commit messages** — the conventions above, re-checked across the whole pushed range. This catches anything that reached the branch by `--no-verify`, an amend, or a rebase.
+3. **Publish disclosure** — prints exactly which commits and how many files would become newly public, and **refuses** if any of them touch a never-publish path.
+
+Never-publish paths are listed in `.githooks/never-publish`. They currently cover the orchestration control plane and local working state.
+
+> The disclosure check exists because of a real incident: a branch was pushed to this public repository carrying commits that had not been chosen for publication. Nothing in the tooling made the blast radius of a push visible beforehand. This makes it visible.
+
+## Enable the hooks
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Hooks live in the repository rather than each person's `.git/hooks`, so they apply to everyone and to any agent working here.
+
+## Conventions that apply to writing, not just code
+
+- **No claim about speed, throughput, velocity or cycle time.** Not in documents, not in commit messages, not in comments. The north star is better software, not faster.
+- **A prose promise is not a control.** If a boundary matters, something has to refuse. If nothing refuses, say the boundary is asserted rather than enforced.
+- **Grade every claim.** `STANDARDS.md` has the scheme. Vendor material is vendor methodology, never independent outcome evidence.
+- **State what is unresolved as unresolved.** An open question written down is worth more than a confident answer that is wrong.
+- **Do not describe a capability this repository does not have.** Mark state honestly: drafted, specified, built.
