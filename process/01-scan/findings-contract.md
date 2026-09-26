@@ -140,7 +140,7 @@ A vendor saying their tool improves something is recorded as *what the vendor cl
 
 ## The boundary stage 1 must not cross
 
-Stage 1 has no authority to judge what a finding means. *"What does this mean for us"* is stage 2, behind a human gate, and a finding that arrives pre-judged has skipped that gate. This is the boundary the whole stage rests on, and it is enforced two ways.
+Stage 1 has no authority to judge what a finding means. *"What does this mean for us"* belongs to the assess stage, behind a human gate — a stage that is named and not built — and a finding that arrives pre-judged has skipped that gate. This is the boundary the whole stage rests on, and it is enforced two ways.
 
 **Structurally**, which is the reliable half: the columns, the field keys and the section headings are fixed. There is no field for a verdict, and an added one is refused.
 
