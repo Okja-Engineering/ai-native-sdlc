@@ -1,6 +1,8 @@
 # Stage 1 — Scan
 
-**Status:** specified, not built. This document exists to be argued with before code is written.
+**Status:** specified, and partly built. The record shape is declared in [`findings-contract.md`](findings-contract.md) and a gate refuses a file that breaks it ([`validate-findings.sh`](validate-findings.sh)); the cycle itself is a written instruction a person runs ([`scan.md`](scan.md)). Nothing is scheduled and no classifier exists.
+
+This document remains the specification, and the place to argue with the stage.
 
 **Authority:** none. This stage reads, records, and stops. It does not assess impact, does not rank, does not decide, and cannot advance anything. Everything downstream is behind a human gate.
 
@@ -75,9 +77,14 @@ A dismissal is recorded rather than deleted, for two reasons: next cycle needs t
 - Its dismissals, read back three months later, still look right.
 - A finding's source resolved when someone checked it.
 
+## Settled in building it
+
+1. **"Since we last looked" anchors to the most recent file in `findings/`**, skipping any marked `example: yes`. No state outside git. An empty directory is a first run, which records `since: first run` and covers the thirty days before the cycle date.
+2. **A finding is a row** in a per-cycle file. Revisit on volume.
+3. **One agent per source**, merged into one cycle file. Different sources fail differently, and one agent averaging three failure modes reports the average.
+
 ## Open
 
-1. What "since we last looked" anchors to — a stored date, or the most recent findings file. The second needs no state outside git.
-2. Whether a finding is a row in a per-cycle file or its own file. Leaning rows; revisit on volume.
-3. How a superseded finding is recorded — amended in place, or a new finding that points at the old one. This matters, because supersession is the kind we most want to catch and the kind most likely to be quietly overwritten.
-4. Whether the scan is one agent or one per source. Different sources fail differently, and one agent averaging across three failure modes may be worse than three narrow ones.
+1. How a superseded finding is recorded — amended in place, or a new finding that points at the old one. This matters, because supersession is the kind we most want to catch and the kind most likely to be quietly overwritten. Nothing in the contract settles it yet.
+2. The specific source list — one tool named in discussion did not transcribe cleanly and is deliberately not guessed at — and whether paid search or fetch is in scope, and at what cost per cycle.
+3. Where a dismissal is recorded. This stage writes findings and stops; the assess stage does not exist.

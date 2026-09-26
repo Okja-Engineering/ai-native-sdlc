@@ -10,6 +10,10 @@ The portable conventions. This file is the cross-tool standard and is read by ag
 | What V0 is, and is not yet | [`spec.md`](spec.md) |
 | How mature AI-native teams work, Q3 2026 | [`STANDARDS.md`](STANDARDS.md) |
 | The scan stage, specified | [`process/01-scan/README.md`](process/01-scan/README.md) |
+| The shape of a findings file, declared once | [`process/01-scan/findings-contract.md`](process/01-scan/findings-contract.md) |
+| How to run a scan cycle | [`process/01-scan/scan.md`](process/01-scan/scan.md) |
+| Check a findings file before it is committed | `process/01-scan/validate-findings.sh` |
+| Run every test suite | `tests/run-all.sh` |
 | Commit and push conventions | this file, below |
 
 ## Commits
