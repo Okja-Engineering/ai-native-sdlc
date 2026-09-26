@@ -14,11 +14,13 @@ Four documents and one stage specification. No code.
 | `STANDARDS.md` — how mature AI-native teams work, Q3 2026, graded | written |
 | `spec.md` — this document | written |
 | `README.md` — the loop, and what's here | written |
-| `process/01-scan/` — the scan stage, specified | specified, **not built** |
+| `process/01-scan/` — the scan stage | **built** — contract, gate, instruction, worked example |
 
 ## What V0 is not
 
-Stages 2–4 (assess, propose, update) are **named only.** No classifier. No tooling — no CLI, no MCP server, no skills. No scheduled job. Nothing runs.
+Stages 2–4 (assess, propose, update) are **named only.** No classifier. No CLI, no MCP server, no scheduled job.
+
+Stage 1 is built, and what "built" means is narrow: the findings **contract**, a deterministic **gate** that refuses a findings file breaking it, and the **instruction** for running a cycle. A scan has not been run — the source list is still open, so nothing has produced a real findings file.
 
 This is on purpose. Stage 1's output shape determines everything downstream, and the cheapest time to get it wrong is now.
 
