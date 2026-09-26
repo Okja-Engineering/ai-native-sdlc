@@ -193,4 +193,32 @@ STATUS=$?
 assert_status 2 "$STATUS" "a contract with no declared lists stops the gate"
 assert_contains "$OUT" "would pass everything" "a hollow contract says the gate would otherwise pass everything"
 
+# --- the contract is the only place the shape is declared ---------------------
+# Not a grep for duplication: change the contract, and the gate's verdict has to
+# change with it. If the gate carried its own copy of a list, this would not.
+
+widened="$TMP/widened-contract.md"
+awk '{ print } /^- `sentiment-shift`$/ { print "- `big-news`" }' "$CONTRACT" > "$widened"
+if grep -Fq -- '- `big-news`' "$widened"; then
+  assert_pass "the widened contract really declares the extra kind"
+else
+  assert_fail "the widened contract really declares the extra kind" "the fixture edit did not land, so the case below would prove nothing"
+fi
+with_new_kind="$(prepare "$WITH_FINDINGS" 2026-10-01.md 's/release-or-capability/big-news/')"
+
+gate "$with_new_kind"
+assert_status 1 "$STATUS" "a kind the contract does not declare is refused"
+
+OUT="$(FINDINGS_CONTRACT="$widened" bash "$GATE" "$with_new_kind" 2>&1)"
+STATUS=$?
+assert_status 0 "$STATUS" "the same file passes once the contract declares that kind"
+
+for value in release-or-capability practice-change milestone-or-event counter-evidence sentiment-shift; do
+  if grep -Fq -- "$value" "$GATE"; then
+    assert_fail "the gate carries no copy of the kind \"$value\"" "found it in $GATE"
+  else
+    assert_pass "the gate carries no copy of the kind \"$value\""
+  fi
+done
+
 assert_done
