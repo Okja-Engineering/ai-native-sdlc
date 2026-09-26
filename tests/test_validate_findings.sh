@@ -158,6 +158,27 @@ gate "$(prepare "$WITH_FINDINGS" 2026-02-30.md)"
 assert_status 1 "$STATUS" "a date-shaped filename that is not a date is refused"
 assert_contains "$OUT" "shaped like a date but is not one" "a bad date filename says so"
 
+# --- required cells, and fields that appear twice -----------------------------
+
+gate "$(prepare "$WITH_FINDINGS" 2026-10-01.md 's/| A platform shipped a review gate that a person configures per repository. |/|  |/')"
+assert_status 1 "$STATUS" "a finding with an empty what cell is refused"
+assert_contains "$OUT" "the what cell is empty" "an empty what cell says which cell is empty"
+
+gate "$(prepare "$WITH_FINDINGS" 2026-10-01.md 's/| verify (guess) | medium |/|  | medium |/')"
+assert_status 1 "$STATUS" "a finding with an empty might-affect cell is refused"
+assert_contains "$OUT" "the might affect cell is empty" "an empty might-affect cell says which cell is empty"
+
+mkdir -p "$TMP/duplicate-field"
+awk '{ print } /^since: 2026-09-01$/ { print "since: 2026-08-01" }' \
+  "$WITH_FINDINGS" > "$TMP/duplicate-field/2026-10-01.md"
+gate "$TMP/duplicate-field/2026-10-01.md"
+assert_status 1 "$STATUS" "a field that appears twice is refused"
+assert_contains "$OUT" 'the "since" field appears 2 times' "a duplicated field says how many times it appeared"
+
+gate "$(prepare "$WITH_FINDINGS" 2026-10-01.md 's/^example: yes/example: perhaps/')"
+assert_status 1 "$STATUS" "an example field outside yes/no is refused"
+assert_contains "$OUT" 'the "example" field is "perhaps"' "a bad example value names what it rejected"
+
 # --- the boundary: stage 1 may not judge what a finding means -----------------
 
 gate "$(prepare "$WITH_FINDINGS" 2026-10-01.md 's/| A platform shipped a review gate that a person configures per repository./| We should move our own review gate, and this is why./')"
