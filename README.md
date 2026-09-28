@@ -40,11 +40,16 @@ Three human gates. Nothing advances a stage without a person deciding it should.
 | [`intent.md`](intent.md) | Why this repository exists and what we believe | drafted |
 | [`spec.md`](spec.md) | What V0 is, and what it is not yet | drafted |
 | [`STANDARDS.md`](STANDARDS.md) | How mature AI-native teams work, as of Q3 2026 | drafted |
-| [`process/01-scan/`](process/01-scan/) | Stage 1 — the scan | specified, not built |
+| [`process/01-scan/README.md`](process/01-scan/README.md) | Stage 1 — the scan, specified | specified |
+| [`process/01-scan/findings-contract.md`](process/01-scan/findings-contract.md) | The shape of a findings file, declared once | built |
+| [`process/01-scan/validate-findings.sh`](process/01-scan/validate-findings.sh) | The gate that refuses a findings file breaking that contract | built |
+| [`process/01-scan/scan.md`](process/01-scan/scan.md) | How a cycle is run: three source agents, one merged file | built, as an instruction |
+| [`process/01-scan/findings/`](process/01-scan/findings/) | One file per cycle. Currently a worked example only | built |
+| [`tests/`](tests/) | `run-all.sh` over the suites, and the assertions they use | built |
 | Stages 2–4 | Assess, propose, update | named only |
 
 ## Status
 
-**V0.** Nothing here is built yet — this is the intent, the spec, and the research it rests on. Stage 1 is specified so it can be argued with before it is written.
+**V0.** Stage 1 records and stops: the shape of a findings file is declared, a gate refuses a file that breaks it, and the cycle itself is a written instruction a person runs. **Nothing is scheduled and nothing runs on its own.** Stages 2–4 are names.
 
 The prototype this derives from is preserved on the `experiment/0.0.0` branch and will not be merged. It is reference: what we tried, and what an adversarial audit of it found.
