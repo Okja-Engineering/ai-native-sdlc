@@ -34,7 +34,7 @@ The second half is the point. A release note tells you a capability shipped. It 
 
 Each source is weak in a way the others are not, which is why the list has three entries rather than one.
 
-**Unsettled:** the specific source list, whether paid search or fetch is in scope, and the per-cycle cost. One tool named in discussion did not transcribe cleanly and is deliberately not guessed at here — a wrong tool name in a standards document is worse than a missing one.
+**Unsettled:** whether paid search or fetch is in scope, and the per-cycle cost.
 
 ## What it produces
 
@@ -86,5 +86,5 @@ A dismissal is recorded rather than deleted, for two reasons: next cycle needs t
 ## Open
 
 1. How a superseded finding is recorded — amended in place, or a new finding that points at the old one. This matters, because supersession is the kind we most want to catch and the kind most likely to be quietly overwritten. Nothing in the contract settles it yet.
-2. The specific source list — one tool named in discussion did not transcribe cleanly and is deliberately not guessed at — and whether paid search or fetch is in scope, and at what cost per cycle.
+2. Whether paid search or fetch is in scope, and at what cost per cycle. X was reachable in cycle 2026-09-29 only through unauthenticated surfaces, which leaves reply threads — where retractions sit — uncovered.
 3. Where a dismissal is recorded. This stage writes findings and stops; the assess stage does not exist.

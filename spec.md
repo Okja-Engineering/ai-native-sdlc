@@ -85,7 +85,7 @@ Move to weekly or daily only when a classifier exists and has been wrong in fron
 
 ## Open, to settle before stage 1 is built
 
-- **Source list and tool naming.** One tool came up in discussion and its name did not transcribe cleanly. Names going into a standards document need to be right, so the source list is unsettled.
+- **Whether three sources are the right three**, and whether paid search or fetch is in scope. Cycle 2026-09-29 reached X only through unauthenticated surfaces.
 - **What "since we last looked" is anchored to** — a stored date, or the last findings file in the repo. The second is self-describing and needs no state outside git.
 - **Whether a finding is one file or one row.** Per-finding files diff well and are addressable; a single table per cycle reads faster. Leaning per-cycle file containing rows, and revisiting when volume says otherwise.
 - **Whether stage 1 may use paid search or fetch at all**, and what that costs per cycle.

@@ -64,7 +64,7 @@ Required. One line per source in the declared source list, each naming the groun
 
 A source that returned nothing still gets a line saying what was covered. A source that could not be reached gets a line saying so — an unreachable source is a gap in the cycle, and a missing line hides it.
 
-**The source list has a known gap.** One tool named in discussion did not transcribe cleanly and is deliberately not guessed at. A wrong tool name in a standards document is worse than a missing one, so the gap is stated and stays stated until someone names the tool.
+**A source that could not be reached is recorded, not omitted.** An unreachable, rate-limited or walled source gets a line in `## Looked at` saying so. A reader cannot otherwise tell a quiet month from a shallow look, and that ambiguity is where a scan rots.
 
 ## `## Findings`
 
