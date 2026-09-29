@@ -66,7 +66,7 @@ One file, `findings/<cycle date>.md`, in the shape [`findings-contract.md`](find
 2. Write `## Looked at` with one line per source, from each agent's coverage line. A source that failed or was unreachable gets a line saying so — a missing line hides whether it ran at all.
 3. Write `## Findings`, one row per finding, **ordered by `dated`, oldest first.** A mechanical order carries no opinion; any other order is a ranking.
 4. **Collapse only identical locators.** Two sources describing the same event stay two rows. Deciding they are the same event is a judgment, and this stage does not make judgments — it also loses the fact that two independent sources carried it.
-5. Carry the source-list gap forward as a note: one tool named in discussion did not transcribe cleanly and is deliberately not guessed at, so a cycle covers three sources rather than four. A wrong tool name in a standards document is worse than a missing one.
+5. Record what each source could not reach, in its `## Looked at` line. A source that was unreachable, rate-limited or behind a wall gets a line saying so. Without it a reader cannot tell a quiet month from a shallow look, and that ambiguity is where a scan rots.
 
 ## 4 · Run the gate
 
@@ -88,7 +88,7 @@ A person then reads the file and decides, per finding: **interesting** · **not 
 
 Carried from [`README.md`](README.md), unchanged by building this:
 
-1. **The source list has a gap** — the tool that did not transcribe cleanly. Stated, not guessed.
+1. **Whether three sources are the right three.** Cycle 2026-09-29 found the web good for what shipped, YouTube good for how teams say they now work, and X reachable only through unauthenticated surfaces.
 2. **Whether paid search or fetch is in scope**, and the cost of a cycle.
 3. **Where a dismissal is recorded.** This stage writes findings only.
 4. **How a superseded finding is recorded** — amended in place, or a new row pointing at the old one. This matters most of all, because supersession is the kind we most want to catch and the kind most easily overwritten in silence.
