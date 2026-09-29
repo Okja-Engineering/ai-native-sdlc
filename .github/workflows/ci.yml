@@ -88,6 +88,19 @@ jobs:
   claims:
     # AGENTS.md forbids any claim about speed. That was a prose promise with
     # nothing behind it; this is the check.
+    #
+    # Scope: everything WE write. The record of what other people said is
+    # excluded, because two of this repo's own rules collide there — AGENTS.md
+    # forbids speed claims in documents, while the scan and discovery contracts
+    # *require* recording a vendor's claim as a claim. A findings row reading
+    # `TypeSafe states "193.6x Faster"` is the repository doing its job, not the
+    # repository claiming speed.
+    #
+    # The exclusion is by directory rather than by phrasing on purpose. A lexical
+    # rule that tried to tell "we claim X" from "they claim X" would be guessing
+    # at attribution; the directory boundary is one that already exists in the
+    # design. Those files carry their own constraint instead: every row needs a
+    # resolving source, so an unattributed claim cannot live there anyway.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -97,8 +110,16 @@ jobs:
           set -u
           # Matches are reported with context so a false positive is obvious and
           # the fix is to rephrase, not to weaken the pattern.
-          if git grep -nEi '\b(makes? (us|it|teams?) faster|ships? faster|speeds? up delivery|velocity (gain|improvement)|cycle.time (reduction|improvement)|[0-9]+x (faster|productivity))\b' \
-             -- '*.md' > /tmp/hits 2>/dev/null; then
+          #
+          # No \b anchors. macOS git grep (2.50.1, Apple Git-155) does not honour
+          # them and silently matches nothing, while Linux git does — so the
+          # anchored version fired in CI and did nothing on a developer's machine,
+          # which is the worst of both. The phrases are specific enough that word
+          # boundaries bought little. Verified on both platforms.
+          if git grep -nEi '(makes? (us|it|teams?) faster|ships? faster|speeds? up delivery|velocity (gain|improvement)|cycle.time (reduction|improvement)|[0-9]+x (faster|productivity))' \
+             -- '*.md' \
+             ':(exclude)process/*/findings/*' \
+             ':(exclude)process/*/topics/*' > /tmp/hits 2>/dev/null; then
             echo "::error::a speed or velocity claim appears in a tracked document"
             sed 's/^/  /' /tmp/hits
             echo "AGENTS.md: the north star is better software, not faster."

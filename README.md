@@ -44,9 +44,11 @@ Three human gates. Nothing advances a stage without a person deciding it should.
 | [`process/01-scan/findings-contract.md`](process/01-scan/findings-contract.md) | The shape of a findings file, declared once | built |
 | [`process/01-scan/validate-findings.sh`](process/01-scan/validate-findings.sh) | The gate that refuses a findings file breaking that contract | built |
 | [`process/01-scan/scan.md`](process/01-scan/scan.md) | How a cycle is run: three source agents, one merged file | built, as an instruction |
-| [`process/01-scan/findings/`](process/01-scan/findings/) | One file per cycle. Currently a worked example only | built |
+| [`process/01-scan/findings/`](process/01-scan/findings/) | One file per cycle. `2026-09-29` is the first real one — 64 findings | built and run |
+| [`process/02-discover/topics/`](process/02-discover/topics/) | Deep discovery on one question. First topic: classifier models | run once |
+| [`process/02-discover/discovery-contract.md`](process/02-discover/discovery-contract.md) | The shape that artifact turned out to need — derived from it, not designed ahead | asserted, not enforced |
 | [`tests/`](tests/) | `run-all.sh` over the suites, and the assertions they use | built |
-| Stages 2–4 | Assess, propose, update | named only |
+| Define, Develop, Deliver | The phases after discovery | named only |
 
 ## Status
 
