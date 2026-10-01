@@ -50,7 +50,9 @@ Three human gates. Nothing advances a stage without a person deciding it should.
 | [`tests/`](tests/) | `run-all.sh` over the suites, and the assertions they use | built |
 | [`process/03-define/cycles/`](process/03-define/cycles/) | A cycle converged into themes. First: `2026-09-29`, 64 findings into 7 themes and 3 outliers | run once |
 | [`process/03-define/define-contract.md`](process/03-define/define-contract.md) | The shape that artifact needed — derived from it, not designed ahead | asserted, not enforced |
-| Develop, Deliver | The second diamond | named only |
+| [`process/04-develop/options/`](process/04-develop/options/) | A problem diverged into options, none chosen. First: producing themes | run once |
+| [`process/04-develop/develop-contract.md`](process/04-develop/develop-contract.md) | The shape that artifact needed — derived from it, not designed ahead | asserted, not enforced |
+| Deliver | Converge on one option and ship it | named only |
 
 ## Status
 

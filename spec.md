@@ -16,7 +16,8 @@ Four documents and one stage specification. No code.
 | `README.md` — the loop, and what's here | written |
 | `process/01-scan/` — the scan stage | **built and run** — contract, gate, instruction, one real cycle |
 | `process/02-discover/` — topic discovery | **run once**, contract derived from it, no gate |
-| `process/03-define/` — converge a cycle into themes | **run once**, contract derived from it, no gate |
+| `process/03-define/` — converge a cycle into themes, and a theme into a problem | **run once**, contract derived from it, no gate |
+| `process/04-develop/` — diverge a problem into options | **run once**, contract derived from it, no gate |
 
 ## What V0 is not
 
@@ -24,7 +25,7 @@ There is still no classifier, no CLI, no MCP server, and no scheduled job. Nothi
 
 **Stage 1 is built and has been run.** Cycle `2026-09-29` produced 64 findings across three sources, and the gate refused the first draft before accepting it. Discovery has been run once, on the classifier question, and `process/02-discover/discovery-contract.md` describes the shape that artifact turned out to need — **derived from it rather than designed ahead of it, and asserted rather than enforced**, because one artifact is not enough to know which parts are real.
 
-**Define has been run once**, converging cycle `2026-09-29`'s 64 findings into seven themes and three outliers, with every finding accounted for. **Develop and Deliver do not exist**, so there is still nowhere to record the human's per-theme decision.
+**Define has been run once**, converging cycle `2026-09-29`'s 64 findings into seven themes and three outliers, with every finding accounted for. **Develop has been run once**, diverging one stated problem into six options with no choice made. **Deliver does not exist**, so an option set still has nowhere to resolve to and the human's decision still has nowhere to live.
 
 > **This section has gone stale twice within days of shipping.** It said "specified, not built" after the stage was built, then "a scan has not been run" after one had. Both were caught only because someone read it. Worth naming rather than quietly fixing a third time: a document stating the state of the work is wrong by default the moment the work moves, and nothing here checks it.
 
