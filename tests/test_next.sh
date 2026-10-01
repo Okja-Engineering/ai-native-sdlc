@@ -30,8 +30,23 @@ t="$(fresh done)"
 out="$(run "$t" 2026-09-29 producing-themes)"; rc=$?
 assert_status 0 "$rc" "a complete cycle exits 0"
 assert_contains "$out" "Nothing missing" "it says nothing is missing"
-assert_contains "$out" "AWAITING A HUMAN" "it names the decision still waiting"
+
+# --- a pending decision is called out -----------------------------------------
+# These two first asserted against the shipped record while its `chosen:` was
+# `pending`, and went red the moment a real decision was made — a test pinned to
+# transient data rather than to behaviour. The pending state is now constructed
+# here, so the assertion survives the artifact being decided, undecided, or
+# superseded.
+t="$(fresh pending)"
+perl -0pi -e 's/^chosen: .*$/chosen: pending/m' "$t/process/05-deliver/decisions/producing-themes.md"
+out="$(run "$t" 2026-09-29 producing-themes)"
+assert_contains "$out" "AWAITING A HUMAN" "it names a decision still waiting"
 assert_contains "$out" "not mine to write" "it says the decision is not its to make"
+
+t="$(fresh decided)"
+perl -0pi -e 's/^chosen: .*$/chosen: F/m' "$t/process/05-deliver/decisions/producing-themes.md"
+out="$(run "$t" 2026-09-29 producing-themes)"
+assert_not_contains "$out" "AWAITING A HUMAN" "a decided record is not reported as waiting"
 
 # --- scaffolds define ---------------------------------------------------------
 t="$(fresh define)"
