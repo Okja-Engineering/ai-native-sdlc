@@ -48,7 +48,9 @@ Three human gates. Nothing advances a stage without a person deciding it should.
 | [`process/02-discover/topics/`](process/02-discover/topics/) | Deep discovery on one question. First topic: classifier models | run once |
 | [`process/02-discover/discovery-contract.md`](process/02-discover/discovery-contract.md) | The shape that artifact turned out to need — derived from it, not designed ahead | asserted, not enforced |
 | [`tests/`](tests/) | `run-all.sh` over the suites, and the assertions they use | built |
-| Define, Develop, Deliver | The phases after discovery | named only |
+| [`process/03-define/cycles/`](process/03-define/cycles/) | A cycle converged into themes. First: `2026-09-29`, 64 findings into 7 themes and 3 outliers | run once |
+| [`process/03-define/define-contract.md`](process/03-define/define-contract.md) | The shape that artifact needed — derived from it, not designed ahead | asserted, not enforced |
+| Develop, Deliver | The second diamond | named only |
 
 ## Status
 
