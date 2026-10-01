@@ -5,9 +5,16 @@ How Okja builds software as an AI-native team — captured, kept current, and us
 This repository does two things:
 
 1. **States how mature AI-native teams work**, as of a date, with the evidence grade on every claim → [`STANDARDS.md`](STANDARDS.md)
-2. **Keeps that statement true**, through a scheduled process that looks for what changed, brings findings to a human, and proposes changes to our own way of working → [`process/`](process/)
+2. **Keeps that statement true**, through a process that looks for what changed, brings findings to a human, and proposes changes to our own way of working → [`process/`](process/)
 
 The second point is the one that matters. A standards document written once is wrong within a quarter. This repo is the loop that notices.
+
+**The loop's subject is us.** It scans what is changing in how teams build software, converges the noise into something a person can read, and the thing that comes out the other end is a change to our own standards or our own tools. It is pointed at itself, which is the only reason it is worth running rather than reading.
+
+Two examples of that, both real, both in the tree:
+
+- **Inward.** A cycle produced 64 findings — more than anyone reads, which is a defect in the loop itself. That went through Define, Develop and Deliver and came out as a dated decision about how themes get produced, with a tripwire so that waiting could not quietly become the answer.
+- **Outward, returning inward.** The scan caught a vendor shipping agent approval of pull requests. Define found that whether it collides with [`STANDARDS.md`](STANDARDS.md) §3 turns entirely on what the word *"separate"* is doing in our own sentence. An external capability went in; a question about our own writing came out.
 
 ## The loop
 
@@ -34,36 +41,33 @@ Three human gates. Nothing advances a stage without a person deciding it should.
 
 ## What's here
 
-| File | What it is | State |
-|---|---|---|
-| [`AGENTS.md`](AGENTS.md) | How to work here — conventions, enforced by `.githooks/` locally and by CI where they cannot be skipped | built |
-| [`intent.md`](intent.md) | Why this repository exists and what we believe | drafted |
-| [`spec.md`](spec.md) | What V0 is, and what it is not yet | drafted |
-| [`STANDARDS.md`](STANDARDS.md) | How mature AI-native teams work, as of Q3 2026 | drafted |
-| [`process/01-scan/README.md`](process/01-scan/README.md) | Stage 1 — the scan, specified | specified |
-| [`process/01-scan/findings-contract.md`](process/01-scan/findings-contract.md) | The shape of a findings file, declared once | built |
-| [`process/01-scan/validate-findings.sh`](process/01-scan/validate-findings.sh) | The gate that refuses a findings file breaking that contract | built |
-| [`process/01-scan/scan.md`](process/01-scan/scan.md) | How a cycle is run: three source agents, one merged file | built, as an instruction |
-| [`process/01-scan/findings/`](process/01-scan/findings/) | One file per cycle. `2026-09-29` is the first real one — 64 findings | built and run |
-| [`process/02-discover/topics/`](process/02-discover/topics/) | Deep discovery on one question. `classifier-models`, then `agent-pr-approval` | **run twice** — the contract held |
-| [`process/02-discover/discovery-contract.md`](process/02-discover/discovery-contract.md) | The shape that artifact turned out to need — derived from it, not designed ahead | asserted, not enforced |
-| [`tests/`](tests/) | `run-all.sh` over the suites, and the assertions they use | built |
-| [`process/03-define/cycles/`](process/03-define/cycles/) | A cycle converged into themes. First: `2026-09-29`, 64 findings into 7 themes and 3 outliers | run once |
-| [`process/03-define/define-contract.md`](process/03-define/define-contract.md) | The shape that artifact needed — derived from it, not designed ahead | **3 of 5 checks enforced** |
-| [`process/04-develop/options/`](process/04-develop/options/) | A problem diverged into options, none chosen. First: producing themes | run once |
-| [`process/04-develop/develop-contract.md`](process/04-develop/develop-contract.md) | The shape that artifact needed — derived from it, not designed ahead | asserted, not enforced |
-| [`process/05-deliver/decisions/`](process/05-deliver/decisions/) | One choice, by a named person, with what is given up written down | **one decided** — `producing-themes`, F, with a tripwire |
-| [`process/05-deliver/deliver-contract.md`](process/05-deliver/deliver-contract.md) | The shape a decision needs | **gated** — a decision needs a named human |
-| [`process/05-deliver/validate-decision.sh`](process/05-deliver/validate-decision.sh) | Refuses a decision with no named person, no date, or an option that does not exist | built |
-| [`process/03-define/validate-define.sh`](process/03-define/validate-define.sh) | Refuses a cycle that drops a finding, omits its method, or has no outlier section | built |
-| [`bin/cycle.sh`](bin/cycle.sh) | Where every cycle is and what is missing. Reads the tree, writes nothing | built |
-| [`bin/next.sh`](bin/next.sh) | Starts the next artifact, with the fields and sections read out of the contract that declares them. Refuses to overwrite | built |
+| File | What it is for |
+|---|---|
+| [`AGENTS.md`](AGENTS.md) | How to work here — conventions, enforced by `.githooks/` locally and by CI where they cannot be skipped |
+| [`intent.md`](intent.md) | Why this repository exists and what we believe |
+| [`spec.md`](spec.md) | What V0 is, and what it is not |
+| [`STANDARDS.md`](STANDARDS.md) | How mature AI-native teams work, as of a date, graded |
+| [`process/01-scan/`](process/01-scan/) | Record what changed. A contract, a gate that refuses a file breaking it, and the instruction a person runs |
+| [`process/01-scan/findings/`](process/01-scan/findings/) | One findings file per cycle. Ranks nothing, drops nothing |
+| [`process/02-discover/`](process/02-discover/) | Establish what is true about one question, every claim graded and sourced. Recommends nothing |
+| [`process/03-define/`](process/03-define/) | Converge a cycle into themes, and a theme into a stated problem. A theme is a summary, not a filter |
+| [`process/03-define/validate-define.sh`](process/03-define/validate-define.sh) | Refuses a cycle that drops a finding, omits its method, or has no outlier section |
+| [`process/04-develop/`](process/04-develop/) | Diverge a problem into options, each with its cost and its failure mode. Chooses nothing |
+| [`process/05-deliver/`](process/05-deliver/) | Converge on one choice, with the accepted cost and a reversal condition |
+| [`process/05-deliver/validate-decision.sh`](process/05-deliver/validate-decision.sh) | Refuses a decision with no named person, no date, or an option that does not exist |
+| [`bin/cycle.sh`](bin/cycle.sh) | Where every cycle is and what is missing. Reads the tree, writes nothing |
+| [`bin/next.sh`](bin/next.sh) | Starts the next artifact, with its shape read from the contract that declares it. Refuses to overwrite |
+| [`tests/`](tests/) | `run-all.sh` over the suites, and the assertions they use |
+
+Each phase's contract was written **after** the artifact it describes, from what that artifact turned out to need — and is asserted rather than enforced until a second, differently shaped artifact shows which parts were real.
 
 ## Status
 
-**V0, and the loop has closed once.** All five phases have been run on cycle `2026-09-29` — 64 findings, 7 themes, 3 outliers, 2 problems, 6 options, and **one decision, made by a named person on 2026-10-01**: option F, measure two more cycles first, with a dated tripwire so waiting cannot quietly become the decision.
+```bash
+bin/cycle.sh
+```
 
-That is the thing worth checking before anything else here is believed. Four phases producing artifacts proves the method runs; a decision with a name on it, an accepted failure mode, and a reversal condition is the first evidence it produces an outcome. Three phases have gates. `bin/cycle.sh` says where a cycle is; `bin/next.sh` starts the artifact it needs next.
+That is the status. It reads the tree, so it is correct by construction. Counts are deliberately not repeated here — a hand-typed copy of what a script already computes went stale three times in days, caught by a reader every time and by a check never.
 
 **Nothing is scheduled and nothing runs on its own.** A person starts every cycle, and a person writes every judgement — `next.sh` produces the skeleton, and the gates refuse that skeleton until it is filled in.
 
