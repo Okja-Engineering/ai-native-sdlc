@@ -45,7 +45,7 @@ Three human gates. Nothing advances a stage without a person deciding it should.
 | [`process/01-scan/validate-findings.sh`](process/01-scan/validate-findings.sh) | The gate that refuses a findings file breaking that contract | built |
 | [`process/01-scan/scan.md`](process/01-scan/scan.md) | How a cycle is run: three source agents, one merged file | built, as an instruction |
 | [`process/01-scan/findings/`](process/01-scan/findings/) | One file per cycle. `2026-09-29` is the first real one — 64 findings | built and run |
-| [`process/02-discover/topics/`](process/02-discover/topics/) | Deep discovery on one question. First topic: classifier models | run once |
+| [`process/02-discover/topics/`](process/02-discover/topics/) | Deep discovery on one question. `classifier-models`, then `agent-pr-approval` | **run twice** — the contract held |
 | [`process/02-discover/discovery-contract.md`](process/02-discover/discovery-contract.md) | The shape that artifact turned out to need — derived from it, not designed ahead | asserted, not enforced |
 | [`tests/`](tests/) | `run-all.sh` over the suites, and the assertions they use | built |
 | [`process/03-define/cycles/`](process/03-define/cycles/) | A cycle converged into themes. First: `2026-09-29`, 64 findings into 7 themes and 3 outliers | run once |
@@ -61,7 +61,7 @@ Three human gates. Nothing advances a stage without a person deciding it should.
 
 ## Status
 
-**V0, and the loop has closed once.** All five phases have been run on cycle `2026-09-29` — 64 findings, 7 themes, 3 outliers, 1 problem, 6 options, and **one decision, made by a named person on 2026-10-01**: option F, measure two more cycles first, with a dated tripwire so waiting cannot quietly become the decision.
+**V0, and the loop has closed once.** All five phases have been run on cycle `2026-09-29` — 64 findings, 7 themes, 3 outliers, 2 problems, 6 options, and **one decision, made by a named person on 2026-10-01**: option F, measure two more cycles first, with a dated tripwire so waiting cannot quietly become the decision.
 
 That is the thing worth checking before anything else here is believed. Four phases producing artifacts proves the method runs; a decision with a name on it, an accepted failure mode, and a reversal condition is the first evidence it produces an outcome. Three phases have gates. `bin/cycle.sh` says where a cycle is; `bin/next.sh` starts the artifact it needs next.
 
