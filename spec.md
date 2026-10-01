@@ -20,6 +20,7 @@ Four documents and one stage specification. No code.
 | `process/04-develop/` — diverge a problem into options | **run once**, contract derived from it, no gate |
 | `process/05-deliver/` — converge on one choice | contract written and **gated**, first decision awaiting a human |
 | `bin/cycle.sh` — where everything is and what is missing | **built** |
+| `bin/next.sh` — start the next artifact, from the contract that declares it | **built** |
 
 ## What V0 is not
 
@@ -27,9 +28,11 @@ There is still no classifier, no CLI, no MCP server, and no scheduled job. Nothi
 
 **Stage 1 is built and has been run.** Cycle `2026-09-29` produced 64 findings across three sources, and the gate refused the first draft before accepting it. Discovery has been run once, on the classifier question, and `process/02-discover/discovery-contract.md` describes the shape that artifact turned out to need — **derived from it rather than designed ahead of it, and asserted rather than enforced**, because one artifact is not enough to know which parts are real.
 
-**Define has been run once**, converging cycle `2026-09-29`'s 64 findings into seven themes and three outliers, with every finding accounted for. **Develop has been run once**, diverging one stated problem into six options with no choice made. **Deliver now exists**, and the first decision record is drafted and waiting on a person — six options open, nothing chosen. `bin/cycle.sh` reports the state of every cycle by reading the tree, so the loop is inspectable rather than only described. Three of the five phases now have gates — scan, define and deliver — and the define accounting check and the deliver named-human check both run in CI. What is still missing is automation: every phase is still *run* by hand; the gates check the output, they do not produce it.
+**Define has been run once**, converging cycle `2026-09-29`'s 64 findings into seven themes and three outliers, with every finding accounted for. **Develop has been run once**, diverging one stated problem into six options with no choice made. **Deliver now exists**, and the first decision record is drafted and waiting on a person — six options open, nothing chosen. `bin/cycle.sh` reports the state of every cycle by reading the tree, so the loop is inspectable rather than only described. `bin/next.sh` starts the next artifact a cycle needs, reading the fields and sections **out of the contract that declares them** — so a contract stays the single declaration of its phase's shape and the scaffolder cannot drift from it.
 
-> **This section has gone stale twice within days of shipping.** It said "specified, not built" after the stage was built, then "a scan has not been run" after one had. Both were caught only because someone read it. Worth naming rather than quietly fixing a third time: a document stating the state of the work is wrong by default the moment the work moves, and nothing here checks it.
+Three of the five phases now have gates — scan, define and deliver — and the define accounting check and the deliver named-human check both run in CI. What is still missing is the *content*: `next.sh` writes a skeleton, and the gates refuse that skeleton until a person fills it in. Nothing here produces a judgement, and that is the line being held rather than a gap waiting to be closed.
+
+> **This section has gone stale three times within days of shipping.** It said "specified, not built" after the stage was built, "a scan has not been run" after one had, and `README.md` still called stages 2–4 "names" after all four had been run. Every time it was caught by someone reading it, never by a check. Worth naming rather than quietly fixing again: a document stating the state of the work is wrong by default the moment the work moves, and nothing here checks it.
 
 This is on purpose. Stage 1's output shape determines everything downstream, and the cheapest time to get it wrong is now.
 

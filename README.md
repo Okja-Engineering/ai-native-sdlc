@@ -57,9 +57,12 @@ Three human gates. Nothing advances a stage without a person deciding it should.
 | [`process/05-deliver/validate-decision.sh`](process/05-deliver/validate-decision.sh) | Refuses a decision with no named person, no date, or an option that does not exist | built |
 | [`process/03-define/validate-define.sh`](process/03-define/validate-define.sh) | Refuses a cycle that drops a finding, omits its method, or has no outlier section | built |
 | [`bin/cycle.sh`](bin/cycle.sh) | Where every cycle is and what is missing. Reads the tree, writes nothing | built |
+| [`bin/next.sh`](bin/next.sh) | Starts the next artifact, with the fields and sections read out of the contract that declares them. Refuses to overwrite | built |
 
 ## Status
 
-**V0.** Stage 1 records and stops: the shape of a findings file is declared, a gate refuses a file that breaks it, and the cycle itself is a written instruction a person runs. **Nothing is scheduled and nothing runs on its own.** Stages 2–4 are names.
+**V0.** All five phases have been run once, on cycle `2026-09-29` — 64 findings, 7 themes, 3 outliers, 1 problem, 6 options, and a decision record **waiting on a person**. Three phases have gates. `bin/cycle.sh` says where a cycle is; `bin/next.sh` starts the artifact it needs next.
+
+**Nothing is scheduled and nothing runs on its own.** A person starts every cycle, and a person writes every judgement — `next.sh` produces the skeleton, and the gates refuse that skeleton until it is filled in.
 
 The prototype this derives from is preserved on the `experiment/0.0.0` branch and will not be merged. It is reference: what we tried, and what an adversarial audit of it found.
