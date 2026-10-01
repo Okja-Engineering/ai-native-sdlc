@@ -8,37 +8,31 @@ Derived from [`intent.md`](intent.md). Scoped deliberately small: V0 states the 
 
 Four documents and one stage specification. No code.
 
-| Deliverable | State after V0 |
+| Deliverable | What it is for |
 |---|---|
-| `intent.md` — why this exists, what we believe, how sure we are | written |
-| `STANDARDS.md` — how mature AI-native teams work, Q3 2026, graded | written |
-| `spec.md` — this document | written |
-| `README.md` — the loop, and what's here | written |
-| `process/01-scan/` — the scan stage | **built and run** — contract, gate, instruction, one real cycle |
-| `process/02-discover/` — topic discovery | **run twice**, contract derived from the first and tested against the second, no gate |
-| `process/03-define/` — converge a cycle into themes, and a theme into a problem | **run once**, contract derived from it, no gate |
-| `process/04-develop/` — diverge a problem into options | **run once**, contract derived from it, no gate |
-| `process/05-deliver/` — converge on one choice | contract written and **gated**, **first decision made** — F, by a named person, 2026-10-01 |
-| `bin/cycle.sh` — where everything is and what is missing | **built** |
-| `bin/next.sh` — start the next artifact, from the contract that declares it | **built** |
+| `intent.md` | Why this exists, what we believe, how sure we are |
+| `STANDARDS.md` | How mature AI-native teams work, as of a date, with a grade on every claim |
+| `spec.md` | This document |
+| `README.md` | The loop, and what each piece is for |
+| `process/01-scan/` | Record what changed since we last looked. Rank nothing, drop nothing |
+| `process/02-discover/` | Establish what is true about one question, graded and sourced. Recommend nothing |
+| `process/03-define/` | Converge a cycle into themes, and a theme into a stated problem |
+| `process/04-develop/` | Diverge a problem into options, with each one's failure mode |
+| `process/05-deliver/` | Converge on one choice, made by a named person, with the accepted cost written down |
+| `bin/cycle.sh` | Where every cycle is and what is missing. Reads the tree, writes nothing |
+| `bin/next.sh` | Start the next artifact, with its shape read from the contract that declares it |
+
+**Where each phase has actually got to is not written here.** Run `bin/cycle.sh`. It reads the tree, so it is correct by construction and cannot go stale.
+
+That is a deliberate repair, not an omission. This section previously carried hand-typed counts — findings, themes, options, how many times a phase had run — duplicating what `cycle.sh` already computes. It went stale three times in days, was caught by a reader every time and by a check never, and the response each time was to correct the copy and add a note observing that it keeps happening. Documenting a symptom three times is not fixing it. The duplicate is gone, so there is nothing left to go stale.
 
 ## What V0 is not
 
 There is still no classifier, no CLI, no MCP server, and no scheduled job. Nothing runs on its own; a person starts every cycle.
 
-**Stage 1 is built and has been run.** Cycle `2026-09-29` produced 64 findings across three sources, and the gate refused the first draft before accepting it. **Discovery has now been run twice** — on the classifier question, and on whether an agent may approve what an agent wrote. `process/02-discover/discovery-contract.md` was **derived from the first and tested against the second**, which is the first time a contract here has been checked against a question it was not written from. The sections held. One rule turned out to be the first topic's accident: "three independent passes" is really "independent passes briefed to fail differently, scaled to the question", and the second topic needed two. It remains **asserted rather than enforced** — now because the one check a gate would most want, *no recommendation language*, is the one that cannot be mechanised without spending trust on false positives.
+**Nothing here produces a judgement.** `next.sh` writes a skeleton and the gates refuse that skeleton until a person fills it in. That is the line being held, not a gap waiting to be closed.
 
-**Define has been run once**, converging cycle `2026-09-29`'s 64 findings into seven themes and three outliers, with every finding accounted for. **Develop has been run once**, diverging one stated problem into six options with no choice made. **Deliver has now been run**, and on 2026-10-01 a named person chose from the six: option F, measure two more cycles before building anything, with a tripwire dated 2026-11-30 and three earlier reversal conditions. The gate accepted it, which means it carries a name, a date, an option that exists in the set, the failure mode being accepted, and a reason for each option not taken.
-
-**This is the first outcome the loop has produced rather than the fifth artifact.** Up to this point every phase could be satisfied by writing something down. A decision cannot: it names a person, forecloses five alternatives, and states the condition under which it is wrong. Whether the loop is worth anything turns on this step, and until 2026-10-01 it had never been taken.
-
-`bin/cycle.sh` reports the state of every cycle by reading the tree, so the loop is inspectable rather than only described. `bin/next.sh` starts the next artifact a cycle needs, reading the fields and sections **out of the contract that declares them** — so a contract stays the single declaration of its phase's shape and the scaffolder cannot drift from it.
-
-Three of the five phases now have gates — scan, define and deliver — and the define accounting check and the deliver named-human check both run in CI. What is still missing is the *content*: `next.sh` writes a skeleton, and the gates refuse that skeleton until a person fills it in. Nothing here produces a judgement, and that is the line being held rather than a gap waiting to be closed.
-
-> **This section has gone stale three times within days of shipping.** It said "specified, not built" after the stage was built, "a scan has not been run" after one had, and `README.md` still called stages 2–4 "names" after all four had been run. Every time it was caught by someone reading it, never by a check. Worth naming rather than quietly fixing again: a document stating the state of the work is wrong by default the moment the work moves, and nothing here checks it.
-
-This is on purpose. Stage 1's output shape determines everything downstream, and the cheapest time to get it wrong is now.
+**No phase contract was designed in advance.** Each was written after the artifact it describes, from what that artifact turned out to need — and is asserted rather than enforced until a second, differently shaped artifact shows which parts were real and which were the first one's accidents. Where a gate exists, it checks only what does not depend on shape.
 
 ## The architect loop
 
