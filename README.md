@@ -52,7 +52,9 @@ Three human gates. Nothing advances a stage without a person deciding it should.
 | [`process/03-define/define-contract.md`](process/03-define/define-contract.md) | The shape that artifact needed — derived from it, not designed ahead | asserted, not enforced |
 | [`process/04-develop/options/`](process/04-develop/options/) | A problem diverged into options, none chosen. First: producing themes | run once |
 | [`process/04-develop/develop-contract.md`](process/04-develop/develop-contract.md) | The shape that artifact needed — derived from it, not designed ahead | asserted, not enforced |
-| Deliver | Converge on one option and ship it | named only |
+| [`process/05-deliver/decisions/`](process/05-deliver/decisions/) | One choice, by a named person, with what is given up written down | **awaiting a human** |
+| [`process/05-deliver/deliver-contract.md`](process/05-deliver/deliver-contract.md) | The shape a decision needs | asserted, one gate named as worth having |
+| [`bin/cycle.sh`](bin/cycle.sh) | Where every cycle is and what is missing. Reads the tree, writes nothing | built |
 
 ## Status
 
