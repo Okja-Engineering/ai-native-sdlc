@@ -36,6 +36,17 @@ jobs:
       - name: Validate every findings file
         run: /bin/bash process/01-scan/validate-findings.sh
 
+      - name: Validate every define cycle
+        # Accounting, method, outlier section. The accounting check caught a real
+        # defect by hand before it was mechanised; this is so the next one is
+        # caught here instead of by someone reading carefully.
+        run: /bin/bash process/03-define/validate-define.sh
+
+      - name: Validate every decision record
+        # A decision is made by a human and the record names which one. This
+        # guards the only thing here that cannot be reconstructed afterwards.
+        run: /bin/bash process/05-deliver/validate-decision.sh
+
       - name: Prove the suite can fail
         # A runner that swallows a failure makes every suite vacuous while
         # reporting green. Assert the failure path rather than trusting it.

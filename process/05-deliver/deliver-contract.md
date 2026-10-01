@@ -2,7 +2,7 @@
 
 **Status:** derived alongside the first decision record. The record was drafted first and this describes the shape it needed.
 
-**No gate yet**, with one exception noted below.
+**The one gate the contract named is now built.** See *The gate* at the end.
 
 ## What Deliver is for
 
@@ -63,7 +63,7 @@ The gaps the option set already named. The first set had no answer for the outli
 - **Drop the accepted cost.** A record with no "what we are accepting" is a sales document.
 - **Silently supersede an earlier decision.** A reversal is a new record pointing at the old one. Editing a decision in place destroys the thing that made it a record.
 
-## The one gate worth having now
+## The gate
 
 Three phases have deferred their gates on the grounds that one artifact cannot tell shape from accident. That reasoning holds here too — except for one check, which does not depend on shape at all:
 
@@ -71,7 +71,9 @@ Three phases have deferred their gates on the grounds that one artifact cannot t
 
 That is mechanical, cheap, and guards the only thing in the repository that cannot be reconstructed afterwards. Everything else about Deliver's shape should wait for a second decision.
 
-Not built in this change. Named here so it is deliberate rather than forgotten — and so the next person to touch Deliver knows which check was judged worth having before the others.
+**Built**, as `validate-decision.sh`, with two companions that are equally shape-independent: a chosen option must exist in the option set it claims to choose from, and a decided record must be dated. A `decided_by` naming a role, a team or a model is refused as not a person.
+
+Every refusal carries its own message and is asserted by that message in `tests/test_validate_decision.sh`. Everything else about Deliver's shape still waits for a second decision.
 
 ## Open
 

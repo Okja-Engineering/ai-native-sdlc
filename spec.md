@@ -18,7 +18,7 @@ Four documents and one stage specification. No code.
 | `process/02-discover/` — topic discovery | **run once**, contract derived from it, no gate |
 | `process/03-define/` — converge a cycle into themes, and a theme into a problem | **run once**, contract derived from it, no gate |
 | `process/04-develop/` — diverge a problem into options | **run once**, contract derived from it, no gate |
-| `process/05-deliver/` — converge on one choice | contract written, **first decision awaiting a human** |
+| `process/05-deliver/` — converge on one choice | contract written and **gated**, first decision awaiting a human |
 | `bin/cycle.sh` — where everything is and what is missing | **built** |
 
 ## What V0 is not
@@ -27,7 +27,7 @@ There is still no classifier, no CLI, no MCP server, and no scheduled job. Nothi
 
 **Stage 1 is built and has been run.** Cycle `2026-09-29` produced 64 findings across three sources, and the gate refused the first draft before accepting it. Discovery has been run once, on the classifier question, and `process/02-discover/discovery-contract.md` describes the shape that artifact turned out to need — **derived from it rather than designed ahead of it, and asserted rather than enforced**, because one artifact is not enough to know which parts are real.
 
-**Define has been run once**, converging cycle `2026-09-29`'s 64 findings into seven themes and three outliers, with every finding accounted for. **Develop has been run once**, diverging one stated problem into six options with no choice made. **Deliver now exists**, and the first decision record is drafted and waiting on a person — six options open, nothing chosen. `bin/cycle.sh` reports the state of every cycle by reading the tree, so the loop is inspectable rather than only described. What is still missing is automation: every phase is run by hand.
+**Define has been run once**, converging cycle `2026-09-29`'s 64 findings into seven themes and three outliers, with every finding accounted for. **Develop has been run once**, diverging one stated problem into six options with no choice made. **Deliver now exists**, and the first decision record is drafted and waiting on a person — six options open, nothing chosen. `bin/cycle.sh` reports the state of every cycle by reading the tree, so the loop is inspectable rather than only described. Three of the five phases now have gates — scan, define and deliver — and the define accounting check and the deliver named-human check both run in CI. What is still missing is automation: every phase is still *run* by hand; the gates check the output, they do not produce it.
 
 > **This section has gone stale twice within days of shipping.** It said "specified, not built" after the stage was built, then "a scan has not been run" after one had. Both were caught only because someone read it. Worth naming rather than quietly fixing a third time: a document stating the state of the work is wrong by default the moment the work moves, and nothing here checks it.
 

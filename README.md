@@ -49,11 +49,13 @@ Three human gates. Nothing advances a stage without a person deciding it should.
 | [`process/02-discover/discovery-contract.md`](process/02-discover/discovery-contract.md) | The shape that artifact turned out to need — derived from it, not designed ahead | asserted, not enforced |
 | [`tests/`](tests/) | `run-all.sh` over the suites, and the assertions they use | built |
 | [`process/03-define/cycles/`](process/03-define/cycles/) | A cycle converged into themes. First: `2026-09-29`, 64 findings into 7 themes and 3 outliers | run once |
-| [`process/03-define/define-contract.md`](process/03-define/define-contract.md) | The shape that artifact needed — derived from it, not designed ahead | asserted, not enforced |
+| [`process/03-define/define-contract.md`](process/03-define/define-contract.md) | The shape that artifact needed — derived from it, not designed ahead | **3 of 5 checks enforced** |
 | [`process/04-develop/options/`](process/04-develop/options/) | A problem diverged into options, none chosen. First: producing themes | run once |
 | [`process/04-develop/develop-contract.md`](process/04-develop/develop-contract.md) | The shape that artifact needed — derived from it, not designed ahead | asserted, not enforced |
 | [`process/05-deliver/decisions/`](process/05-deliver/decisions/) | One choice, by a named person, with what is given up written down | **awaiting a human** |
-| [`process/05-deliver/deliver-contract.md`](process/05-deliver/deliver-contract.md) | The shape a decision needs | asserted, one gate named as worth having |
+| [`process/05-deliver/deliver-contract.md`](process/05-deliver/deliver-contract.md) | The shape a decision needs | **gated** — a decision needs a named human |
+| [`process/05-deliver/validate-decision.sh`](process/05-deliver/validate-decision.sh) | Refuses a decision with no named person, no date, or an option that does not exist | built |
+| [`process/03-define/validate-define.sh`](process/03-define/validate-define.sh) | Refuses a cycle that drops a finding, omits its method, or has no outlier section | built |
 | [`bin/cycle.sh`](bin/cycle.sh) | Where every cycle is and what is missing. Reads the tree, writes nothing | built |
 
 ## Status
