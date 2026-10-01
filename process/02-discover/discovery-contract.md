@@ -1,8 +1,15 @@
 # Discovery contract
 
-**Status:** derived from one artifact, not designed in advance. `topics/classifier-models.md` was written first; this describes the shape it turned out to need. A second topic will show which parts are real and which are that topic's accidents.
+**Status:** derived from one artifact, then tested against a second. `topics/classifier-models.md` was written first and this describes the shape it needed. `topics/agent-pr-approval.md` (2026-10-01) was the test.
 
-**No gate yet.** See *Why there is no gate* at the end — that is a deliberate call, not an omission.
+**What the second topic showed.** The required sections all held on a question shaped differently — the first was *"is this substance or marketing"*, the second product mechanics with a partly documented answer. Nothing had to be added and nothing was dead weight. Two parts earned their place rather than merely surviving:
+
+- **Quoting the question verbatim.** The second topic was selected because *"it has a clock"*, and discovery established the clock did not apply to the feature. Had the question been tidied, the artifact would have answered a question nobody asked and the falsified premise would have left no trace.
+- **"Verified by hand", and the three-part coverage.** That topic ran two agent passes and the assembling author re-verified ten claims directly, correcting one — a reported 15% rate that recomputation put at 10%. Without a section separating *an agent reported this* from *someone checked it*, the wrong figure would have shipped as a fact.
+
+**What turned out to be the first topic's accident.** *"Several independent passes, briefed to fail differently"* was written from a run of three. The second ran **two**: the first topic's third pass existed to advocate a counter-case against a marketing judgment and had nothing distinct to do on a mechanics question. The rule is the independence and the differing briefs; the number scales to the question. Corrected below.
+
+**Still no gate**, and the reason has changed. It is no longer that one artifact cannot separate shape from accident — two now can, for the sections. It is that the checks worth mechanising are the ones a careful reader will not reliably perform, and the second topic is what showed which those are. See *Why there is no gate* at the end.
 
 ## What discovery is for
 
@@ -57,7 +64,13 @@ What a later phase will need that this phase could not supply, recorded so it is
 
 ## Rules the worked artifact established
 
-**Several independent passes, briefed to fail differently.** Three passes, separately briefed, no shared context — technical novelty, claims-and-practice, and the counter-case. The counter-case pass exists because *nothing markets a limitation*: without a pass whose only job is finding reasons not to, the other two will not find them.
+**Several independent passes, briefed to fail differently.** Separately briefed, no shared context. The first topic ran three — technical novelty, claims-and-practice, and the counter-case. The second ran two — mechanics and the counter-case.
+
+**The counter-case pass is the one that does not scale away**, because *nothing markets a limitation*: without a pass whose only job is finding reasons not to, the others will not find them. It earned its place on the second topic too, where it independently caught that the feature's supposed deadline did not apply to it.
+
+**The number of other passes scales to the question.** Three was right when the question was "is this substance or marketing" and the counter-case needed an advocate against a judgment. Two was right for product mechanics with a partly documented answer; a third pass had nothing distinct to do. A pass with no angle of its own is overhead that produces agreement.
+
+**Both passes corrected their own briefs on the second topic**, and both corrections were more consequential than the findings they were sent for. A brief that cannot be contradicted by the pass it commissions is not a brief, it is an instruction to confirm.
 
 **A pass reporting against its own angle is recorded, not quietly dropped.** The counter-case pass found two things that undercut its own brief — that a suspected failure mode was contradicted by the evidence, and that a body of literature cut in favour of the design. Both are in the artifact. A pass that only ever confirms its own angle is not a pass, it is an advocate.
 
@@ -71,7 +84,14 @@ What a later phase will need that this phase could not supply, recorded so it is
 
 The scan has one because it runs monthly and produces a comparable artifact each time, so a drift in shape is a real risk worth mechanising against.
 
-Discovery has run **once**. A gate written now would encode this topic's accidents as rules — a section ordering that suited a "is this new or marketing" question may be wrong for a question shaped differently. The prototype's central failure was building enforcement faster than the thing being enforced, and this is exactly where that would start.
+Discovery has now run **twice**, on questions shaped differently, and the sections held both times. That removes the original reason to wait — but it does not by itself argue for a gate.
+
+**What the second run changed is which checks are worth mechanising.** A gate earns its place where a careful reader will *not* reliably catch the failure. On that test the four checks below separate into two kinds:
+
+- **Worth mechanising.** A missing grade, a claim with no resolving source, an absent `[O]` section. These are countable, a reader skims past them, and the second topic carried 55 graded claims — past the point where checking by eye is dependable.
+- **Not safely mechanisable.** "No recommendation language" looks like the easiest of the four and is the trap. A grep for *recommend* fires on the sentence *"No option set, no recommendation, no decision"* — a correct disclaimer flagged as the thing it disclaims. The real failure is a neutral-sounding paragraph that steers, which no pattern catches. Mechanising the proxy would spend trust on false positives while the actual failure walks through.
+
+The prototype's central failure was building enforcement faster than the thing being enforced. The remaining argument for waiting is narrower than it was: a gate on the countable three is defensible now, and the fourth should stay a reader's job.
 
 What a gate should check when it is written, all of which are mechanical:
 

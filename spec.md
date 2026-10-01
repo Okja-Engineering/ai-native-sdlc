@@ -15,7 +15,7 @@ Four documents and one stage specification. No code.
 | `spec.md` — this document | written |
 | `README.md` — the loop, and what's here | written |
 | `process/01-scan/` — the scan stage | **built and run** — contract, gate, instruction, one real cycle |
-| `process/02-discover/` — topic discovery | **run once**, contract derived from it, no gate |
+| `process/02-discover/` — topic discovery | **run twice**, contract derived from the first and tested against the second, no gate |
 | `process/03-define/` — converge a cycle into themes, and a theme into a problem | **run once**, contract derived from it, no gate |
 | `process/04-develop/` — diverge a problem into options | **run once**, contract derived from it, no gate |
 | `process/05-deliver/` — converge on one choice | contract written and **gated**, **first decision made** — F, by a named person, 2026-10-01 |
@@ -26,7 +26,7 @@ Four documents and one stage specification. No code.
 
 There is still no classifier, no CLI, no MCP server, and no scheduled job. Nothing runs on its own; a person starts every cycle.
 
-**Stage 1 is built and has been run.** Cycle `2026-09-29` produced 64 findings across three sources, and the gate refused the first draft before accepting it. Discovery has been run once, on the classifier question, and `process/02-discover/discovery-contract.md` describes the shape that artifact turned out to need — **derived from it rather than designed ahead of it, and asserted rather than enforced**, because one artifact is not enough to know which parts are real.
+**Stage 1 is built and has been run.** Cycle `2026-09-29` produced 64 findings across three sources, and the gate refused the first draft before accepting it. **Discovery has now been run twice** — on the classifier question, and on whether an agent may approve what an agent wrote. `process/02-discover/discovery-contract.md` was **derived from the first and tested against the second**, which is the first time a contract here has been checked against a question it was not written from. The sections held. One rule turned out to be the first topic's accident: "three independent passes" is really "independent passes briefed to fail differently, scaled to the question", and the second topic needed two. It remains **asserted rather than enforced** — now because the one check a gate would most want, *no recommendation language*, is the one that cannot be mechanised without spending trust on false positives.
 
 **Define has been run once**, converging cycle `2026-09-29`'s 64 findings into seven themes and three outliers, with every finding accounted for. **Develop has been run once**, diverging one stated problem into six options with no choice made. **Deliver has now been run**, and on 2026-10-01 a named person chose from the six: option F, measure two more cycles before building anything, with a tripwire dated 2026-11-30 and three earlier reversal conditions. The gate accepted it, which means it carries a name, a date, an option that exists in the set, the failure mode being accepted, and a reason for each option not taken.
 
