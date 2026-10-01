@@ -26,6 +26,39 @@ The portable conventions. This file is the cross-tool standard and is read by ag
 
 Enforced by `.githooks/commit-msg`.
 
+## Pull requests
+
+There are no issues in this repository, so the PR carries the whole story. Use these headings, in this order. Drop one if it genuinely has nothing in it.
+
+```markdown
+## Background
+What a reader needs to know to follow the rest. One short paragraph.
+
+## The problem
+What was wrong, or what the opportunity was. Be concrete.
+
+## What we're not doing
+The scope deliberately left out, so nobody goes looking for it.
+
+## What we did
+The change itself, described plainly.
+
+## What you get for it
+What is different now that someone can see or use.
+
+## How it was checked
+What was run, and what the result was.
+```
+
+### Write it the way you would say it
+
+- **Plain words.** "This went stale three times" — not "the duplicate exhibited repeated staleness."
+- **No aphorisms.** Lines like *"documenting a symptom is not repairing it"* sound clever and tell the reader nothing. Cut them. If a sentence would feel strange said out loud to a colleague, rewrite it.
+- **Don't bold a one-liner for drama.** Bold the word that matters, not every third sentence.
+- **Numbers and quotes instead of adjectives.** "875 pull requests, 10% sole approver" beats "a significant proportion."
+- **Say what you are unsure about in the same plain voice.** "I couldn't get the PCI text, so this is unverified" beats a hedge.
+- Short paragraphs. A table when comparing things. Code blocks for commands and their output.
+
 ## Pushing
 
 A push is the moment work becomes public, and this repository is public. `.githooks/pre-push` runs three checks in parallel and is expected to finish in well under a second:
