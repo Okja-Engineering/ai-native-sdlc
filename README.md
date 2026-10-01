@@ -52,7 +52,7 @@ Three human gates. Nothing advances a stage without a person deciding it should.
 | [`process/03-define/define-contract.md`](process/03-define/define-contract.md) | The shape that artifact needed — derived from it, not designed ahead | **3 of 5 checks enforced** |
 | [`process/04-develop/options/`](process/04-develop/options/) | A problem diverged into options, none chosen. First: producing themes | run once |
 | [`process/04-develop/develop-contract.md`](process/04-develop/develop-contract.md) | The shape that artifact needed — derived from it, not designed ahead | asserted, not enforced |
-| [`process/05-deliver/decisions/`](process/05-deliver/decisions/) | One choice, by a named person, with what is given up written down | **awaiting a human** |
+| [`process/05-deliver/decisions/`](process/05-deliver/decisions/) | One choice, by a named person, with what is given up written down | **one decided** — `producing-themes`, F, with a tripwire |
 | [`process/05-deliver/deliver-contract.md`](process/05-deliver/deliver-contract.md) | The shape a decision needs | **gated** — a decision needs a named human |
 | [`process/05-deliver/validate-decision.sh`](process/05-deliver/validate-decision.sh) | Refuses a decision with no named person, no date, or an option that does not exist | built |
 | [`process/03-define/validate-define.sh`](process/03-define/validate-define.sh) | Refuses a cycle that drops a finding, omits its method, or has no outlier section | built |
@@ -61,7 +61,9 @@ Three human gates. Nothing advances a stage without a person deciding it should.
 
 ## Status
 
-**V0.** All five phases have been run once, on cycle `2026-09-29` — 64 findings, 7 themes, 3 outliers, 1 problem, 6 options, and a decision record **waiting on a person**. Three phases have gates. `bin/cycle.sh` says where a cycle is; `bin/next.sh` starts the artifact it needs next.
+**V0, and the loop has closed once.** All five phases have been run on cycle `2026-09-29` — 64 findings, 7 themes, 3 outliers, 1 problem, 6 options, and **one decision, made by a named person on 2026-10-01**: option F, measure two more cycles first, with a dated tripwire so waiting cannot quietly become the decision.
+
+That is the thing worth checking before anything else here is believed. Four phases producing artifacts proves the method runs; a decision with a name on it, an accepted failure mode, and a reversal condition is the first evidence it produces an outcome. Three phases have gates. `bin/cycle.sh` says where a cycle is; `bin/next.sh` starts the artifact it needs next.
 
 **Nothing is scheduled and nothing runs on its own.** A person starts every cycle, and a person writes every judgement — `next.sh` produces the skeleton, and the gates refuse that skeleton until it is filled in.
 

@@ -18,7 +18,7 @@ Four documents and one stage specification. No code.
 | `process/02-discover/` — topic discovery | **run once**, contract derived from it, no gate |
 | `process/03-define/` — converge a cycle into themes, and a theme into a problem | **run once**, contract derived from it, no gate |
 | `process/04-develop/` — diverge a problem into options | **run once**, contract derived from it, no gate |
-| `process/05-deliver/` — converge on one choice | contract written and **gated**, first decision awaiting a human |
+| `process/05-deliver/` — converge on one choice | contract written and **gated**, **first decision made** — F, by a named person, 2026-10-01 |
 | `bin/cycle.sh` — where everything is and what is missing | **built** |
 | `bin/next.sh` — start the next artifact, from the contract that declares it | **built** |
 
@@ -28,7 +28,11 @@ There is still no classifier, no CLI, no MCP server, and no scheduled job. Nothi
 
 **Stage 1 is built and has been run.** Cycle `2026-09-29` produced 64 findings across three sources, and the gate refused the first draft before accepting it. Discovery has been run once, on the classifier question, and `process/02-discover/discovery-contract.md` describes the shape that artifact turned out to need — **derived from it rather than designed ahead of it, and asserted rather than enforced**, because one artifact is not enough to know which parts are real.
 
-**Define has been run once**, converging cycle `2026-09-29`'s 64 findings into seven themes and three outliers, with every finding accounted for. **Develop has been run once**, diverging one stated problem into six options with no choice made. **Deliver now exists**, and the first decision record is drafted and waiting on a person — six options open, nothing chosen. `bin/cycle.sh` reports the state of every cycle by reading the tree, so the loop is inspectable rather than only described. `bin/next.sh` starts the next artifact a cycle needs, reading the fields and sections **out of the contract that declares them** — so a contract stays the single declaration of its phase's shape and the scaffolder cannot drift from it.
+**Define has been run once**, converging cycle `2026-09-29`'s 64 findings into seven themes and three outliers, with every finding accounted for. **Develop has been run once**, diverging one stated problem into six options with no choice made. **Deliver has now been run**, and on 2026-10-01 a named person chose from the six: option F, measure two more cycles before building anything, with a tripwire dated 2026-11-30 and three earlier reversal conditions. The gate accepted it, which means it carries a name, a date, an option that exists in the set, the failure mode being accepted, and a reason for each option not taken.
+
+**This is the first outcome the loop has produced rather than the fifth artifact.** Up to this point every phase could be satisfied by writing something down. A decision cannot: it names a person, forecloses five alternatives, and states the condition under which it is wrong. Whether the loop is worth anything turns on this step, and until 2026-10-01 it had never been taken.
+
+`bin/cycle.sh` reports the state of every cycle by reading the tree, so the loop is inspectable rather than only described. `bin/next.sh` starts the next artifact a cycle needs, reading the fields and sections **out of the contract that declares them** — so a contract stays the single declaration of its phase's shape and the scaffolder cannot drift from it.
 
 Three of the five phases now have gates — scan, define and deliver — and the define accounting check and the deliver named-human check both run in CI. What is still missing is the *content*: `next.sh` writes a skeleton, and the gates refuse that skeleton until a person fills it in. Nothing here produces a judgement, and that is the line being held rather than a gap waiting to be closed.
 
