@@ -2,7 +2,7 @@
 
 **Status:** derived from one artifact. `cycles/2026-09-29.md` was written first; this describes the shape it turned out to need.
 
-**No gate yet.** See *Why there is no gate* at the end.
+**Three checks are enforced; two remain deferred.** See *The gate* at the end.
 
 ## What Define is for
 
@@ -60,19 +60,22 @@ What the human now decides, and what cannot yet be recorded. Define names the ga
 - **No ranking that implies priority.** Ordering by size or date is mechanical. Ordering by importance is a judgment Define does not make.
 - **No new claims.** Define groups what Discover found. A theme asserting something no underlying item says is a fabrication with a summary's authority.
 
-## Why there is no gate
+## The gate
 
-Define has run once. A gate written now would encode this cycle's accidents — six themes and three outliers happened to fit this month's 64 findings, and a quieter month or a different source mix may want a different shape. The prototype's central failure was building enforcement faster than the thing being enforced.
+`validate-define.sh` enforces the three checks that do not depend on a cycle's shape:
 
-What a gate should check when a second cycle shows which parts are real, all mechanical:
+- **every item in the source artifact is accounted for** — under a theme or in the outliers. This one caught a real defect by hand before it was mechanised: the first draft of cycle `2026-09-29` themed 54 of 64 and reported three wrong counts, and the ten strays included a pattern nobody had named
+- **the outlier section exists, and says so explicitly when empty** — an empty list and an omitted one look identical otherwise
+- **`method` is declared**
 
-- every item in the source artifact appears under exactly one theme or in the outliers
-- every theme carries a name, a count, and a *why*
-- the outlier section exists, and says so explicitly when empty
-- `method` is declared
-- no decision language — the same vocabulary the scan's `assessment` check already refuses
+Each refusal carries its own message, and each is asserted by that message in `tests/test_validate_define.sh`.
 
-**Until then this contract is asserted, not enforced**, and should be described that way.
+Two checks remain deferred, because they do depend on shape and one cycle cannot tell shape from accident:
+
+- every theme carries a name, a count, and a *why* — theme formatting may legitimately differ between cycles
+- no decision language — a second cycle is needed to know the vocabulary
+
+**Those two remain asserted, not enforced**, and should be described that way.
 
 ## Open
 
