@@ -114,6 +114,36 @@
 
 ---
 
+## CTRL-7 · A discovery artifact says what it could not establish
+
+**What it prevents.** An artifact claiming completeness it has not earned, and agent output presented as verified fact. Discover carries more claims than any other phase — 55 graded ones in a single artifact — and had no mechanical check at all.
+
+**Enforced by** `process/02-discover/validate-discovery.sh`.
+
+| Refusal | Condition |
+|---|---|
+| `no-open-section` | no "what could not be established" section |
+| `silent-empty-open` | the section lists nothing and does not say so |
+| `no-verified-by-hand` | coverage has no verified-by-hand part |
+| `no-not-reached` | coverage lists only what was reached |
+| `no-question` | the question is not in the asker's own words |
+| `question-not-quoted` | the question section carries no quotation |
+| `grade-not-in-enum` | a grade outside `E`, `S`, `V`, `P`, `O` |
+| `no-grades` | no graded claims at all |
+| `no-where-this-stops` | does not record what a later phase will need |
+| `link-unresolved` | a local link that does not resolve |
+| `undated` | no `dated:` field |
+| `no-status` | no `status:` field |
+
+**Evidence.** Coverage in three parts — reached, not reached, and **verified by hand** — which is what separates *an agent reported this* from *someone checked it*. Both shipped topics pass despite differing in markup, so the gate checks the contract rather than one artifact's formatting.
+
+**What it does not cover.** Two of the checks the contract hoped for are **not mechanisable**, and the gate's own header says so rather than leaving the gap implicit:
+
+- **"Every claim carries a grade"** and **"every claim carries a source"** need a claim to be a delimited thing. The two topics write claims as prose paragraphs in different markup with no boundary a script can find. Checking this would mean inventing a convention mid-gate. What is checked instead is that the grades *used* are from the enum and that the enum is declared.
+- **"No recommendation language"** is covered under *What is not controlled*, item 3.
+
+---
+
 ## What is not controlled
 
 The section an assessor should read first. Each of these is a real gap, not a formality.
@@ -124,7 +154,7 @@ The section an assessor should read first. Each of these is a real gap, not a fo
 
 **3. Judgement in a discovery artifact.** The discovery contract forbids recommendation language, and that check is deliberately **not** mechanised. A pattern match on *recommend* fires on the sentence "No option set, no recommendation, no decision" — flagging a correct disclaimer as the thing it disclaims. The real failure is a neutral-sounding paragraph that steers, which no pattern catches. This stays a reader's job.
 
-**4. Discover has no gate at all.** The phase carrying the most claims — 55 graded claims in one artifact — has no mechanical check. Tracked as issue #21.
+**4. Whether every claim in a discovery artifact is graded and sourced.** CTRL-7 gates the phase now, but not this. It needs a claim to be a delimited thing, and the two topics write claims as prose paragraphs in different markup with no boundary a script can find. The gate checks that the grades *used* are from the enum, not that every assertion carries one. A reader counting graded claims against ungraded ones is still the only way to know.
 
 **5. Develop has no gate.** One options artifact existed when its contract was written, so a gate would have encoded that artifact's accidents. The reasoning that justified waiting still holds.
 

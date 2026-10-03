@@ -9,7 +9,7 @@
 
 **What turned out to be the first topic's accident.** *"Several independent passes, briefed to fail differently"* was written from a run of three. The second ran **two**: the first topic's third pass existed to advocate a counter-case against a marketing judgment and had nothing distinct to do on a mechanics question. The rule is the independence and the differing briefs; the number scales to the question. Corrected below.
 
-**Still no gate**, and the reason has changed. It is no longer that one artifact cannot separate shape from accident — two now can, for the sections. It is that the checks worth mechanising are the ones a careful reader will not reliably perform, and the second topic is what showed which those are. See *Why there is no gate* at the end.
+**Gated**, as `validate-discovery.sh`. Twelve refusals, each asserted by message in `tests/test_validate_discovery.sh`. Both shipped topics pass despite differing in markup, which is the property that mattered — a gate keyed to the newer artifact's formatting would have encoded its accidents as rules. See *The gate* at the end, including the two checks named here that turned out **not** to be mechanisable.
 
 ## What discovery is for
 
@@ -80,24 +80,23 @@ What a later phase will need that this phase could not supply, recorded so it is
 
 **Numbers get recomputed where the data is public.** The counter-case pass did its own arithmetic on committed prediction files rather than restating the project's tables. Two of those recomputations changed what the headline meant.
 
-## Why there is no gate
+## The gate
 
-The scan has one because it runs monthly and produces a comparable artifact each time, so a drift in shape is a real risk worth mechanising against.
+Built as `validate-discovery.sh` once discovery had run twice on differently shaped questions, which was the condition this contract set for itself.
 
-Discovery has now run **twice**, on questions shaped differently, and the sections held both times. That removes the original reason to wait — but it does not by itself argue for a gate.
+**Two of the four checks this section used to call mechanical are not.** Writing the gate is what established that, and it is recorded rather than quietly dropped:
 
-**What the second run changed is which checks are worth mechanising.** A gate earns its place where a careful reader will *not* reliably catch the failure. On that test the four checks below separate into two kinds:
+| The check this contract named | Outcome |
+|---|---|
+| every claim carries a grade from the enum, and a source | **Not mechanisable.** See below |
+| the `[O]` section exists and is not empty without saying why | Built — `no-open-section`, `silent-empty-open` |
+| no recommendation language appears anywhere | **Deliberately not built.** See below |
+| the required sections are present, including *verified by hand* | Built — `no-question`, `no-coverage`, `no-not-reached`, `no-verified-by-hand`, `no-where-this-stops` |
 
-- **Worth mechanising.** A missing grade, a claim with no resolving source, an absent `[O]` section. These are countable, a reader skims past them, and the second topic carried 55 graded claims — past the point where checking by eye is dependable.
-- **Not safely mechanisable.** "No recommendation language" looks like the easiest of the four and is the trap. A grep for *recommend* fires on the sentence *"No option set, no recommendation, no decision"* — a correct disclaimer flagged as the thing it disclaims. The real failure is a neutral-sounding paragraph that steers, which no pattern catches. Mechanising the proxy would spend trust on false positives while the actual failure walks through.
+**Why "every claim carries a grade and a source" is not mechanisable.** It needs a claim to be a delimited thing. The two topics write claims as prose paragraphs in different markup — one uses bare `[E]`, the other bold `**[E]**` — with no boundary a script can find. Checking it would mean inventing a claim convention mid-gate and then testing both artifacts against a rule neither was written to. What is checked instead is narrower and honest: that every grade *used* is from the enum, that the enum is declared, and that the artifact carries graded claims at all.
 
-The prototype's central failure was building enforcement faster than the thing being enforced. The remaining argument for waiting is narrower than it was: a gate on the countable three is defensible now, and the fourth should stay a reader's job.
+**Why "no recommendation language" is deliberately not built.** It looks like the easiest of the four and is the trap. A pattern match on *recommend* fires on the sentence *"No option set, no recommendation, no decision"* — a correct disclaimer flagged as the thing it disclaims, which happened while self-checking the second topic. The real failure is a neutral-sounding paragraph that steers, which no pattern catches. Mechanising the proxy would spend reader trust on false positives while the actual failure walks through. `tests/test_validate_discovery.sh` asserts the gate does **not** refuse on it, so a later edit cannot quietly add it back.
 
-What a gate should check when it is written, all of which are mechanical:
+**Section presence is matched loosely on purpose.** The two topics carry the same required sections in different form — `## 5 · What we could not establish` with bold inline labels in one, `## What could not be established` with `###` subheadings in the other. A gate keyed to exact headings would have made the newer artifact's markup the rule, which is exactly what deferring the gate was meant to avoid.
 
-- every claim carries a grade from the enum, and a source
-- the `[O]` section exists and is not empty without saying why
-- no recommendation language appears anywhere
-- the required sections are present, including *verified by hand*
-
-**Until then this contract is asserted, not enforced**, and should be described that way.
+**One portability note, recorded because it nearly shipped.** The first version used `\?` in a `sed` address. That is a GNU extension to basic regular expressions: BSD `sed` does not support it, so the range matched nothing on macOS and the gate refused every artifact, while passing on the Linux CI leg. Same class of bug as `\b` in `git grep`, found the same way — by running it on both. The gate now uses only POSIX constructs and runs on both legs in CI.
