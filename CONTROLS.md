@@ -19,7 +19,7 @@
 | Refusal | Condition |
 |---|---|
 | `undecided-by` | `chosen:` is set and `decided_by:` is empty |
-| `not-a-person` | `decided_by:` names a role, a team, or a model |
+| `not-a-person` | `decided_by:` names someone not listed in [`DECIDERS.md`](DECIDERS.md) |
 | `undated-decision` | a decided record carries no date |
 | `pending-but-decided` | the record claims both states at once |
 

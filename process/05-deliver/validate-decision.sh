@@ -41,8 +41,36 @@ field() { # file key -> value, first match, trimmed
 
 line_of() { grep -n "^$2:" "$1" 2>/dev/null | head -1 | cut -d: -f1; }
 
-# A name is a person. Not a role, not a team, not an agent.
-NOT_A_PERSON='^(the )?(team|group|us|we|everyone|owner|author|reviewer|maintainer|claude|gpt|codex|copilot|agent|bot|ai|assistant|system|automation)$'
+# A name is a person — and the only way to check that mechanically is to
+# enumerate the people. DECIDERS.md is that list.
+#
+# This replaced a DENYLIST: an anchored exact match against twenty words like
+# `team`, `reviewer`, `claude`, `bot`. An external audit walked through it:
+#
+#   decided_by: the Platform Engineering Team  ->  within the contract
+#   decided_by: Claude Opus 5                  ->  within the contract
+#
+# Any multi-word role and any model with a version number passed. Widening the
+# list would not have fixed it — the set of things that are not a person is
+# unbounded, so a denylist fails OPEN and every miss is silent.
+#
+# The tests that were supposed to catch this asserted the three literal strings
+# the regex was written for. They proved the list contained three words; they
+# never pinned the invariant. That is the finding this change exists for, and it
+# is why the new tests use inputs chosen to sit outside the implementation.
+#
+# The denylist is kept only to give a clearer message for the obvious cases. It
+# is advisory: the allowlist is what decides.
+DECIDERS="${DECIDERS_FILE:-$ROOT/DECIDERS.md}"
+OBVIOUSLY_NOT_A_PERSON='(^|[^a-z])(team|group|everyone|owner|reviewer|maintainer|claude|gpt|codex|copilot|agent|bot|assistant|automation|llm|model)([^a-z]|$)'
+
+# authorized <name> -> 0 if the name is a listed decider
+authorized() {
+  [ -f "$DECIDERS" ] || return 1
+  grep -oE '^\| [^|]+ \|' "$DECIDERS" 2>/dev/null \
+    | sed -e 's/^| *//' -e 's/ *|$//' \
+    | grep -qxF "$1"
+}
 
 check_record() {
   local f="$1" chosen decided dated opts ln
@@ -71,9 +99,17 @@ check_record() {
   if [ -z "$decided" ]; then
     refuse "$f" "${ln:--}" "undecided-by" \
       "chosen is '$chosen' but decided_by is empty: a decision is made by a human and the record names which one"
-  elif printf '%s' "$decided" | tr 'A-Z' 'a-z' | grep -Eq "$NOT_A_PERSON"; then
-    refuse "$f" "${ln:--}" "not-a-person" \
-      "decided_by is \"$decided\", which is a role or a machine, not a named person"
+  elif ! authorized "$decided"; then
+    # Two messages for one refusal code, because the fix differs. A role or a
+    # model name is wrong and needs replacing; a real person's name just is not
+    # on the list yet, and adding them is a reviewable change to DECIDERS.md.
+    if printf '%s' "$decided" | tr 'A-Z' 'a-z' | grep -Eq "$OBVIOUSLY_NOT_A_PERSON"; then
+      refuse "$f" "${ln:--}" "not-a-person" \
+        "decided_by is \"$decided\", which is a role or a machine, not a named person. A decision is made by someone listed in DECIDERS.md"
+    else
+      refuse "$f" "${ln:--}" "not-a-person" \
+        "decided_by is \"$decided\", who is not listed in DECIDERS.md: if that is a real person authorized to decide, add them there — the list is the control, and adding to it is meant to be an explicit change"
+    fi
   fi
 
   ln="$(line_of "$f" dated)"

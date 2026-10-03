@@ -65,6 +65,26 @@ out="$(gate "$t")"
 assert_contains "$out" "refuse[unknown-source]" "a citation absent from the register is refused"
 assert_contains "$out" "reads as evidence" "the message says why a dangling citation is worse than none"
 
+# A TRUNCATED id must also be refused. Found by the #29 mutation sweep: swapping
+# the exact match for a substring match caused zero test failures, so the suite
+# did not pin exactness — the same defect #29 exists for, in a gate written an
+# hour before. `S-NBER` is a prefix of a real id and is not an id.
+t="$(fresh trunc_prefix)"
+perl -0pi -e 's/`S-NBER-2026-01`/`S-NBER`/' "$t/STANDARDS.md"
+assert_contains "$(gate "$t")" "refuse[unknown-source]" "a truncated id that is still well-formed is refused"
+
+# A MALFORMED id is not a citation at all, so the right refusal is uncited-claim.
+# Both of these were initially asserted as unknown-source and were wrong — the
+# gate was right and the test was not. `S-` exposed a real hole on the way: the
+# uncited check tested for the substring '`S-' rather than a well-formed id, so
+# `S-` satisfied "has a citation" while being extracted as none, and NEITHER
+# refusal fired. Fixed in the gate; these pin it.
+for malformed in 'NBER-2026-01' 'S-'; do
+  t="$(fresh "mal$(printf '%s' "$malformed" | tr -dc 'A-Za-z')")"
+  perl -0pi -e "s/\`S-NBER-2026-01\`/\`$malformed\`/" "$t/STANDARDS.md"
+  assert_contains "$(gate "$t")" "refuse[uncited-claim]" "a malformed id '$malformed' leaves the claim uncited"
+done
+
 # --- a register entry with nothing to open -----------------------------------
 t="$(fresh nolink)"
 perl -0pi -e 's{\| `S-SPACE-2021-01` \| SPACE — \[queue\.acm\.org\]\(https://queue\.acm\.org/detail\.cfm\?id=3454124\)}{| `S-SPACE-2021-01` | SPACE, the well-known paper}' "$t/SOURCES.md"

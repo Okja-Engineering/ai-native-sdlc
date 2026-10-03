@@ -14,6 +14,20 @@ GATE="$ROOT/process/05-deliver/validate-decision.sh"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+# The suite supplies its own decider list. Pointing at the real DECIDERS.md
+# would make these cases fail whenever a person is added or removed, which is a
+# test coupled to data rather than to behaviour — the defect that broke this
+# suite once already when a decision was first made.
+cat > "$TMP/DECIDERS.md" <<'DEC'
+# Authorized deciders
+
+| Name | Since |
+|---|---|
+| Matt Van Dusen | 2026-01-01 |
+| Ada Lovelace | 2026-01-01 |
+DEC
+export DECIDERS_FILE="$TMP/DECIDERS.md"
+
 # A record beside a real option set, so the options link resolves and the thing
 # under test is the only thing wrong with the file.
 mkdir -p "$TMP/process/04-develop/options" "$TMP/process/05-deliver/decisions"
@@ -61,17 +75,46 @@ assert_status 1 "$rc" "chosen without a decider exits 1"
 assert_contains "$out" "refuse[undecided-by]" "the refusal is undecided-by"
 assert_contains "$out" "a decision is made by a human" "the message says why"
 
-out="$(bash "$GATE" "$(record A 'the team' 2026-10-01)" 2>&1)"
-assert_contains "$out" "refuse[not-a-person]" "a team is not a person"
+# The invariant: decided_by denotes a natural person authorized to decide.
+#
+# The previous version of this block asserted exactly `the team`, `Claude` and
+# `reviewer` — the three literals the old denylist regex was written for. It
+# proved the list contained three words and never tested the invariant, so an
+# external audit passed `the Platform Engineering Team` and `Claude Opus 5`
+# through a check this repository calls irreplaceable.
+#
+# These cases are deliberately chosen to sit OUTSIDE whatever the implementation
+# obviously handles: multi-word roles, versioned model names, a vendor prefix, a
+# plausible-looking human who simply is not authorized. If the implementation is
+# rewritten, these must still pass.
+for bad in \
+  'the team' 'Claude' 'reviewer' \
+  'the Platform Engineering Team' 'Claude Opus 5' 'Anthropic Claude Opus 5.1' \
+  'Engineering Leadership Group' 'the SRE on call' 'GPT-5' 'our LLM' \
+  'nobody' 'TBD' 'A. N. Other' \
+  'Matt' 'Ada' 'Van Dusen' 'Matt Van Dusen and the team' 'matt van dusen'
+do
+  out="$(bash "$GATE" "$(record A "$bad" 2026-10-01)" 2>&1)"; rc=$?
+  assert_status 1 "$rc" "refuses decided_by: $bad"
+done
 
-out="$(bash "$GATE" "$(record A 'Claude' 2026-10-01)" 2>&1)"
-assert_contains "$out" "refuse[not-a-person]" "a model is not a person"
-
-out="$(bash "$GATE" "$(record A 'reviewer' 2026-10-01)" 2>&1)"
-assert_contains "$out" "refuse[not-a-person]" "a role is not a person"
-
+# And the positive half, which is what makes it an allowlist rather than a
+# denylist: a listed decider is accepted, and so is a second one.
 out="$(bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01)" 2>&1)"; rc=$?
-assert_status 0 "$rc" "a named human is accepted"
+assert_status 0 "$rc" "an authorized decider is accepted"
+out="$(bash "$GATE" "$(record A 'Ada Lovelace' 2026-10-01)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "a second authorized decider is accepted"
+
+# The two messages, because the fix differs. A role needs replacing; a real
+# person needs adding to the list.
+out="$(bash "$GATE" "$(record A 'the Platform Engineering Team' 2026-10-01)" 2>&1)"
+assert_contains "$out" "a role or a machine" "a role gets the role message"
+out="$(bash "$GATE" "$(record A 'Grace Hopper' 2026-10-01)" 2>&1)"
+assert_contains "$out" "not listed in DECIDERS.md" "an unlisted person is told to be added"
+
+# No decider list at all must fail closed, not open.
+out="$(DECIDERS_FILE=/nonexistent/DECIDERS.md bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a missing decider list refuses rather than passing everything"
 
 # --- companion checks, equally shape-independent ------------------------------
 out="$(bash "$GATE" "$(record A 'Matt Van Dusen' '')" 2>&1)"
@@ -119,10 +162,20 @@ out="$(bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01)" 2>&1)"; rc=$?
 assert_status 0 "$rc" "a reciprocated link is accepted once restored"
 
 # --- the shipped records ------------------------------------------------------
+# These use the REAL DECIDERS.md, because they are checking real records. The
+# fixture list above is for the synthetic cases only.
+unset DECIDERS_FILE
+
 out="$(bash "$GATE" "$ROOT/process/05-deliver/decisions/producing-themes.md" 2>&1)"; rc=$?
 assert_status 0 "$rc" "the measure-first record is within the contract"
 
 out="$(bash "$GATE" "$ROOT/process/05-deliver/decisions/agent-pr-approval.md" 2>&1)"; rc=$?
 assert_status 0 "$rc" "the record that amends STANDARDS.md is within the contract"
+
+# The real list must actually name the person the real records name, or the two
+# agree only by the gate not looking.
+assert_contains "$(cat "$ROOT/DECIDERS.md")" \
+  "$(sed -n 's/^decided_by:[[:space:]]*//p' "$ROOT/process/05-deliver/decisions/agent-pr-approval.md" | head -1)" \
+  "the real decider list names the person the real record names"
 
 assert_done

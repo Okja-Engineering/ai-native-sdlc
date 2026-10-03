@@ -55,6 +55,7 @@ The last box is not a phase. A decision records `amends:` naming the document it
 | [`intent.md`](intent.md) | Why this repository exists and what we believe |
 | [`spec.md`](spec.md) | What V0 is, and what it is not |
 | [`STANDARDS.md`](STANDARDS.md) | How mature AI-native teams work, as of a date, graded |
+| [`DECIDERS.md`](DECIDERS.md) | Who is authorized to make a decision. The gate refuses a name that is not on it |
 | [`SOURCES.md`](SOURCES.md) | The source behind every graded claim, with its population, finding and limitation |
 | [`process/01-scan/`](process/01-scan/) | Record what changed. A contract, a gate that refuses a file breaking it, and the instruction a person runs |
 | [`process/01-scan/findings/`](process/01-scan/findings/) | One findings file per cycle. Ranks nothing, drops nothing |
