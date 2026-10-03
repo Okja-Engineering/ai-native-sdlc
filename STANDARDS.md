@@ -179,7 +179,7 @@ Every `[E]` and `[S]` claim above cites an ID in [`SOURCES.md`](SOURCES.md), and
 
 Three places in this document name a grade without using one: the table above that defines what each grade means, and two sentences about the grading scheme rather than graded by it. Each one says so in an HTML comment carrying its reason, and the gate prints how many such declarations it honoured. Until 2026-10-03 the gate instead skipped every line starting with `|` or `> `, which was silent, unconditional, and let a table row and a blockquote carry an uncited grade.
 
-Derived from research conducted Q3 2026. The corpus is in history at `fa7538a`, **not on a branch** — `experiment/0.0.0` was referenced here and in `README.md` and does not exist on origin, which left this document with no reachable evidence at all. Found by the external audit in #22.
+Derived from research conducted Q3 2026. The corpus is in history at `fa7538a`, **not on a branch** — `experiment/0.0.0` was referenced here and in `README.md` and does not exist on origin, which left this document with no reachable evidence at all. Found by the external audit in #22. <!-- dead-pointer: experiment/0.0.0 — named here to record that it never existed on origin, not as a route to anything -->
 
 **The three defects this document named are now corrected in `SOURCES.md` rather than inherited:** one source's population understated fivefold (`S-NBER-2026-01`, 100,000 to 500,000+); the METR supersession unrecorded (now `S-METR-2026-01`, carrying METR's own statement that the replacement results are unreliable); three vendor-affiliated sources filed under non-vendor labels (now marked in the class column). A fourth was found while doing it: §3's self-assessment claim was graded `[E]` and is `[P]`.
 
