@@ -274,3 +274,7 @@ The sentence below was run against the repaired gate on 2026-10-03 and **passes*
 ```
 
 Both names resolve, so the part names things, and the sentence denies checking them. Nothing mechanical closes that, which is why the repaired gate is written as *names a referent* rather than as *was verified*. A reader is still the only check on whether a coverage part is true. What has changed is narrower and worth stating exactly: a part naming nothing at all is now refused however it is punctuated, where before two commas were enough.
+
+**12. A gate refuses on the authority of a document nobody accepted.** [`bin/validate-claims.sh`](bin/validate-claims.sh) enforces the rule against speed and velocity claims and names [`intent.md`](intent.md) as the authority when it refuses. `intent.md` is marked *draft, unaccepted*, and six other tracked files cite it as binding; its status line now lists all seven. So a reviewer asking what authorized a refusal is told the root document is a draft nobody accepted.
+
+Stated rather than closed, for one reason: accepting `intent.md` is a decision by a named decider under [`DECIDERS.md`](DECIDERS.md), and an agent writing "accepted" into a status line would be item 10's defect wearing different clothes — a document asserting a state nothing produced. The check that would close it is *no gate names a document that declares itself unaccepted*. It cannot pass until the decider acts, which is the same position `bin/validate-authorship.sh` is in, so it is written down here and not added.
