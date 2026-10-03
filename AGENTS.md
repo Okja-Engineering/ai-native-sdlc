@@ -35,7 +35,7 @@ Two artifacts, each with one job.
 
 **The issue** carries the intent, at the feature or capability level: title as the problem statement, background, the problem, proposed solution, expected outcome, validation method. The validation method is decided **before** the work starts. Template: [`.github/ISSUE_TEMPLATE/capability.md`](.github/ISSUE_TEMPLATE/capability.md).
 
-**The pull request** links the issue and stays short: what changed, how it was proved and what wasn't, what is deliberately out of scope, and how AI was used. It does not repeat the intent. Template: [`.github/pull_request_template.md`](.github/pull_request_template.md).
+**The pull request** links the issue and stays short: what changed, how it was proved and what wasn't, and what is deliberately out of scope. It does not repeat the intent. Template: [`.github/pull_request_template.md`](.github/pull_request_template.md).
 
 Together they give an auditable chain: the issue states the intended change and how it will be validated, the pull request shows what was done and the evidence, and the merge is the approval by a named person.
 
@@ -76,12 +76,6 @@ The widely quoted "200–400 lines, 70–90% defect discovery" figure is **not**
 ### Declaring what you could not verify
 
 State it. A test you could not run, a claim taken on trust, a platform you did not check. The Linux kernel requires this of patch submissions — *"If the fix could not be built or tested, or if no reproducer could be produced, say so explicitly."* This repository already holds the same rule for scan findings, where `nothing found` is a result.
-
-### Declaring AI use
-
-**Extent and purpose, not the model name.** Whether a tool implemented an idea or produced the idea is what a reviewer needs. Rust's policy puts it directly: *"We don't care which model you used, but we do care whether you used the LLM to implement the idea or to come up with it"* — and a bare "Generated with \<tool\>" is explicitly not acceptable there.
-
-This is deliberately against the common pattern. Of 281 open-source AI policies, 32.8% ask for the tool name and only 13.0% for the extent of use. The two projects with the most developed policies, Linux and Rust, both ask for extent and purpose and both decline the model name.
 
 ### Gates: enumerate what is allowed, not what is not
 
