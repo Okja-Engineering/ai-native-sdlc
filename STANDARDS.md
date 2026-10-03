@@ -16,7 +16,7 @@ Every claim carries a grade. The grade is the point of this document — "accept
 
 ## 1. The constraint moved. It is no longer generation.
 
-**[E]** The largest study available — 500,000+ GitHub developers with usage telemetry — finds the gain attenuating sharply as work moves toward production.
+**[E]** `S-NBER-2026-01` The largest study available — 500,000+ GitHub developers with usage telemetry — finds the gain attenuating sharply as work moves toward production.
 
 ```mermaid
 flowchart LR
@@ -32,9 +32,9 @@ flowchart LR
 
 Observational, not causal. But the direction is consistent with the second finding:
 
-**[E]** Acceleration is **conditional, not general.** A peer-reviewed field experiment across 4,867 developers found ~26% more completed tasks — *run by Microsoft and Accenture on GitHub Copilot, with vendor co-authors*, so read it as a vendor-sponsored result. Against that, a controlled study of 16 experienced maintainers on 246 tasks in their own repositories found them **19% slower.** Clear bounded work with fast feedback tends to benefit; mature, tacit, high-assurance work can incur a verification tax larger than the generation gain.
+**[E]** `S-FIELD-2025-01` `S-METR-2025-01` Acceleration is **conditional, not general.** A peer-reviewed field experiment across 4,867 developers found ~26% more completed tasks — *run by Microsoft and Accenture on GitHub Copilot, with vendor co-authors*, so read it as a vendor-sponsored result. Against that, a controlled study of 16 experienced maintainers on 246 tasks in their own repositories found them **19% slower.** Clear bounded work with fast feedback tends to benefit; mature, tacit, high-assurance work can incur a verification tax larger than the generation gain.
 
-> **[O] Recency caveat that must not be dropped:** METR **publicly superseded** their own slowdown figure on 2026-02-24, reporting late-2025 data consistent with a possible speedup. The 19% result stands for its period and was not retracted, but anyone citing it today owes the reader that update.
+> **[O]** `S-METR-2026-01` **Recency caveat that must not be dropped:** METR **publicly superseded** their own slowdown figure on 2026-02-24, reporting late-2025 data consistent with a possible speedup. The 19% result stands for its period and was not retracted, but anyone citing it today owes the reader that update.
 
 **[V]** Vendor self-reports of large internal multipliers exist and are uncontrolled, self-measured, and framed around speed. Use them as evidence that a verification bottleneck is *real* — several describe interventions that failed within days — not as evidence that any practice works.
 
@@ -74,17 +74,19 @@ Three things distinguish this from a normal pipeline:
 
 **The slice is the smallest independently valuable change**, with its own rollback. **[P]** — and note **[O]**: no source establishes a maximum reviewable size. Nobody has measured this. It is a working hypothesis.
 
-**Production is part of verification, not after it.** **[E]/[S]** Tests prove modeled expectations; production reveals actual behavior. Deployment identity, traces, and customer outcomes connect back to the originating intent.
+**Production is part of verification, not after it.** **[E]/[S]** `S-DORA-2025-01` `S-NIST-SSDF-2022-01` Tests prove modeled expectations; production reveals actual behavior. Deployment identity, traces, and customer outcomes connect back to the originating intent.
 
 ---
 
 ## 3. An agent runs checks. It does not set them, and it cannot pass itself.
 
-**[V]** stated plainly by vendors — *"the agent that wrote the code has no way to approve it"* — and **[E]** in the sense that this is the most reliably reproduced failure in practice. Agents asked to assess their own work praise it; a dedicated reviewer agent will talk itself out of its own findings.
+**[V]** stated plainly by vendors — *"the agent that wrote the code has no way to approve it"* — and **[P]** from our own repeated experience: agents asked to assess their own work praise it, and a dedicated reviewer agent will talk itself out of its own findings.
 
-**The practice:** separation of duties. Whoever produced the change does not grade it. A second, independent evaluator, with criteria written down beforehand. This maps onto maker-checker, which is why it travels well in regulated environments. **[S]**
+> **This was graded [E] until 2026-10-03, and that was wrong.** "The most reliably reproduced failure in practice" is something we have observed, not a controlled result, and no study in [`SOURCES.md`](SOURCES.md) establishes it. Downgraded to **[P]** rather than given a citation it does not have. The behaviour is still what §3 rests on; what changed is the honesty of the grade.
 
-**An agent may be that evaluator. It may not be the approver.** An agent reviews, comments and flags. The act that unblocks a merge is a natural person's. Two accounts belonging to one vendor's one product is a separation of *identity*, not of duties — measured 2026-10-03, an agent was the sole approving reviewer on 10% of a 300-item sample of pull requests it had authored itself, because the authoring and reviewing accounts differ and the platform evaluates "an author cannot approve their own pull request" per account. **[E]** for the measurement.
+**The practice:** `S-NIST-AC5` separation of duties. Whoever produced the change does not grade it. A second, independent evaluator, with criteria written down beforehand. This maps onto maker-checker, which is why it travels well in regulated environments. **[S]**
+
+**An agent may be that evaluator. It may not be the approver.** An agent reviews, comments and flags. The act that unblocks a merge is a natural person's. Two accounts belonging to one vendor's one product is a separation of *identity*, not of duties — measured 2026-10-03 (`S-OURS-APPROVAL-2026-01`), an agent was the sole approving reviewer on 10% of a 300-item sample of pull requests it had authored itself, because the authoring and reviewing accounts differ and the platform evaluates "an author cannot approve their own pull request" per account. **[E]** for the measurement.
 
 **This is our practice, not an established requirement. [O]** Whether a machine approval can satisfy a regulated separation-of-duties control is unresolved in both directions. NIST SP 800-53 AC-5 is written in terms of *"different individuals or roles"* and routes enforcement through IA-2 *Organizational Users* rather than IA-9 *Service Identification*, saying nothing either way; the PCI DSS clause that would settle it could not be obtained. See unresolved item 4.
 
@@ -98,7 +100,7 @@ decided: [`process/05-deliver/decisions/agent-pr-approval.md`](process/05-delive
 
 ## 4. Autonomy is earned per action class, never granted globally
 
-**[S]/[P]** Prompts and skills are advisory. Consequence-bearing authority requires identity, least privilege, least agency, sandboxing, policy enforcement, provenance, observable operations, and tested rollback.
+**[S]/[P]** `S-OWASP-GENAI-2026-01` `S-NIST-AIRMF-2023-01` `S-SLSA-2023-01` Prompts and skills are advisory. Consequence-bearing authority requires identity, least privilege, least agency, sandboxing, policy enforcement, provenance, observable operations, and tested rollback.
 
 ```mermaid
 flowchart LR
@@ -131,7 +133,7 @@ Our own prior attempt allocated a fixed deterministic ratio in advance. That tur
 
 ## 6. Measure outcomes, not activity
 
-**[E]** The delivery-research consensus is that activity metrics mislead and that AI amplifies existing platform quality, architecture, and organizational health rather than substituting for them.
+**[E]** `S-DORA-2024-01` `S-DORA-2025-01` `S-SPACE-2021-01` `S-DEVEX-2023-01` The delivery-research consensus is that activity metrics mislead and that AI amplifies existing platform quality, architecture, and organizational health rather than substituting for them.
 
 **Worth measuring:** defects escaping to production versus caught before merge · repeat incidents of the same class · rework after human approval · intent survival — intents accepted versus closed unbuilt · change failure and recovery time · human review time and intervention rate · comprehension and confidence calibration.
 
@@ -162,7 +164,11 @@ Not gaps in this document — open questions in the field, as of Q3 2026.
 
 ## Provenance and maintenance
 
-Derived from research conducted Q3 2026, preserved with its source register on `experiment/0.0.0`. **Known defects in that corpus, being corrected rather than inherited:** one source's population understated fivefold; the METR supersession above unrecorded; three vendor-affiliated sources filed under non-vendor labels.
+Every `[E]` and `[S]` claim above cites an ID in [`SOURCES.md`](SOURCES.md), and `bin/validate-standards.sh` refuses one that does not.
+
+Derived from research conducted Q3 2026. The corpus is in history at `fa7538a`, **not on a branch** — `experiment/0.0.0` was referenced here and in `README.md` and does not exist on origin, which left this document with no reachable evidence at all. Found by the external audit in #22.
+
+**The three defects this document named are now corrected in `SOURCES.md` rather than inherited:** one source's population understated fivefold (`S-NBER-2026-01`, 100,000 to 500,000+); the METR supersession unrecorded (now `S-METR-2026-01`, carrying METR's own statement that the replacement results are unreliable); three vendor-affiliated sources filed under non-vendor labels (now marked in the class column). A fourth was found while doing it: §3's self-assessment claim was graded `[E]` and is `[P]`.
 
 This document is expected to go stale. It carries a date because the honest version of "current standards" is a dated snapshot with a refresh obligation, not a permanent claim. **Review cadence: monthly** — what changed, what was superseded, what is newly contested.
 

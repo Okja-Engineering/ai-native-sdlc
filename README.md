@@ -55,6 +55,7 @@ The last box is not a phase. A decision records `amends:` naming the document it
 | [`intent.md`](intent.md) | Why this repository exists and what we believe |
 | [`spec.md`](spec.md) | What V0 is, and what it is not |
 | [`STANDARDS.md`](STANDARDS.md) | How mature AI-native teams work, as of a date, graded |
+| [`SOURCES.md`](SOURCES.md) | The source behind every graded claim, with its population, finding and limitation |
 | [`process/01-scan/`](process/01-scan/) | Record what changed. A contract, a gate that refuses a file breaking it, and the instruction a person runs |
 | [`process/01-scan/findings/`](process/01-scan/findings/) | One findings file per cycle. Ranks nothing, drops nothing |
 | [`process/02-discover/`](process/02-discover/) | Establish what is true about one question, every claim graded and sourced. Recommends nothing |
@@ -79,4 +80,4 @@ That is the status. It reads the tree, so it is correct by construction. Counts 
 
 **Nothing is scheduled and nothing runs on its own.** A person starts every cycle, and a person writes every judgement — `next.sh` produces the skeleton, and the gates refuse that skeleton until it is filled in.
 
-The prototype this derives from is preserved on the `experiment/0.0.0` branch and will not be merged. It is reference: what we tried, and what an adversarial audit of it found.
+The prototype this derives from is preserved in history at `fa7538a` and will not be merged. It is reference: what we tried, and what an adversarial audit of it found.

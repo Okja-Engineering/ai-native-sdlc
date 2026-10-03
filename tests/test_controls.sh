@@ -17,7 +17,12 @@ assert_file_exists "$DOC" "the controls document exists"
 
 # --- every gate named in the document exists ----------------------------------
 # Scripts are cited as `process/<phase>/validate-<thing>.sh` in backticks.
-gates="$(grep -oE 'process/[0-9a-z-]+/validate-[a-z-]+\.sh' "$DOC" | sort -u)"
+# Gates live beside their phase, except the STANDARDS.md gate, which has no
+# phase to live beside — #18 established that applying a decision is a field
+# plus a link rather than a sixth phase, so it sits in bin/ with the other
+# repository-level tools. The first version of this pattern matched only
+# process/ and reported CTRL-8's refusals as emitted by nothing.
+gates="$(grep -oE '(process/[0-9a-z-]+|bin)/validate-[a-z-]+\.sh' "$DOC" | sort -u)"
 assert_contains "$gates" "validate-decision.sh" "the document cites the deliver gate"
 assert_contains "$gates" "validate-define.sh" "the document cites the define gate"
 assert_contains "$gates" "validate-findings.sh" "the document cites the scan gate"
