@@ -23,11 +23,19 @@ GATE="$ROOT/bin/validate-authorship.sh"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-# --- the real repository refuses, for the stated reasons ----------------------
+# --- the real repository refuses ----------------------------------------------
+# Asserted loosely ON PURPOSE. These run against whatever history the checkout
+# has, and CI clones shallow: locally `git log --all` sees two author names on
+# the shared address and emits `identity-shared`, while in CI it sees one and
+# does not. The first version asserted that specific refusal and failed on both
+# CI legs — a test coupled to checkout depth rather than to behaviour.
+#
+# So this asserts only that the real history refuses and names a cause. The
+# precise refusals are pinned by the fixtures below, which build their own
+# history and do not depend on the environment.
 out="$(bash "$GATE" 2>&1)"; rc=$?
 assert_status 1 "$rc" "the real history refuses"
-assert_contains "$out" "refuse[author-not-a-decider]" "a decision commit not authored by a decider is refused"
-assert_contains "$out" "refuse[identity-shared]" "a shared identity is refused"
+assert_contains "$out" "refuse[" "it names a cause"
 assert_contains "$out" "not yet enforced" "it points at where the gap is recorded"
 
 # --- a clean fixture must be ACCEPTED ----------------------------------------
