@@ -87,10 +87,19 @@ rm -f "$SB/process/01-scan/findings/2099-01-01.md"
 # This is the assertion that matters most. The gate printed ok for an invalid
 # pattern because a non-zero git grep exit was read as "nothing found".
 cp "$SB/bin/validate-claims.sh" "$TMP/good.sh"
-perl -0pi -e "s/OWN='\(our \|the \|your \|my \|their \)\?'/OWN='(our |the |your |my |their |)'/" "$SB/bin/validate-claims.sh"
+# The mutation uses an UNMATCHED PAREN, which is invalid in POSIX ERE on every
+# platform. The first version used an empty alternative — `(our |the |)` — which
+# is what the real bug was, and that is accepted by GNU grep as simply meaning
+# "optional" while BSD rejects it. So the test passed on macOS and failed on
+# ubuntu, asserting a platform quirk rather than the gate's behaviour.
+#
+# Worth recording which way round that is: the defect that shipped was invisible
+# on Linux and caught on macOS. Every other portability bug in this repository
+# has gone the other way.
+perl -0pi -e "s/OWN='\(our \|the \|your \|my \|their \)\?'/OWN='(unterminated'/" "$SB/bin/validate-claims.sh"
 # Confirm the mutation actually landed. A mutation that does not mutate looks
 # identical to a test that works, and this suite has already been fooled once.
-assert_contains "$(cat "$SB/bin/validate-claims.sh")" "their |)" "the broken-pattern mutation applied"
+assert_contains "$(cat "$SB/bin/validate-claims.sh")" "OWN='(unterminated'" "the broken-pattern mutation applied"
 out="$(cd "$SB" && bash bin/validate-claims.sh 2>&1)"; rc=$?
 assert_status 2 "$rc" "a pattern that does not compile exits 2, not 0"
 assert_contains "$out" "nothing was checked" "it says nothing was checked"
