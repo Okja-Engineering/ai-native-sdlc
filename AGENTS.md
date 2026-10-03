@@ -36,6 +36,27 @@ Two artifacts, each with one job.
 
 Together they give an auditable chain: the issue states the intended change and how it will be validated, the pull request shows what was done and the evidence, and the merge is the approval by a named person. All of it in git.
 
+### Two chains, and only one of them is in git
+
+This said *"All of it in git."* It is not, and an external audit caught it.
+
+| | Where it lives | Readable from a clone? |
+|---|---|---|
+| **The process chain** — findings → topic → problem → options → decision → the `STANDARDS.md` amendment | Tracked files, each linked to the next by a `from:`, `rests on:`, `problem:`, `options:` or `amends:` field | **Yes, end to end** |
+| **The engineering chain** — issue → pull request → merge | Issue and pull request bodies are in GitHub's database. The merge commit carries only the number and the title | **No** |
+
+```
+$ git log --format='%s%n%b' -1 --merges
+Merge pull request #47 from Okja-Engineering/doc-drift
+The documents describe a repository that no longer exists, in six confirmed places
+```
+
+No validation method, no evidence section, no approval record.
+
+**What this means for an assessor.** The chain the loop produces — the one being assessed — is complete in a clone. The chain by which this repository was *built* is not: a clone can see that a change was reviewed and merged, and cannot see what it was intended to do or how that was to be validated.
+
+**References to issue numbers in tracked documents therefore carry their own context.** `#19` means nothing offline, so a document naming an issue states the gap in the same sentence rather than pointing at it.
+
 ### Why these are short
 
 An earlier draft of this section had six required headings. The evidence is against that:
