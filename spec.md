@@ -1,12 +1,12 @@
 # Spec — V0
 
-**Status:** draft, unaccepted. Nothing downstream of this is authorized.
+**Status:** this described V0 before V0 was built, and said so — "draft, unaccepted. Nothing downstream of this is authorized." That stopped being true. Five phases, two decisions, five gates and a standards amendment are downstream of it. The forward-looking framing is replaced below; what V0 turned out to be is in `README.md`, and where any cycle has got to is `bin/cycle.sh`.
 
-Derived from [`intent.md`](intent.md). Scoped deliberately small: V0 states the intent, captures the research, and specifies **stage 1 only** — so the stage can be argued with before it is written.
+Derived from [`intent.md`](intent.md). Scoped deliberately small at the time: state the intent, capture the research, specify **stage 1 only** — so the stage could be argued with before it was written. All five phases have since been built.
 
 ## What V0 is
 
-Four documents and one stage specification. No code.
+Originally scoped as four documents and one stage specification, with no code. It did not stay that way: there are five phases, five gates, two tools and a CI workflow. The table below says what each piece is for, which is stable; it no longer claims what exists, which was not.
 
 | Deliverable | What it is for |
 |---|---|
@@ -32,7 +32,9 @@ There is still no classifier, no CLI, no MCP server, and no scheduled job. Nothi
 
 **Nothing here produces a judgement.** `next.sh` writes a skeleton and the gates refuse that skeleton until a person fills it in. That is the line being held, not a gap waiting to be closed.
 
-**No phase contract was designed in advance.** Each was written after the artifact it describes, from what that artifact turned out to need — and is asserted rather than enforced until a second, differently shaped artifact shows which parts were real and which were the first one's accidents. Where a gate exists, it checks only what does not depend on shape.
+**Most phase contracts were written after the artifact they describe**, from what that artifact turned out to need, and each is asserted rather than enforced until a second, differently shaped artifact shows which parts were real. Where a gate exists, it checks only what does not depend on shape.
+
+> **"Each" was too strong, and git says so.** Define, Develop and Discover hold the claimed order. Scan does not — `67a85aa` declared the contract before `d6da793` added the worked example. Deliver's contract landed one second before its first record, so the two were one batch and `deliver-contract.md`'s specific claim that "the record was drafted first" is unverifiable from the repository, with git's only testimony against it. Three of five, stated for five. Found by an external audit.
 
 ## The loop
 
@@ -52,7 +54,7 @@ Specified in [`process/01-scan/README.md`](process/01-scan/README.md). In summar
 
 **Sources:** the web, X, YouTube. A release note tells you a capability shipped; a thread or a talk tells you whether anyone changed how they work because of it. The second is the signal.
 
-**Produces:** a findings file per cycle. Each finding carries what it is, where it came from, when, what it might affect, and an initial consequence guess — nothing more. **Stage 1 does not assess impact.** That is stage 2, behind a human gate.
+**Produces:** a findings file per cycle. Each finding carries what it is, where it came from, when, what it might affect, and an initial consequence guess — nothing more. **Stage 1 does not assess impact.** That is Discover (`process/02-discover/`), behind a human gate.
 
 **Stops at:** a human reading the findings. Stage 1 has no authority to advance anything.
 
@@ -69,7 +71,7 @@ Move to weekly or daily only when a classifier exists and has been wrong in fron
 3. Nothing in this repository claims a capability it does not have.
 4. No claim about speed, throughput or velocity appears anywhere.
 
-## Open, to settle before stage 1 is built
+## Open, carried from before stage 1 was built
 
 - **Whether three sources are the right three**, and whether paid search or fetch is in scope. Cycle 2026-09-29 reached X only through unauthenticated surfaces.
 - **What "since we last looked" is anchored to** — a stored date, or the last findings file in the repo. The second is self-describing and needs no state outside git.

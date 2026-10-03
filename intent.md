@@ -16,7 +16,9 @@ So: a repository that states how we work, and a process that keeps that statemen
 
 **An honest statement of what's actually established.** Distinguishing an empirical result from a vendor's methodology from our own opinion. This matters more for us than most teams: we work in a high-risk regulated codebase, in a carved-out space where AI exploration is permitted on the condition it's done as controlled experiment rather than enthusiasm. "This is accepted practice" is a claim we have to be able to defend.
 
-**Change detection with an opinion about consequence.** Not a news feed. A filter that says *this one matters to a software team, and here's the blast radius* — and stays quiet about the rest.
+**Change detection with an opinion about consequence.** Not a news feed. Something that says *this one matters to a software team, and here is what it might touch* — and stays quiet about the rest.
+
+> **This asked for the opposite of what was built, and in the words the gate refuses.** It said "a filter... and here is the blast radius", while the scan "ranks nothing, drops nothing" and `findings-contract.md` lists `blast radius` in the assessment vocabulary the gate refuses. What resolved the tension is that a theme is a summary rather than a filter: nothing is dropped, and the reader still decides once per theme instead of once per item. The wording here is corrected to match; the gate was right.
 
 **The ability to change ourselves deliberately.** When something does matter, the output isn't a link. It's a proposed change to our standards and our skills, that a person accepts or rejects.
 
@@ -74,7 +76,7 @@ That last one is the real test. A change-detector that always finds something is
 - **Not autonomy.** The human gates are the product, not friction in front of it.
 - **Not speed.** No claim about throughput, cycle time or velocity appears in this repository, and none should.
 - **Not a standard for anyone else.** We're one team working out how we want to work. Portability is a nice property, not a goal.
-- **Not a platform.** If it stops being a small number of readable files plus a scheduled job, something has gone wrong.
+- **Not a platform.** If it stops being a small number of readable files plus a scheduled job, something has gone wrong. **There is no scheduled job yet** — nothing runs on its own, and a missed cycle is currently invisible. Tracked as issue #19.
 
 ## Open questions
 

@@ -21,30 +21,32 @@ Two examples of that, both real, both in the tree:
 ```mermaid
 flowchart LR
     S["<b>01 · Scan</b><br/>what changed since<br/>we last looked?"]
-    G1{{"human:<br/>interesting?"}}
+    F1["<b>03 · Define</b><br/>every finding into themes,<br/>nothing dropped"]
+    G1{{"human:<br/>which theme?"}}
     D["<b>02 · Discover</b><br/>what is true about it,<br/>graded and sourced"]
-    G2{{"human:<br/>pursue it?"}}
-    F["<b>03 · Define</b><br/>themes, then one<br/>stated problem"]
+    F2["<b>03 · Define</b><br/>one stated problem"]
     V["<b>04 · Develop</b><br/>options, each with<br/>its failure mode"]
     L["<b>05 · Deliver</b><br/>one choice, by a<br/>named person"]
     U(["<b>amends</b><br/>STANDARDS.md,<br/>linked both ways"])
 
-    S --> G1 --> D --> G2 --> F --> V --> L --> U
+    S --> F1 --> G1 --> D --> F2 --> V --> L --> U
     U -. "next cycle" .-> S
 
     classDef human fill:#fde68a,stroke:#b45309,color:#1c1917
     classDef step fill:#e0f2fe,stroke:#0369a1,color:#0c1a2b
     classDef out fill:#dcfce7,stroke:#15803d,color:#052e16
-    class G1,G2 human
-    class S,D,F,V,L step
+    class G1 human
+    class S,F1,D,F2,V,L step
     class U out
 ```
 
-Five phases, two human gates between them, and a third at the end: **Deliver is itself a human gate** — a decision needs a named natural person, and the gate refuses a role, a team or a model name.
+**Define runs twice, and the directory numbering is not the running order.** Define groups the Scan's findings before anyone picks a theme; Discover then goes deep on the theme that was picked; Define states the problem from both. `bin/cycle.sh` prints it in this order.
+
+**Deliver is itself the last human gate** — a decision needs a named natural person from [`DECIDERS.md`](DECIDERS.md), and the gate refuses a role, a team or a model name.
 
 The last box is not a phase. A decision records `amends:` naming the document it changes, and the amended claim links back to the decision — checked in both directions, so the standard and the decision cannot disagree silently.
 
-> **This diagram said something else until 2026-10-03.** It drew four stages — Scan, Assess, Propose, Update — while `process/` held five differently named ones, and the Update stage was never built. Nobody reconciled them for five phases of real work. The divergence was found by asking why `STANDARDS.md` had never been changed by the loop built to change it.
+> **This diagram has been wrong twice.** Until 2026-10-03 it drew four stages — Scan, Assess, Propose, Update — while `process/` held five differently named ones and the Update stage was never built. The replacement then drew `Scan → Discover → Define`, which is not the order the work ran: the artifacts' own `from:` fields show Define reading the Scan, and the Discover topic on the same question dated two days later. Found by an external audit both times, not by anyone here.
 
 ## What's here
 

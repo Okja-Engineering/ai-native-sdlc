@@ -82,7 +82,7 @@ It refuses a file that breaks the contract, each refusal naming its own rule.
 
 The stage writes one file, runs the gate, and stops. It does not advance anything, and there is nothing built for it to advance into.
 
-A person then reads the file and decides, per finding: **interesting** · **not interesting**, dismissed with a reason · **later**, parked. Where those decisions get recorded is not settled and is deliberately not invented here — the assess stage does not exist.
+A person then reads the file and decides, per finding: **interesting** · **not interesting**, dismissed with a reason · **later**, parked. Where those decisions get recorded is still not settled and is deliberately not invented here. The phase that reads the findings is `process/02-discover/`, called "assess" when this was written; what is missing is a place a dismissal is recorded, not the phase.
 
 ## Unsettled
 

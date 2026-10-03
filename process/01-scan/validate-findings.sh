@@ -257,7 +257,7 @@ check_no_judgment() {
     while IFS= read -r hit; do
       [ -n "$hit" ] || continue
       lno="${hit%%:*}"
-      refuse "$file" "$lno" assessment "the words \"$phrase\" appear here: stage 1 records what happened and has no authority to judge what it means — that belongs to the assess stage, behind a human gate, and the assess stage is not built"
+      refuse "$file" "$lno" assessment "the words \"$phrase\" appear here: stage 1 records what happened and has no authority to judge what it means — that belongs to Discover, behind a human gate"
     done < <(grep -n -i -F -- "$phrase" "$file")
   done < <(printf '%s\n' "$VOCABULARY_L")
 }
