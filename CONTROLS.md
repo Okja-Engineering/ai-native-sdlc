@@ -78,7 +78,11 @@
 
 | Refusal | Condition |
 |---|---|
-| `unaccounted` | themes plus outliers do not equal the source item count |
+| `no-accounting` | no `accounting:ids` block, so there is nothing to compare |
+| `unaccounted` | a finding in the source the block does not list |
+| `invented-accounting` | an id accounted for that is not in the source |
+| `duplicate-accounting` | an id listed twice |
+| `counts-disagree` | theme counts plus outliers do not sum to the ids accounted for |
 | `no-outlier-section` | no outlier section at all |
 | `silent-empty-outliers` | the section lists nothing and does not say it is empty |
 | `no-source` | the record links no source artifact |
@@ -86,7 +90,12 @@
 
 **Evidence.** The counts reconcile against the source artifact, which is linked and resolvable. This control caught a real defect before it was mechanised: a draft that grouped 54 of 64 findings and reported three wrong counts, where the ten strays included a pattern nobody had named.
 
-**What it does not cover.** Whether the grouping is *useful*. Accounting for every item says nothing about whether the themes are the right themes.
+**Evidence note.** The accounting is a **set comparison by id**, not arithmetic. It was a total until 2026-10-03, when an external audit broke it two ways — lowercasing a finding's first letter removed it from the denominator, and two theme counts could move in opposite directions with the total reconciling.
+
+**What it does not cover.**
+
+- **A finding moved between themes.** Moving a count from one theme to another leaves the set unchanged and still reconciles. That is a count-accuracy defect rather than a dropping defect, and closing it needs per-theme ids — required by `define-contract.md` from the next cycle. Cycle `2026-09-29` predates ids and recorded counts only, so its membership is not recoverable and its artifact says so rather than reconstructing a mapping nobody made.
+- **Whether the grouping is useful.** Accounting for every item says nothing about whether the themes are the right themes.
 
 ---
 
@@ -176,6 +185,8 @@ The section an assessor should read first. Each of these is a real gap, not a fo
 **0. Whether a cited source actually supports the claim it is cited for.** CTRL-8 establishes that a citation resolves. Nothing establishes that the paper says what the sentence says it says. Four of the register's entries carry limitations that materially bound the claim — three are vendor-affiliated, and `S-METR-2026-01` carries its own authors' statement that the results are unreliable. A reader who does not open the register will not know.
 
 **1. Whether an approver actually reviewed.** CTRL-1 makes a decision attributable. It cannot distinguish a person who read the change from one who clicked approve. `STANDARDS.md` §3 now requires a natural person to hold the approving position, and the decision that set that policy records the cost explicitly: a machine approval is visible in a platform audit log, a human rubber stamp is not, so the policy **moves a detectable failure into an undetectable one.**
+
+**1b. Whether a finding was moved between themes.** CTRL-4 detects a dropped or invented finding and not a relabelled one. See CTRL-4.
 
 **2. Whether a machine approval can satisfy a separation-of-duties control.** **Undecided, in both directions.** NIST SP 800-53 AC-5 is written in terms of *"different individuals or roles"* and routes enforcement through IA-2 *Organizational Users* rather than IA-9 *Service Identification*, saying nothing either way. The PCI DSS clause that would settle it could not be obtained. `STANDARDS.md` §3 carries this as `[O]`. **Our position is a practice we chose, not a requirement we met.**
 

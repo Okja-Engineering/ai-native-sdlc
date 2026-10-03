@@ -36,18 +36,73 @@ out="$(gate "$t")"; rc=$?
 assert_status 0 "$rc" "the shipped cycle file is within the contract"
 assert_contains "$out" "within the contract" "it says so"
 
-# --- accounting ---------------------------------------------------------------
-t="$(fresh_tree count)"
-perl -0pi -e 's/\*\*7 findings · mostly `high`/**3 findings · mostly `high`/' "$t/$CYCLE_REL"
+# --- accounting, as a set -----------------------------------------------------
+# This was arithmetic comparing two totals. An external audit broke it two ways:
+# lowercasing a finding's first letter removed it from the denominator, and two
+# theme counts could move in opposite directions with the total reconciling.
+# These cases cover the four distinct things that can be wrong with a set, which
+# is what a total cannot distinguish.
+
+# A finding deleted from the source — the case the arithmetic version passed.
+t="$(fresh_tree drop_row)"
+perl -0pi -e 's/^\| F03 \|.*\n//m' "$t/process/01-scan/findings/2026-09-29.md"
 out="$(gate "$t")"; rc=$?
-assert_status 1 "$rc" "a theme count that does not add up exits 1"
-assert_contains "$out" "refuse[unaccounted]" "the refusal is unaccounted"
+assert_status 1 "$rc" "a finding deleted from the source exits 1"
+assert_contains "$out" "refuse[invented-accounting]" "an id accounted for but no longer in the source"
+assert_contains "$out" "F03" "the refusal names which id"
+
+# The same deletion, with the id mentioned in prose elsewhere in the source. The
+# id set must come from table ROWS, not from anywhere the string appears — a
+# loosened extractor passes this, which the mutation sweep found and nothing
+# else caught.
+t="$(fresh_tree drop_row_alibi)"
+perl -0pi -e 's/^\| F03 \|.*\n//m' "$t/process/01-scan/findings/2026-09-29.md"
+printf '\nNote: F03 was reviewed separately.\n' >> "$t/process/01-scan/findings/2026-09-29.md"
+out="$(gate "$t")"; rc=$?
+assert_status 1 "$rc" "a deleted row is still caught when its id appears in prose"
+assert_contains "$out" "refuse[invented-accounting]" "ids come from table rows, not from any mention"
+
+t="$(fresh_tree drop_id)"
+perl -0pi -e 's/\bF03 //' "$t/$CYCLE_REL"
+out="$(gate "$t")"
+assert_contains "$out" "refuse[unaccounted]" "a finding left out of the accounting is refused"
 assert_contains "$out" "nothing may be dropped" "the message states the rule it enforces"
+
+t="$(fresh_tree invent)"
+perl -0pi -e 's/\bF64\b/F64 F99/' "$t/$CYCLE_REL"
+assert_contains "$(gate "$t")" "refuse[invented-accounting]" "an invented id is refused"
+
+t="$(fresh_tree dupe)"
+perl -0pi -e 's/\bF10 /F10 F10 /' "$t/$CYCLE_REL"
+assert_contains "$(gate "$t")" "refuse[duplicate-accounting]" "an id accounted for twice is refused"
+
+# No block at all must refuse, not fall back to arithmetic.
+t="$(fresh_tree no_block)"
+perl -0pi -e 's/<!-- accounting:ids -->.*?<!-- \/accounting:ids -->//s' "$t/$CYCLE_REL"
+assert_contains "$(gate "$t")" "refuse[no-accounting]" "a cycle with no accounting block is refused"
+
+t="$(fresh_tree counts)"
+perl -0pi -e 's/\*\*7 findings · mostly `high`/**3 findings · mostly `high`/' "$t/$CYCLE_REL"
+assert_contains "$(gate "$t")" "refuse[counts-disagree]" "theme counts that do not sum to the accounting are refused"
 
 t="$(fresh_tree outlier_drop)"
 perl -0pi -e 's/^- \*\*Models beat the human record.*?\n//ms' "$t/$CYCLE_REL"
-out="$(gate "$t")"
-assert_contains "$out" "refuse[unaccounted]" "losing an outlier is caught too"
+assert_contains "$(gate "$t")" "refuse[counts-disagree]" "losing an outlier is caught too"
+
+# The documented limit, asserted so nobody mistakes it for coverage: moving a
+# count between themes leaves the set unchanged and is NOT detected. Per-theme
+# ids would close it, and cycle 2026-09-29 predates them.
+t="$(fresh_tree launder)"
+perl -0pi -e 's/\*\*12 findings/**11 findings/; s/\*\*16 findings/**17 findings/' "$t/$CYCLE_REL"
+out="$(gate "$t")"; rc=$?
+assert_status 0 "$rc" "moving a count between themes is NOT detected — the documented limit"
+
+# Lowercasing a finding's prose must no longer change the accounting. The old
+# counter was `grep -cE '^| [A-Z]'`, which dropped the row from the denominator.
+t="$(fresh_tree lowercase)"
+perl -0pi -e 's/^\| F03 \| A study of/| F03 | a study of/m' "$t/process/01-scan/findings/2026-09-29.md"
+out="$(gate "$t")"; rc=$?
+assert_status 0 "$rc" "lowercasing a finding's first letter no longer removes it"
 
 # --- method -------------------------------------------------------------------
 t="$(fresh_tree method)"
