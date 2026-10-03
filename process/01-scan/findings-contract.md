@@ -71,6 +71,7 @@ A source that returned nothing still gets a line saying what was covered. A sour
 Required unless `nothing found: yes`. Exactly these columns, in this order:
 
 <!-- contract:columns -->
+- `id`
 - `what`
 - `source`
 - `dated`
@@ -81,12 +82,15 @@ Required unless `nothing found: yes`. Exactly these columns, in this order:
 
 A finding carries these and **nothing more**. An extra column is refused, because every field stage 1 does not have is a field where a verdict can arrive pre-made.
 
+**Why an id.** Define accounts for every finding, and a total cannot establish that nothing was dropped — an item can leave one theme and be absorbed by another with the sum unchanged. An id makes the accounting a set comparison rather than arithmetic. It also makes a row countable by its id rather than by the case of its first letter: the previous counter was `grep -cE '^\| [A-Z]'`, so lowercasing a finding's first word removed it from the denominator and both gates passed a dropped finding. Found by the external audit in #22.
+
 The guess label lives in the **column header**, not in each cell, so it cannot be dropped one row at a time.
 
 Cells must not contain `|`.
 
 | Column | What goes in it |
 |---|---|
+| `id` | `F` plus a number, unique within the cycle. Assigned once and never reused |
 | `what` | one plain sentence, neutral. What happened, not what it means |
 | `source` | a URL or a precise citation, in one of the forms below |
 | `dated` | `YYYY-MM-DD` — when the thing happened, not when we found it |

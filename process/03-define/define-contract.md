@@ -16,6 +16,28 @@ It is the convergent half of the first diamond. Discover goes wide. Define says 
 
 Every item from the source artifact appears under a theme or in the outlier list. This is what makes Define compatible with rules the repository already holds — `intent.md`: *"a classifier that wrongly suppresses something is worse than no classifier"*; the scan spec: *"must not rank or filter to a top N."* Those forbid **dropping**. They do not forbid **naming**, and naming is what solves the problem they were worried about.
 
+### The accounting is a set, declared by id
+
+**A total cannot establish that nothing was dropped.** The first version of this check added theme counts to outlier counts and compared the result to a row count. An external audit broke it two ways: lowercasing a finding's first letter removed it from the denominator (the counter was `grep -cE '^\| [A-Z]'`), and two theme counts could be adjusted in opposite directions with the total still reconciling.
+
+So a cycle declares the ids it accounted for, in a fenced block, and `validate-define.sh` compares it to the source as a **set**:
+
+```markdown
+<!-- accounting:ids -->
+F01 F02 F03 ...
+<!-- /accounting:ids -->
+```
+
+| Refusal | Condition |
+|---|---|
+| `no-accounting` | no block at all |
+| `unaccounted` | a finding in the source the block does not list |
+| `invented-accounting` | an id in the block that is not in the source |
+| `duplicate-accounting` | an id listed twice |
+| `counts-disagree` | theme counts plus outliers do not sum to the ids accounted for |
+
+**From the next cycle, each theme lists its own ids.** The set check closes dropping. It cannot detect a finding *moved* between themes, because moving one leaves the set unchanged — that is a count-accuracy defect rather than a dropping defect. Cycle `2026-09-29` predates ids and recorded counts only, so its membership is not recoverable; its artifact says so rather than reconstructing a mapping nobody made.
+
 The problem Define exists for is that **reading** is the wall. Sixty-four rows is more than anyone gets through, and a process people stop opening catches nothing regardless of how complete its record is. Trust in an automated feed is spent, not easily earned back, and every low-value item is a withdrawal. Themes reduce what must be read without reducing what is kept.
 
 ## Required fields

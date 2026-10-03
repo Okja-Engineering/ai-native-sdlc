@@ -135,6 +135,13 @@ cells_of() {
 
 cell() { printf '%s\n' "$2" | sed -n "${1}p" | cut -f2-; }
 
+# col_index <column name> — the 1-based position the CONTRACT gives that column.
+# Keeps the gate from carrying a second copy of the column order, which is the
+# duplicate-declaration failure this repository keeps finding. A name the
+# contract does not declare yields 0, and `cell 0` is empty, so a typo here
+# surfaces as an empty-cell refusal rather than silently reading a neighbour.
+col_index() { printf '%s\n' "$COLUMNS_L" | grep -nxF -- "$1" | cut -d: -f1; }
+
 cell_count() { printf '%s\n' "$1" | grep -c ''; }
 
 is_separator_row() {
@@ -277,7 +284,7 @@ check_header_row() {
 
 check_finding_row() {
   local file="$1" lno="$2" row="$3"
-  local cells n want what src dated kind affect consequence
+  local cells n want id what src dated kind affect consequence
   cells="$(cells_of "$row")"
   n="$(cell_count "$cells")"
   want="$(list_count "$COLUMNS_L")"
@@ -285,12 +292,23 @@ check_finding_row() {
     refuse "$file" "$lno" columns "this finding has $n cells; the contract declares $want columns"
     return
   fi
-  what="$(cell 1 "$cells")"
-  src="$(cell 2 "$cells")"
-  dated="$(cell 3 "$cells")"
-  kind="$(cell 4 "$cells")"
-  affect="$(cell 5 "$cells")"
-  consequence="$(cell 6 "$cells")"
+  # Cells are resolved by COLUMN NAME, read from the contract, not by a fixed
+  # position. Adding `id` as the first column shifted every index by one, and the
+  # positional version then read the wrong cell for every check — `source` got
+  # the what text, `dated` got the URL — producing four confident refusals that
+  # each named the wrong problem. The contract declares the order; the gate asks
+  # it rather than assuming it.
+  id="$(cell "$(col_index id)" "$cells")"
+  what="$(cell "$(col_index what)" "$cells")"
+  src="$(cell "$(col_index source)" "$cells")"
+  dated="$(cell "$(col_index dated)" "$cells")"
+  kind="$(cell "$(col_index kind)" "$cells")"
+  affect="$(cell "$(col_index 'might affect (guess)')" "$cells")"
+  consequence="$(cell "$(col_index 'consequence guess')" "$cells")"
+
+  if ! printf '%s' "$id" | grep -qE '^F[0-9]+$'; then
+    refuse "$file" "$lno" id "the id cell is \"$id\"; an id is F followed by a number — Define accounts for findings by id, and a row without one cannot be accounted for"
+  fi
 
   if [ -z "$what" ]; then
     refuse "$file" "$lno" field "the what cell is empty; a row that does not say what happened is not a record of anything"

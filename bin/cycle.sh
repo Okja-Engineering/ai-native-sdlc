@@ -16,7 +16,7 @@ cd "$ROOT" || exit 2
 
 ok="  ok "; no="  -- "; miss="  !! "
 
-count_rows()   { grep -cE '^\| [A-Z]' "$1" 2>/dev/null || echo 0; }
+count_rows()   { grep -cE '^\| F[0-9]+ \|' "$1" 2>/dev/null || echo 0; }
 count_themes() { grep -cE '^### [0-9]+ · ' "$1" 2>/dev/null || echo 0; }
 count_opts()   { grep -cE '^## [A-F] · ' "$1" 2>/dev/null || echo 0; }
 count_outl()   { sed -n '/## Outliers/,/^---/p' "$1" 2>/dev/null | grep -cE '^- \*\*' || echo 0; }

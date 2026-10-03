@@ -199,7 +199,11 @@ assert_contains "$OUT" "refuse[sections]" "an undeclared section is refused unde
 
 gate "$(prepare "$WITH_FINDINGS" 2026-10-01.md 's/| dated |/| when |/')"
 assert_status 1 "$STATUS" "a renamed column is refused"
-assert_contains "$OUT" 'column 3 is "when"' "a renamed column names the column and what was declared"
+# Asserted on the names, not the index. The index version broke when `id` was
+# added as the first column — a test coupled to the column order it happened to
+# be written against rather than to the behaviour it was checking.
+assert_contains "$OUT" 'is "when"; the contract declares "dated"' \
+  "a renamed column names both what it found and what was declared"
 
 # --- the gate refuses to run on a contract it cannot read ---------------------
 
