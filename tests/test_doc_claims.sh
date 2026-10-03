@@ -31,10 +31,78 @@ ABSENCE='does not exist|is not built|was never built|neither exists|do not exist
 # guessed, so a new phase is covered without editing this list.
 paths="$(ls -d process/*/ bin 2>/dev/null | sed 's|/$||')"
 
-# A line is a problem when it asserts absence AND names a path that exists.
-# `git grep` is used so untracked scratch files cannot fail the suite.
-hits=0
-offenders=""
+# And the phase NAMES, from the same listing. Three claims survived the first
+# version of this check because they named the phase instead of the path:
+# `Define does not exist` carries no `process/03-define` for a path match to find.
+# The list is derived, not written out, so a sixth phase is covered by existing.
+phase_names="$(ls -d process/*/ 2>/dev/null | sed -e 's|/$||' -e 's|.*/||' -e 's|^[0-9]*-||')"
+
+# The subject of an absence claim sits next to it. This takes the text up to the
+# absence phrase and keeps the tail of it, so a line that names a phase and then
+# says something ELSE is absent is not read as a claim about the phase.
+#
+# `README.md`'s note that the **Update** stage "was never built" is the case that
+# needs this and it is a true sentence: it lists `Scan` among four old stage names
+# forty characters earlier, and `Update` is not a phase this repository has. A
+# window keeps that out without an exemption for the line.
+#
+# The honest limit: a claim with a long qualifier between the phase and the verb
+# escapes. Recorded in CONTROLS.md under what is not controlled.
+SUBJECT_CHARS=40
+subject_of_absence() {
+  printf '%s' "$1" | sed -E "s/(${ABSENCE}).*//" | tr 'A-Z' 'a-z' | tail -c "$((SUBJECT_CHARS + 1))"
+}
+
+# A line is a problem when it asserts absence AND the thing it says is absent is
+# something this repository has — named either as a path or as a phase.
+#
+# One implementation, used for the real sweep and for every fixture below. A
+# fixture that re-implements the decision proves the re-implementation works,
+# which is the vacuous assertion this repository has shipped before.
+absence_offenders() {
+  for line in $(grep -nIE "$ABSENCE" "$@" /dev/null 2>/dev/null | cut -d: -f1,2 | sort -u); do
+    f="${line%%:*}"; n="${line##*:}"
+    text="$(sed -n "${n}p" "$f" 2>/dev/null)"
+
+    # Exempt: an annotation saying the claim is historical, and the dangling-ref
+    # sentences which are about a ref that genuinely does not exist.
+    case "$text" in
+      *Annotated*|*"was referenced"*|*"not on a branch"*|*"never did"*) continue ;;
+    esac
+
+    # A line that LINKS a path is referencing it, not asserting it is absent. The
+    # first version tripped on a README table row reading "Refuses a decision with
+    # ... an option that does not exist" next to a link to the gate — the absence
+    # phrase was about a chosen option, not about the path. You cannot link
+    # something and claim it does not exist in the same breath, and if you did, the
+    # link is the stronger signal.
+    case "$text" in
+      *'](process/'*|*'](bin/'*) continue ;;
+    esac
+
+    flagged=no
+    for p in $paths; do
+      case "$text" in
+        *"$p"*) [ -e "$p" ] && flagged=yes && break ;;
+      esac
+    done
+
+    # The same claim made about the phase by name rather than by path. Checked
+    # against the subject region so a mention elsewhere on the line is not read
+    # as the subject of the claim.
+    if [ "$flagged" = no ]; then
+      subj="$(subject_of_absence "$text")"
+      for p in $phase_names; do
+        case "$subj" in
+          *"$p"*) flagged=yes; break ;;
+        esac
+      done
+    fi
+
+    [ "$flagged" = yes ] && printf '%s ' "$line"
+  done
+}
+
 # `tests/` is excluded. A test that proves this detection works has to contain a
 # line asserting a built path is absent, so including tests/ makes the check flag
 # its own fixture — which is exactly what happened, and only in CI.
@@ -43,54 +111,47 @@ offenders=""
 # content: the fixture line was not visible until the file was committed, and the
 # local run happened before `git add`. "Verify after the last edit" is not enough
 # for a check that reads the index — it has to be "verify after staging".
-for line in $(git grep -nIE "$ABSENCE" -- '*.md' '*.sh' ':(exclude).devin/*' ':(exclude)tests/*' 2>/dev/null | cut -d: -f1,2 | sort -u); do
-  f="${line%%:*}"; n="${line##*:}"
-  text="$(sed -n "${n}p" "$f" 2>/dev/null)"
-
-  # Exempt: an annotation saying the claim is historical, and the dangling-ref
-  # sentences which are about a ref that genuinely does not exist.
-  case "$text" in
-    *Annotated*|*"was referenced"*|*"not on a branch"*|*"never did"*) continue ;;
-  esac
-
-  # A line that LINKS a path is referencing it, not asserting it is absent. The
-  # first version tripped on a README table row reading "Refuses a decision with
-  # ... an option that does not exist" next to a link to the gate — the absence
-  # phrase was about a chosen option, not about the path. You cannot link
-  # something and claim it does not exist in the same breath, and if you did, the
-  # link is the stronger signal.
-  case "$text" in
-    *'](process/'*|*'](bin/'*) continue ;;
-  esac
-
-  for p in $paths; do
-    case "$text" in
-      *"$p"*)
-        if [ -e "$p" ]; then
-          hits=$((hits + 1)); offenders="$offenders $f:$n"; break
-        fi ;;
-    esac
-  done
-done
-
-assert_eq "" "$offenders" "no document says a path does not exist when it does"
+# shellcheck disable=SC2046
+offenders="$(absence_offenders $(git grep -lIE "$ABSENCE" \
+  -- '*.md' '*.sh' ':(exclude).devin/*' ':(exclude)tests/*' 2>/dev/null))"
+assert_eq "" "${offenders% }" "no document says a path or a phase does not exist when it does"
 
 # --- the check must be able to fail ------------------------------------------
 # A check that cannot fail is the vacuous-assertion failure this repository has
-# shipped twice. Prove the detection works on a constructed line rather than
+# shipped twice. Prove the detection works on constructed lines rather than
 # trusting that zero hits means it looked.
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 printf 'The phase process/05-deliver does not exist.\n' > "$TMP/bad.md"
-found=no
-if grep -qE "$ABSENCE" "$TMP/bad.md" && grep -q 'process/05-deliver' "$TMP/bad.md" && [ -e process/05-deliver ]; then
-  found=yes
-fi
-assert_eq "yes" "$found" "the detection fires on a line asserting a built path is absent"
+assert_eq "$TMP/bad.md:1 " "$(absence_offenders "$TMP/bad.md")" \
+  "the detection fires on a line asserting a built path is absent"
 
 printf 'The phase process/05-deliver does not exist. [Annotated 2026-10-03: it was built.]\n' > "$TMP/ok.md"
-exempt=no
-case "$(cat "$TMP/ok.md")" in *Annotated*) exempt=yes ;; esac
-assert_eq "yes" "$exempt" "an annotated historical claim is exempt"
+assert_eq "" "$(absence_offenders "$TMP/ok.md")" "an annotated historical claim is exempt"
+
+# --- and on a phase named instead of a path ----------------------------------
+# The three survivors of the first version. Every phase in the tree, not just the
+# ones the survivors happened to name, so widening `process/` widens the check.
+for p in $phase_names; do
+  cap="$(printf '%s' "$p" | cut -c1 | tr 'a-z' 'A-Z')$(printf '%s' "$p" | cut -c2-)"
+  printf 'Nothing above says what it means for us — that is %s, and %s does not exist.\n' \
+    "$cap" "$cap" > "$TMP/phase-$p.md"
+  assert_eq "$TMP/phase-$p.md:1 " "$(absence_offenders "$TMP/phase-$p.md")" \
+    "the detection fires on '$cap does not exist'"
+done
+
+# A phase this repository does not have may be called absent, because it is.
+# `README.md` does exactly this about the Update stage the first diagram drew.
+printf 'It drew four stages — Scan, Assess, Propose, Update — and the Update stage was never built.\n' \
+  > "$TMP/unbuilt.md"
+assert_eq "" "$(absence_offenders "$TMP/unbuilt.md")" \
+  "a stage this repository never had may be called absent"
+
+# The subject window is load-bearing, so prove it bounds. A phase named far from
+# the claim is a mention, not the subject, and must not be flagged.
+printf 'Deliver chose option F after weighing six of them, and the risk class the rejected option needed does not exist.\n' \
+  > "$TMP/mention.md"
+assert_eq "" "$(absence_offenders "$TMP/mention.md")" \
+  "a phase named away from the claim is a mention, not the subject"
 
 # --- no document claims the whole chain is in git ----------------------------
 # `AGENTS.md` said "All of it in git" about the issue → pull request → merge

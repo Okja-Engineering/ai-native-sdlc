@@ -143,7 +143,7 @@ This is a known property of LLMs, not a SemIf defect: [arXiv:2308.11483](https:/
 
 ## 6 · Where this stops
 
-Discovery ends here. Nothing above says what any of it means for us, what we should adopt, or what we should change — that is Define, and Define does not exist.
+Discovery ends here. Nothing above says what any of it means for us, what we should adopt, or what we should change — that is Define, and Define does not exist. *[Annotated 2026-10-03: Define was built after this was written, as was Develop. Left as it stood, for the reason given on line 10 — a dated artifact records what was true when it was made, and editing a record in place destroys what made it a record. The first annotation pass fixed line 10 and missed this one.]*
 
 Two things a later phase will need that this phase could not supply, recorded so they are not rediscovered:
 
