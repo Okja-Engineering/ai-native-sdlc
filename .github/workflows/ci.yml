@@ -131,23 +131,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Refuse speed and velocity claims
-        run: |
-          set -u
-          # Matches are reported with context so a false positive is obvious and
-          # the fix is to rephrase, not to weaken the pattern.
-          #
-          # No \b anchors. macOS git grep (2.50.1, Apple Git-155) does not honour
-          # them and silently matches nothing, while Linux git does — so the
-          # anchored version fired in CI and did nothing on a developer's machine,
-          # which is the worst of both. The phrases are specific enough that word
-          # boundaries bought little. Verified on both platforms.
-          if git grep -nEi '(makes? (us|it|teams?) faster|ships? faster|speeds? up delivery|velocity (gain|improvement)|cycle.time (reduction|improvement)|[0-9]+x (faster|productivity))' \
-             -- '*.md' \
-             ':(exclude)process/*/findings/*' \
-             ':(exclude)process/*/topics/*' > /tmp/hits 2>/dev/null; then
-            echo "::error::a speed or velocity claim appears in a tracked document"
-            sed 's/^/  /' /tmp/hits
-            echo "AGENTS.md: the north star is better software, not faster."
-            exit 1
-          fi
-          echo "ok — no speed claims"
+        # The pattern lives in bin/validate-claims.sh, not here. Inline it was
+        # unrunnable locally and untestable, and an external audit wrote a
+        # document with six speed claims that it matched none of.
+        run: /bin/bash bin/validate-claims.sh
