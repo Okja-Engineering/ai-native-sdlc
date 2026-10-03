@@ -65,4 +65,6 @@ Two things, and both are the decider's:
 1. **Configure a distinct identity for agent-driven commits**, so `git log` separates them without anyone's testimony. The address above already appears in this history and is distinct from the one agent commits use.
 2. **Make the decision commit yourself.** The act being gated is setting `chosen:`. An agent may draft the record and leave it `pending` — which the contract already treats as a valid state — and the commit that fills it is the human's. That is a workflow change, not a code change, and it is what makes the control real rather than described.
 
-Until both hold, `CONTROLS.md` carries this under *what is not controlled*.
+**Both are deferred to a git history cleanup on `main`**, tracked as issue #51. That is a force-push to a public branch which rewrites every SHA, so it has to take the commit citations in `spec.md`, `SOURCES.md` and `STANDARDS.md` with it — `fa7538a` among them. Not an operation to run piecemeal, and not an agent's to run at all.
+
+Until it lands, `CONTROLS.md` carries this under *what is not controlled*.
