@@ -51,6 +51,7 @@ The last box is not a phase. A decision records `amends:` naming the document it
 | File | What it is for |
 |---|---|
 | [`AGENTS.md`](AGENTS.md) | How to work here — conventions, enforced by `.githooks/` locally and by CI where they cannot be skipped |
+| [`CONTROLS.md`](CONTROLS.md) | What this process enforces, the evidence each control produces, and **what is not controlled**. Start here if you are assessing it rather than using it |
 | [`intent.md`](intent.md) | Why this repository exists and what we believe |
 | [`spec.md`](spec.md) | What V0 is, and what it is not |
 | [`STANDARDS.md`](STANDARDS.md) | How mature AI-native teams work, as of a date, graded |
