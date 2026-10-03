@@ -4,7 +4,17 @@
 
 **What this is not.** Not a compliance assertion. This repository has not been audited against SOC 2, ISO 27001, PCI DSS or anything else, and nothing here should be read as a claim that it would pass. It demonstrates a process shaped so that controls are statable and evidenced.
 
-**Derived, not designed.** Every control below describes a gate that already exists. None was written as a requirement first. Each cites the refusal its gate actually emits, and `tests/test_controls.sh` fails if a cited refusal is not in the named script — so a control cannot drift from its enforcement.
+**Derived, not designed.** Every control below describes a gate that already exists. None was written as a requirement first.
+
+**What keeps this document in step with the code.** `bin/validate-controls.sh` checks the wiring between the two in three directions, and `tests/test_controls.sh` drives it against the real document and against fixtures.
+
+- **Forward.** Every refusal code a control cites is emitted at an **emission site** — a `refuse` call with that code as an argument — in a script that control's own **Enforced by** line names. A code appearing in a comment does not satisfy it, and neither does a code emitted by some other gate. `bin/list-refusals.sh` is what decides where an emission site is.
+- **Backward.** Every refusal code any gate emits is cited by a control that names that gate, or is listed under *Refusals and gates no control covers* below with a reason.
+- **Sideways.** Every gate script, and both git hooks, is either named by a control or listed there. A gate with no control turns the check red instead of being quietly absent.
+
+**It checks the wiring, not the claim.** That a control cites `not-a-person` and that `process/05-deliver/validate-decision.sh` emits `not-a-person` says nothing about whether the condition behind that code is the condition this document describes. Reading the two against each other is still a person's job. See *what is not controlled*, item 12.
+
+**This paragraph was wrong until 2026-10-03.** It said a control "cannot drift from its enforcement", and the check behind that sentence was a substring search. Three ways it was false were each demonstrated against the shipped suite: a control pointed at a gate emitting none of its four codes passed 18 assertions out of 18; a fabricated refusal code passed once one comment line was added to any gate; and CTRL-9's five hook and CI controls were outside the check altogether, because its table has no code column and the gate pattern matched only `validate-*.sh`.
 
 **The evidence trail for every control below is git.** Every artifact, its author, its date, and the merge that accepted it. There is no separate audit store to keep in step.
 
@@ -20,6 +30,7 @@
 
 | Refusal | Condition |
 |---|---|
+| `no-chosen-field` | the record declares no `chosen:` field at all, so it does not say whether a decision was made |
 | `undecided-by` | `chosen:` is set and `decided_by:` is empty |
 | `not-a-person` | `decided_by:` names someone not listed in [`DECIDERS.md`](DECIDERS.md) |
 | `undated-decision` | a decided record carries no date |
@@ -112,7 +123,11 @@
 
 **What it prevents.** A reader trusting a grouping without knowing whether a person, a model or a classifier made it.
 
-**Enforced by** `process/03-define/validate-define.sh`, refusal `no-method`.
+**Enforced by** `process/03-define/validate-define.sh`.
+
+| Refusal | Condition |
+|---|---|
+| `no-method` | the cycle record declares no `method:` field |
 
 **Evidence.** The `method:` field on every cycle record.
 
@@ -124,7 +139,27 @@
 
 **What it prevents.** A cycle record that cannot be compared with the next one, and a finding with no source. The scan runs repeatedly, so drift in shape is the risk worth mechanising against.
 
-**Enforced by** `process/01-scan/validate-findings.sh`, with fifteen refusals including `no-source`, `nothing-found`, `empty-cycle`, `since`, `consequence`, `kind`, `contradiction` and `filename`.
+**Enforced by** `process/01-scan/validate-findings.sh`.
+
+All fifteen are listed. The previous version of this control said "fifteen refusals including" and named eight, and the seven it left out — `field`, `sections`, `looked-at`, `assessment`, `columns`, `id` and `dated` — were outside the check that was supposed to bind this document to the gate. One of them, `id`, had no test either.
+
+| Refusal | Condition |
+|---|---|
+| `filename` | the file name is not a cycle date, `<YYYY-MM-DD>.md` |
+| `since` | no `since` field, or a value that is neither a date nor the words first run |
+| `nothing-found` | no "nothing found" field, or a value other than yes or no |
+| `field` | a declared field appears more than once, carries a value outside the declared set, or a required cell is empty |
+| `sections` | a heading that is not one of the sections the contract declares |
+| `looked-at` | no "Looked at" section, an empty one, or a declared source with no line in it |
+| `assessment` | stage 1 prose judging what a finding means, which belongs to Discover |
+| `columns` | the findings table's column count, column names, or a row's cell count disagree with the contract |
+| `id` | the id cell is not `F` followed by a number, so Define cannot account for the row |
+| `no-source` | a finding with no source, or a source that is not a resolvable-looking locator |
+| `dated` | no dated cell, or a value that is not a calendar date in `YYYY-MM-DD` |
+| `kind` | kind is outside the declared list |
+| `consequence` | the consequence guess is outside the declared list |
+| `empty-cycle` | the cycle carries neither a finding nor an explicit "nothing found: yes" |
+| `contradiction` | "nothing found: yes" and the file carries findings |
 
 **Evidence.** Every finding carries what it is, a resolving locator, a date, what it may affect, and a consequence grade. `nothing-found` is a recorded result rather than an empty file, so "the scan found nothing" is distinguishable from "the scan did not run".
 
@@ -209,6 +244,10 @@
 
 **An external audit found this document omitted all of these.** An assessor told to start here got five of the repository's refusals and missed five more, including a hard refusal protecting the local-to-remote boundary.
 
+**Enforced by** `.githooks/commit-msg`, `.githooks/pre-push` and `bin/validate-claims.sh`, and the `commit-messages`, `claims` and `tests` jobs in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+This control enforces by exit status rather than by a refusal code, so there is no refusal table below. That used to put it outside the document check twice over — the check harvested codes from table rows, and it only recognised a gate named `validate-*.sh`. `bin/validate-controls.sh` now resolves every one of the five: each hook path has to exist, and each job name has to be declared in the workflow.
+
 | Control | Local | Server-side | What it refuses |
 |---|---|---|---|
 | Conventional commits | `.githooks/commit-msg` | the `commit-messages` job | a non-conventional subject, one over 72 characters, or an attribution trailer |
@@ -224,6 +263,21 @@
 - **The hooks are local and bypassable.** That is what the server-side half is for, and only two of the five have one. The secret scan and the publish disclosure exist **only** as hooks, so a push from a machine that never ran `git config core.hooksPath .githooks` is unguarded by either.
 - **The publish disclosure cannot run in CI.** It is about a push that has not happened yet.
 - The `commit-messages` job skipped a direct push to main until 2026-10-03. Two commits on main still predate the convention and have never been checked.
+
+---
+
+## Refusals and gates no control covers
+
+The backward and sideways checks above have no silent exclusions. Anything a gate refuses that no control claims has to be here, with a reason, or `bin/validate-controls.sh` refuses. The point of the table is that the list cannot be quietly short.
+
+Two shapes of entry. `the gate itself` means the gate needs no control and none of its refusals needs a citation; a backticked code exempts that one refusal.
+
+| Gate | Refusal | Why no control covers it |
+|---|---|---|
+| `bin/validate-authorship.sh` | the gate itself | It refuses today and is deliberately not wired into CI, so it gates nothing yet. Turning it on needs a git history rewrite that belongs to the decider — *what is not controlled*, item 10, states what. A control claiming enforcement by a gate nothing runs would be the overclaim this document exists to avoid. |
+| `bin/validate-controls.sh` | the gate itself | It checks this document against the gates rather than checking a process artifact. A control over the control document would be this document asserting a control over itself. Its own refusals are covered by `tests/test_controls.sh`. |
+
+`bin/validate-claims.sh` needs no entry. CTRL-9 names it, and it emits no refusal code at all — it exits non-zero and prints the matching lines — so there is nothing for the backward check to find. A control naming it is not asked for a refusal table it could only invent.
 
 ---
 
@@ -266,6 +320,14 @@ The sentence below was run against the repaired gate on 2026-10-03 and **passes*
 ```
 
 Both names resolve, so the part names things, and the sentence denies checking them. Nothing mechanical closes that, which is why the repaired gate is written as *names a referent* rather than as *was verified*. A reader is still the only check on whether a coverage part is true. What has changed is narrower and worth stating exactly: a part naming nothing at all is now refused however it is punctuated, where before two commas were enough.
+
+**12. Whether a control's prose describes what its refusal actually does.** `bin/validate-controls.sh` establishes wiring: the code is cited, the gate the control names emits it, and nothing a gate emits is unclaimed. It never reads the condition behind the code. A control could cite `not-a-person` and describe it as checking a date, and the check would pass. Reading the table's Condition column against the gate is still a person's job, and it is the thing an assessor should spend their time on, because everything mechanical about this document is now checked and this is not.
+
+Three narrower limits of the same check, stated here rather than left to be found:
+
+- **A control naming several scripts is satisfied by any one of them.** The binding is to the set the control itself declares, not to a single script. CTRL-9 names two hooks and three CI jobs. A control that named every gate would be back to the document-wide union that made the old check vacuous — that is visible in the document, and nothing mechanical stops it.
+- **An exception taken on a gate covers every refusal that gate emits, including ones added later.** Both entries in *Refusals and gates no control covers* are that shape.
+- **A fabricated code in prose is not detectable.** The check refuses a code that a gate really emits appearing outside its control's table, because it can recognise those. A backticked word that was never a refusal code anywhere reads as ordinary prose, and nothing can tell the difference.
 
 **9. Why any individual engineering change was made.** The chain the loop produces is complete in a clone. The chain by which this repository was built is not: issue and pull request bodies live in GitHub's database, so a clone shows that a change was reviewed and merged but not what it was intended to do or how that was to be validated. An assessor holding only a clone can assess the process and not its own construction.
 
