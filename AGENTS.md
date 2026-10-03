@@ -34,7 +34,7 @@ Two artifacts, each with one job.
 
 **The pull request** links the issue and stays short: what changed, how it was proved and what wasn't, what is deliberately out of scope, and how AI was used. It does not repeat the intent. Template: [`.github/pull_request_template.md`](.github/pull_request_template.md).
 
-Together they give an auditable chain: the issue states the intended change and how it will be validated, the pull request shows what was done and the evidence, and the merge is the approval by a named person. All of it in git.
+Together they give an auditable chain: the issue states the intended change and how it will be validated, the pull request shows what was done and the evidence, and the merge is the approval by a named person.
 
 ### Two chains, and only one of them is in git
 
