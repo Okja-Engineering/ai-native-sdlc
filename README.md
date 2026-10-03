@@ -29,7 +29,10 @@ flowchart LR
     L["<b>05 · Deliver</b><br/>one choice, by a<br/>named person"]
     U(["<b>amends</b><br/>STANDARDS.md,<br/>linked both ways"])
 
-    S --> F1 --> G1 --> D --> F2 --> V --> L --> U
+    S --> F1 --> G1
+    G1 -- "the theme needs evidence" --> D --> F2
+    G1 -- "the theme is already clear" --> F2
+    F2 --> V --> L --> U
     U -. "next cycle" .-> S
 
     classDef human fill:#fde68a,stroke:#b45309,color:#1c1917
@@ -40,13 +43,17 @@ flowchart LR
     class U out
 ```
 
-**Define runs twice, and the directory numbering is not the running order.** Define groups the Scan's findings before anyone picks a theme; Discover then goes deep on the theme that was picked; Define states the problem from both. `bin/cycle.sh` prints it in this order.
+**Define runs twice, and the directory numbering is not the running order.** Define groups the Scan's findings before anyone picks a theme; Define then states the problem, from the theme plus any Discover topic that was run on it.
+
+**Discover is conditional, and both routes have run.** `agent-pr-approval` went through it — the problem file carries `rests on:` pointing at the topic. `producing-themes` did not: its problem file carries only `from:`, because the cycle's own open question was already specific enough to state a problem from. Discover establishes what is true about a theme when a theme needs that; it is not a toll gate on every item.
+
+**`bin/cycle.sh` prints the per-cycle steps in that order and lists Discover topics in a separate block after them.** A topic hangs off a problem rather than off a cycle, so there is no single place in a cycle's listing for it to sit. Run it and read the output: the `topics` block is the last thing printed, and it names which problem each topic rests under, or says it rests under none.
 
 **Deliver is itself the last human gate** — a decision needs a named natural person from [`DECIDERS.md`](DECIDERS.md), and the gate refuses a role, a team or a model name.
 
 The last box is not a phase. A decision records `amends:` naming the document it changes, and the amended claim links back to the decision — checked in both directions, so the standard and the decision cannot disagree silently.
 
-> **This diagram has been wrong twice.** Until 2026-10-03 it drew four stages — Scan, Assess, Propose, Update — while `process/` held five differently named ones and the Update stage was never built. The replacement then drew `Scan → Discover → Define`, which is not the order the work ran: the artifacts' own `from:` fields show Define reading the Scan, and the Discover topic on the same question dated two days later. Found by an external audit both times, not by anyone here.
+> **This diagram has been wrong three times.** First it drew four stages — Scan, Assess, Propose, Update — while `process/` held five differently named ones and the Update stage was never built. The replacement drew `Scan → Discover → Define`, which is not the order the work ran: the artifacts' own `from:` fields show Define reading the Scan, and the Discover topic on the same question dated two days later. The third was in the version that corrected the second, on 2026-10-03: it put Discover on the single path as a mandatory step, which is wrong for one of the two chains in the tree — `producing-themes` went from theme straight to problem and its artifacts say so. Found by an external audit all three times, not by anyone here.
 
 ## What's here
 

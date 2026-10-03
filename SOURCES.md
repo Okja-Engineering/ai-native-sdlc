@@ -1,6 +1,15 @@
 # Source register
 
-Every `[E]` and `[S]` claim in [`STANDARDS.md`](STANDARDS.md) cites an ID from this file. `bin/validate-standards.sh` refuses a graded claim whose ID is not here, and refuses an ID here that nothing cites.
+Every `[E]` and `[S]` claim in [`STANDARDS.md`](STANDARDS.md) cites an ID from this file. `bin/validate-standards.sh` refuses a graded claim that cites no ID, and refuses a cited ID that is not here.
+
+**An ID here that nothing cites is reported, not refused.** This said *"refuses"* until 2026-10-03 and the gate has never done it — `validate-standards.sh` counts them and exits 0, and `CONTROLS.md` already said so. Run it and read the last line:
+
+```
+$ bin/validate-standards.sh
+validate-standards: 14 source(s) cited and resolving, 22 in the register, 8 not currently cited
+```
+
+The register is the corpus the research was done from, not an index of this document's footnotes. Refusing an uncited entry would force someone to delete a real source or attach it to a claim it does not support, and both are worse than a row nothing points at.
 
 **Why this file exists.** `STANDARDS.md` carried 31 graded claims and zero citations. Its only route to evidence was a reference to a branch, `experiment/0.0.0`, which does not exist on origin and never did. From inside the repository every `[E]` claim was an assertion. Found by the external audit in #22; the register was recovered from history at `fa7538a:research/sources/source-register.md`. <!-- dead-pointer: experiment/0.0.0 — named here to record that it never existed on origin, not as a route to anything -->
 

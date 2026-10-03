@@ -68,6 +68,37 @@ notctl="$(sed -n '/^## What is not controlled/,$p' "$DOC" | grep -cE '^\*\*[0-9]
 [ "$notctl" -ge 6 ] && many=yes || many=no
 assert_eq "yes" "$many" "the not-controlled section lists at least 6 gaps (found $notctl)"
 
+# --- and they are in order ----------------------------------------------------
+# Item 10 was printed before item 9, in the section this document calls "the
+# section an assessor should read first" and the one README.md sends an assessor
+# to. Each new gap had been appended at the point in the prose it was most
+# related to, rather than at its number, and nothing was reading the numbers.
+#
+# Non-decreasing rather than strictly increasing, because `1b` is a sub-item of
+# `1` and shares its number. The letter is dropped before comparing.
+item_numbers() {
+  sed -n '/^## What is not controlled/,$p' "$1" \
+    | grep -oE '^\*\*[0-9]+[a-z]?\.' | tr -d '*.' | sed 's/[a-z]$//'
+}
+out_of_order() {
+  prev=-1
+  for x in $(item_numbers "$1"); do
+    [ "$x" -ge "$prev" ] || printf '%s before %s ' "$x" "$prev"
+    prev="$x"
+  done
+}
+assert_eq "" "$(out_of_order "$DOC")" "the not-controlled items are numbered in order"
+
+# The detection must be able to fail, or a section in any order passes.
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+printf '## What is not controlled\n\n**8. Eight.**\n\n**10. Ten.**\n\n**9. Nine.**\n' > "$TMP/jumbled.md"
+assert_eq "9 before 10 " "$(out_of_order "$TMP/jumbled.md")" \
+  "the detection fires on an item printed out of order"
+
+# A sub-item sharing its parent's number is not out of order.
+printf '## What is not controlled\n\n**1. One.**\n\n**1b. One b.**\n\n**2. Two.**\n' > "$TMP/subitem.md"
+assert_eq "" "$(out_of_order "$TMP/subitem.md")" "a lettered sub-item is not read as out of order"
+
 # --- it must not claim compliance ---------------------------------------------
 # The one assertion here that is about wording rather than structure. A control
 # document that drifts into claiming an audit it has not had is the specific
