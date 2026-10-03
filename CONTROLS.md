@@ -141,8 +141,8 @@
 | `no-open-section` | no "what could not be established" section |
 | `silent-empty-open` | the section lists nothing and does not say so |
 | `no-verified-by-hand` | coverage has no verified-by-hand part |
-| `empty-verified-by-hand` | the part exists and names nothing |
-| `empty-coverage-part` | a reached or not-reached part asserts a state instead of naming things |
+| `empty-verified-by-hand` | the verified-by-hand part names nothing the artifact carries anywhere else |
+| `empty-coverage-part` | the reached or not-reached part names nothing the artifact carries anywhere else |
 | `no-not-reached` | coverage lists only what was reached |
 | `no-question` | the question is not in the asker's own words |
 | `question-not-quoted` | the question section carries no quotation |
@@ -158,7 +158,9 @@
 
 **Evidence.** Coverage in three parts — reached, not reached, and **verified by hand** — which is what separates *an agent reported this* from *someone checked it*. Both shipped topics pass despite differing in markup, so the gate checks the contract rather than one artifact's formatting.
 
-**What it does not cover.** Two of the checks the contract hoped for are **not mechanisable**, and the gate's own header says so rather than leaving the gap implicit:
+**Evidence note.** Each part's check was two numbers until 2026-10-03 — a minimum separator count and a minimum character count — and the comment above them asserted that a fabricated part "tops out around 43 characters and 2 separators". It does not. A sentence denying that anything was checked passed with two commas added to it, and the same sentence without the commas was refused. The gate now requires each part to name something the artifact carries somewhere else, which is the thing the two numbers were a proxy for.
+
+**What it does not cover.** Three things. The first is the limit of the repaired check, and is in *What is not controlled*, item 11. The other two of the checks the contract hoped for are **not mechanisable**, and the gate's own header says so rather than leaving the gap implicit:
 
 - **"Every claim carries a grade"** and **"every claim carries a source"** need a claim to be a delimited thing. The two topics write claims as prose paragraphs in different markup with no boundary a script can find. Checking this would mean inventing a convention mid-gate. What is checked instead is that the grades *used* are from the enum and that the enum is declared.
 - **"No recommendation language"** is covered under *What is not controlled*, item 3.
@@ -241,6 +243,18 @@ The section an assessor should read first. Each of these is a real gap, not a fo
 **10. Who committed a decision.** CTRL-1 establishes that `decided_by` names an authorized person. It does not establish that the person, rather than an agent, wrote the field. Three git identity variants exist in this history and two share an address, so `git log` cannot separate the parties — the same shape `STANDARDS.md` 3 convicts a vendor of, one account with two display names.
 
 `bin/validate-authorship.sh` checks it and **refuses today**: a commit setting `chosen:` must be authored by the identity declared in `DECIDERS.md`, and that identity must not be shared. Neither holds. It is deliberately **not wired into CI**, because a gate that cannot pass blocks every branch, and what turns it on is a configuration change plus a workflow change that both belong to the decider. `DECIDERS.md` states exactly what they are, and they are **deferred to a git history cleanup on `main`** — a force-push that rewrites every SHA and therefore every commit citation in the tracked documents. Tracked as issue #51 and not scheduled into a sprint.
+
+**11. Whether a person checked what a coverage part says they checked.** CTRL-7 requires the verified-by-hand part, and the reached and not-reached parts, to name something the artifact carries somewhere else — a file, an id, a measurement, a product, an address. That establishes two things and no more: the part names something checkable, and the artifact itself carries that thing. It does not establish that anybody looked at it.
+
+The sentence below was run against the repaired gate on 2026-10-03 and **passes**:
+
+```
+### Verified by hand
+
+1. Nothing in the GitHub REST API or the SemIf source was verified by hand.
+```
+
+Both names resolve, so the part names things, and the sentence denies checking them. Nothing mechanical closes that, which is why the repaired gate is written as *names a referent* rather than as *was verified*. A reader is still the only check on whether a coverage part is true. What has changed is narrower and worth stating exactly: a part naming nothing at all is now refused however it is punctuated, where before two commas were enough.
 
 **9. Why any individual engineering change was made.** The chain the loop produces is complete in a clone. The chain by which this repository was built is not: issue and pull request bodies live in GitHub's database, so a clone shows that a change was reviewed and merged but not what it was intended to do or how that was to be validated. An assessor holding only a clone can assess the process and not its own construction.
 

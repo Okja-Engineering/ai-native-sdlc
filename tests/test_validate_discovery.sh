@@ -126,66 +126,117 @@ out="$(bash "$GATE" "$(hollow '## Coverage' b)" 2>&1)"; rc=$?
 assert_status 1 "$rc" "the hollow artifact is refused with a plain heading too"
 assert_not_contains "$out" "refuse[no-coverage]" "a numbered coverage heading is accepted"
 
-# --- a part that asserts instead of naming -----------------------------------
-# The subtler version: the parts exist and carry a sentence rather than a list.
-cat > "$TMP/asserting.md" <<'EOF'
-# Discovery — x
+# --- a coverage part has to NAME something ------------------------------------
+# The whole guard here used to be two numbers: a minimum count of separators and
+# a minimum character count, with a comment asserting that "a fabricated part
+# tops out around 43 characters and 2 separators". That is false. A sentence
+# denying that anything was checked passed with two commas added to it, and the
+# same sentence without the commas was refused. The suite pinned the two
+# numbers, so the gate and its tests agreed with each other and both measured
+# punctuation.
+#
+# What is pinned below is the behaviour instead: a coverage part names something
+# the rest of the artifact also carries. No case here knows how the gate finds a
+# name, or counts anything, so a different implementation of the same rule still
+# passes.
+
+# An artifact whose body names real things — a repository, an API, a commit, a
+# benchmark — so that a coverage part has something it can resolve against. The
+# three coverage parts are supplied per case, and the two not under test always
+# name things, so one case trips one guard. A case that trips two guards at once
+# proves neither; that is the #29 lesson, and this suite broke it twice.
+artifact() { # reached not-reached verified-by-hand suffix -> path
+  local p="$TMP/cov$4.md"
+  cat > "$p" <<EOF
+# Discovery — something
 
 dated: 2026-10-03
 status: discovery complete, not assessed
 
 ## The question, in the asker's own words
 
-> is it on
+> should we turn it on
 
-## Coverage
+## 2 · Coverage
 
-**Reached:** a; b; c and several other things we looked at in some detail here
-**Not reached:** nothing, we got everything
-**Verified by hand:** all of it, basically
+**Reached:** $1
+**Not reached:** $2
+**Verified by hand:** $3
 
 ## Claims
 
-Grades are the STANDARDS.md scheme: [V] vendor, never outcome evidence. **[E]**
+The GitHub REST API returned 300 pull requests, and the SemIf source was read at commit 23cf1f3. [E]
+
+Grades are the STANDARDS.md scheme: [V] vendor, never outcome evidence, [S] standard, [P] practitioner, [O] open.
 
 ## What could not be established
 
-- nothing much [O]
+- the JevBench sealed items [O]
 
 ## Where this stops
 
 Here.
 EOF
-out="$(bash "$GATE" "$TMP/asserting.md" 2>&1)"
-assert_contains "$out" "refuse[empty-coverage-part]" "a part asserting a state rather than naming things is refused"
-assert_contains "$out" "refuse[empty-verified-by-hand]" "so is a verified-by-hand part that names nothing"
-
-# The two thresholds are pinned SEPARATELY. The case above fails both at once, so
-# removing either one alone caused no test failure — a mutation sweep found that
-# and it is the #29 lesson applying here: a case that trips two guards together
-# proves neither.
-part_case() { # not-reached-body suffix -> path
-  local p="$TMP/thresh$2.md"
-  sed -e "s|^\*\*Not reached:\*\*.*|**Not reached:** $1|" "$TMP/asserting.md" \
-    | sed -e 's|^\*\*Verified by hand:\*\*.*|**Verified by hand:** one, two, three, four and five other named things|' \
-          -e 's|^\*\*Reached:\*\*.*|**Reached:** one, two, three, four and five other named things we looked at|' > "$p"
   printf '%s' "$p"
 }
 
-# Long enough, but only one separator: fails the separator threshold alone.
-out="$(bash "$GATE" "$(part_case 'we genuinely did not manage to look at the one thing we wanted to look at here' a)" 2>&1)"
-assert_contains "$out" "refuse[empty-coverage-part]" "a long part with too few separators is refused"
+NAMED='the GitHub REST API, the SemIf source at commit 23cf1f3, and JevBench'
 
-# Two separators, but far too short: fails the length threshold alone. `a; b` was
-# the first attempt and has only ONE separator, so it tripped the other guard and
-# proved nothing — the same mistake twice in one suite.
-out="$(bash "$GATE" "$(part_case 'a; b; c' b)" 2>&1)"
-assert_contains "$out" "refuse[empty-coverage-part]" "a short part with enough separators is still refused"
+# The control first, so a later refusal cannot be the gate refusing everything.
+out="$(bash "$GATE" "$(artifact "$NAMED" "$NAMED" "$NAMED" ctl)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "an artifact whose three coverage parts name things is within the contract"
 
-# And the control: enough of both is accepted, so the thresholds are not just
-# refusing everything.
-out="$(bash "$GATE" "$(part_case 'one, two, three, four and five other named things we did not get to' c)" 2>&1)"
-assert_not_contains "$out" "refuse[empty-coverage-part]" "a part that names things is accepted"
+# The artifact from #32, which the two numbers passed. Each part is varied on its
+# own so the refusal that fires names the part that is hollow.
+DENY='Nothing was verified by hand, nothing whatsoever; we took the agent'"'"'s word for all of it.'
+out="$(bash "$GATE" "$(artifact "$NAMED" "$NAMED" "$DENY" deny)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a verified-by-hand part denying that anything was checked is refused"
+assert_contains "$out" "refuse[empty-verified-by-hand]" "the refusal is empty-verified-by-hand"
+assert_contains "$out" "verified by hand" "the refusal names the part that resolves to nothing"
+
+# The SAME sentence with the punctuation taken out. It must be refused for the
+# same reason, because punctuation is not what decides.
+out="$(bash "$GATE" "$(artifact "$NAMED" "$NAMED" 'Nothing was verified by hand we took the agent'"'"'s word for all of it' denyflat)" 2>&1)"
+assert_contains "$out" "refuse[empty-verified-by-hand]" "the same denial without punctuation is refused the same way"
+
+# And the mutation in the other direction, which is the one the old thresholds
+# could not survive: a part that is long and heavily separated and still names
+# nothing. This passes both old numbers comfortably.
+LONG='well, we did, broadly, go through, item by item, all of the things; and then, after that, we went through them again, carefully, twice over'
+out="$(bash "$GATE" "$(artifact "$NAMED" "$NAMED" "$LONG" long)" 2>&1)"
+assert_contains "$out" "refuse[empty-verified-by-hand]" "a long, heavily punctuated part that names nothing is refused"
+
+# The converse, and the strongest pin on the invariant: a part far below both old
+# thresholds — short, no separators at all — that names one thing the artifact
+# carries. It must be accepted, because naming something is the whole bar.
+out="$(bash "$GATE" "$(artifact "$NAMED" "$NAMED" 'JevBench' short)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "a short part with no separators that names something is accepted"
+
+# A part that names things the artifact carries nowhere else resolves to nothing.
+out="$(bash "$GATE" "$(artifact "$NAMED" "$NAMED" 'QuuxCorp and FooBench, read in full, twice' noref)" 2>&1)"
+assert_contains "$out" "refuse[empty-verified-by-hand]" "a part naming things the artifact never mentions again is refused"
+
+# A TRUNCATION of a name the artifact carries is not that name. Found by
+# mutating the comparison rather than deleting it: swapping the whole-name match
+# for a substring match caused no test to fail, which means the suite did not
+# pin the match. Same defect, and the same fix, as the truncated source id in
+# the STANDARDS.md suite.
+out="$(bash "$GATE" "$(artifact "$NAMED" "$NAMED" 'JevB' trunc)" 2>&1)"
+assert_contains "$out" "refuse[empty-verified-by-hand]" "a part naming a truncation of a real name is refused"
+
+# The other two parts, each on its own, with their own refusal code.
+out="$(bash "$GATE" "$(artifact 'everything, all of it, every last thing' "$NAMED" "$NAMED" r)" 2>&1)"
+assert_contains "$out" "refuse[empty-coverage-part]" "a reached part that names nothing is refused"
+assert_contains "$out" "'reached'" "the refusal names the reached part"
+
+out="$(bash "$GATE" "$(artifact "$NAMED" 'nothing at all, nothing whatsoever, we got to all of it' "$NAMED" n)" 2>&1)"
+assert_contains "$out" "refuse[empty-coverage-part]" "a not-reached part that names nothing is refused"
+assert_contains "$out" "'not reached'" "the refusal names the not-reached part"
+
+# The suite must not be able to pass by pinning the old numbers back in.
+src="$(cat "$GATE")"
+assert_not_contains "$src" "PART_MIN_SEPS" "the gate no longer counts separators"
+assert_not_contains "$src" "PART_MIN_CHARS" "the gate no longer counts characters"
 
 # --- the open section ---------------------------------------------------------
 t="$(fresh open)"

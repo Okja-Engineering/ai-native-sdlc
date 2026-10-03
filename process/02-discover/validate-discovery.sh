@@ -65,8 +65,42 @@ field()  { sed -n "s/^$2:[[:space:]]*//p" "$1" 2>/dev/null | head -1 | sed 's/[[
 # has <file> <extended-regex> -> 0 if present, case-insensitive
 has() { grep -qiE "$2" "$1"; }
 
+# tokens <text> -> the words of a text, one per line.
+#
+# Backticks are dropped first, so a name written as a code span and the same
+# name written in prose produce the same token. The two shipped topics differ on
+# exactly that — one marks names with backticks and the other does not.
+tokens() {
+  printf '%s\n' "$1" | tr -d '`' \
+    | grep -oE 'https?://[^][ )(]+|[A-Za-z0-9][A-Za-z0-9_/%+.-]*' \
+    | sed 's/[.,;:]*$//' | grep -v '^$'
+}
+
+# referents <text> -> the tokens that NAME something a reader could go and check
+#
+# Three classes, and the reason each one is in:
+#
+#   a URL                 an address that can be opened.
+#
+#   an interior capital   an acronym, a product or a repository: MMLU, WANLI,
+#                         JevBench, TypeSafe, GitHub. Interior and not leading,
+#                         because a leading capital is only the start of a
+#                         sentence. This is the whole of why "Nothing" is not a
+#                         referent and "WANLI" is.
+#
+#   letters with digits   an id, a version, a commit, a quantity carrying its
+#                         unit: 27B, v1.5.1, 23cf1f3, S-NBER-2026-01.
+#
+# A bare number is deliberately NOT a referent. 875 and 2026-10-03 name nothing
+# on their own — the thing measured is what a reader would go and look at — and
+# a date in particular is available to any sentence, including one denying that
+# anything was checked.
+referents() {
+  tokens "$1" | grep -E '^https?://|^.[A-Za-z0-9_/%+.-]*[A-Z]|^[A-Za-z0-9_/%+.-]*[A-Za-z][A-Za-z0-9_/%+.-]*[0-9]|^[A-Za-z0-9_/%+.-]*[0-9][A-Za-z0-9_/%+.-]*[A-Za-z]'
+}
+
 check_topic() {
-  local f="$1" grades bad seen cov p low R_LABEL N_LABEL V_LABEL PART_MIN_SEPS PART_MIN_CHARS opensec
+  local f="$1" grades bad seen cov R_LABEL N_LABEL V_LABEL opensec
 
   # --- the fields the contract declares -----------------------------------
   [ -n "$(field "$f" dated)" ] || refuse "$f" "-" "undated" \
@@ -97,9 +131,8 @@ check_topic() {
   # The three-part coverage this repository calls "what separates an agent
   # reported this from someone checked it" was a presence-of-phrase test.
   #
-  # So each part is now located INSIDE the coverage section and has to carry
-  # items, not a phrase. An item is a list marker or a separator — the two real
-  # topics use numbered lists, `·` and `;`, and a denial sentence has none.
+  # So each part is now located INSIDE the coverage section and has to NAME
+  # things, which part_names_things below measures directly.
   #
   # The heading match is also loosened. `^#+ *coverage` required the word
   # immediately after the hashes, so `## Coverage` passed while `## 2 · Coverage`
@@ -113,52 +146,64 @@ check_topic() {
       /^## / { if (inside) exit }
       inside { print }' "$f")"
 
-    # part_items <label-regex> — items under one coverage part.
+    # part_body <label-regex> — the lines belonging to one coverage part.
     #
     # A part's body runs from its label to the next part label, which the two
     # topics write differently: `### Verified by hand` in one, a bold inline
     # `**Verified by hand before recording:**` in the other. Both are matched.
     #
-    # An item is a list marker, a `;` or a `·`. Those are what both real topics
-    # use, and crucially a denial sentence has none of them — which is what the
-    # audit's hollow artifact relied on.
-    # Input is lowercased before matching rather than using awk's IGNORECASE,
-    # which is a GNU extension. BSD awk ignores it silently, so on macOS the
-    # label `### Verified by hand` never matched a lowercase pattern and every
-    # part counted zero items — refusing both real topics. Third GNU-ism of this
-    # kind in the repository, after `\?` in sed and `\b` in git grep, and found
-    # the same way: by running it.
-    # part_body <label-regex> — the lines belonging to one coverage part.
+    # The label is matched against a lowercased copy of each line while the
+    # ORIGINAL line is what gets printed, because the referent test below needs
+    # the capitalisation. awk's IGNORECASE is a GNU extension: BSD awk ignores
+    # it silently, so on macOS a lowercase pattern never matched `### Verified
+    # by hand` and every part came back empty, refusing both real topics. Third
+    # GNU-ism of this kind here, after `\?` in sed and `\b` in git grep.
     part_body() {
-      printf '%s\n' "$cov" | tr 'A-Z' 'a-z' | awk -v re="$1" '
+      printf '%s\n' "$cov" | awk -v re="$1" '
         BEGIN { on = 0 }
         {
-          is_label = ($0 ~ /^#+ /) || ($0 ~ /^[*][*][a-z]/)
-          if (on && is_label && $0 !~ re) exit
-          if ($0 ~ re) { on = 1 }
+          l = tolower($0)
+          is_label = (l ~ /^#+ /) || (l ~ /^[*][*][a-z]/)
+          if (on && is_label && l !~ re) exit
+          if (l ~ re) { on = 1 }
           if (on) print
         }'
     }
 
-    # A part has to NAME things, which two measures separate from a sentence
-    # asserting a state. Both thresholds were set from the real artifacts rather
-    # than guessed: their parts run 304–2226 characters with 5–32 separators,
-    # while a fabricated part tops out around 43 characters and 2. The bar sits
-    # well below the real floor and well above the fabricated ceiling.
-    PART_MIN_SEPS=2
-    PART_MIN_CHARS=60
-
-    part_ok() { # label-regex -> 0 if the part names things
-      local b s c
+    # part_names_things <label-regex> -> 0 if the part names something the rest
+    # of the artifact also carries.
+    #
+    # This replaced two numbers — a minimum separator count and a minimum
+    # character count — whose comment asserted that "a fabricated part tops out
+    # around 43 characters and 2 separators". It does not. The artifact from #32
+    # passed by adding two commas to a sentence denying that anything was
+    # checked, and the same sentence without the commas was refused. The gate
+    # was measuring the shape of a sentence instead of reading it.
+    #
+    # What a coverage part has to do is name things, and that is directly
+    # measurable: a name appears somewhere else in the artifact, because the
+    # things a discovery artifact checked are the things it is about. A denial
+    # names nothing however it is punctuated, and a part naming one real thing
+    # in four words is a coverage part even though both old numbers refused it.
+    #
+    # The bar is ONE resolving referent, not a count. A count would be another
+    # proxy, and the proxy is what was wrong.
+    part_names_things() {
+      local b rest refs
       b="$(part_body "$1")"
-      s="$(printf '%s' "$b" | grep -oE '[;·,]|^[[:space:]]*([0-9]+\.|[-*])[[:space:]]' | grep -c .)"
-      c="$(printf '%s' "$b" | wc -c | tr -d ' ')"
-      [ "$s" -ge "$PART_MIN_SEPS" ] && [ "$c" -ge "$PART_MIN_CHARS" ]
+      [ -n "$b" ] || return 1
+      refs="$(referents "$b" | sort -u)"
+      [ -n "$refs" ] || return 1
+      # The artifact with this part's own lines removed, so a word cannot
+      # corroborate itself. Same scope discipline as the checks above: look at
+      # the part, then at everything that is not the part.
+      rest="$(printf '%s\n' "$b" | grep -vxFf - "$f")"
+      tokens "$rest" | grep -qxF -- "$refs"
     }
 
     # Patterns are anchored to a LABEL — `### reached` or `**reached:**` — not to
     # the word anywhere. Unanchored, `reached` also matched `not reached`, so the
-    # reached part's scope ran on through its neighbour and counted its items. An
+    # reached part's scope ran on through its neighbour and read its items. An
     # artifact with an empty reached part and a full not-reached part would have
     # passed.
     # `[*][*]` rather than `\*\*`: passed through awk's -v the backslashes are
@@ -168,27 +213,31 @@ check_topic() {
     R_LABEL='^(#+ |[*][*])reached'
     N_LABEL='^(#+ |[*][*])not reached'
     V_LABEL='^(#+ |[*][*])verified by hand'
-    low="$(printf '%s\n' "$cov" | tr 'A-Z' 'a-z')"
 
-    printf '%s\n' "$low" | grep -qE "$R_LABEL" || refuse "$f" "-" "no-reached" \
+    printf '%s\n' "$cov" | grep -qiE "$R_LABEL" || refuse "$f" "-" "no-reached" \
       "coverage has no 'reached' part"
-    printf '%s\n' "$low" | grep -qE "$N_LABEL" || refuse "$f" "-" "no-not-reached" \
+    printf '%s\n' "$cov" | grep -qiE "$N_LABEL" || refuse "$f" "-" "no-not-reached" \
       "coverage does not say what was NOT reached: an artifact claiming only successes is claiming completeness it has not earned"
 
-    if ! printf '%s\n' "$low" | grep -qE "$V_LABEL"; then
+    if ! printf '%s\n' "$cov" | grep -qiE "$V_LABEL"; then
       refuse "$f" "-" "no-verified-by-hand" \
         "coverage has no 'verified by hand' part: without it there is nothing separating an agent reported this from someone checked it, and a discovery artifact becomes a pile of agent output"
-    elif ! part_ok "$V_LABEL"; then
+    elif ! part_names_things "$V_LABEL"; then
       refuse "$f" "-" "empty-verified-by-hand" \
-        "the 'verified by hand' part names nothing: a sentence saying nothing was checked is not a coverage part, it is the artifact saying it is pure relay. List what was checked"
+        "the 'verified by hand' part names nothing this artifact carries anywhere else: a sentence asserting a state, however it is punctuated, is not a coverage part. Name what was checked — the file, the id, the measurement, the page"
     fi
 
-    for p in "$R_LABEL" "$N_LABEL"; do
-      if printf '%s\n' "$low" | grep -qE "$p" && ! part_ok "$p"; then
-        refuse "$f" "-" "empty-coverage-part" \
-          "a coverage part matching /$p/ names nothing: a coverage part lists what was or was not reached, not a sentence asserting it"
-      fi
-    done
+    # The refusal names the PART, not the pattern. It used to print the label
+    # regex, which told an operator which line of the gate fired and not which
+    # part of their artifact was hollow.
+    if printf '%s\n' "$cov" | grep -qiE "$R_LABEL" && ! part_names_things "$R_LABEL"; then
+      refuse "$f" "-" "empty-coverage-part" \
+        "the 'reached' coverage part names nothing this artifact carries anywhere else: a coverage part names what was reached, it does not assert that everything was"
+    fi
+    if printf '%s\n' "$cov" | grep -qiE "$N_LABEL" && ! part_names_things "$N_LABEL"; then
+      refuse "$f" "-" "empty-coverage-part" \
+        "the 'not reached' coverage part names nothing this artifact carries anywhere else: a coverage part names what was not reached, it does not assert that nothing was missed"
+    fi
   fi
 
   # --- the open section ----------------------------------------------------
