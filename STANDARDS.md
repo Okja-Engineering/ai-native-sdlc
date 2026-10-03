@@ -4,6 +4,8 @@
 
 Every claim carries a grade. The grade is the point of this document — "accepted standard" and "one vendor's blog post" are not the same thing, and most published material on this subject right now is the second.
 
+<!-- not-a-claim-block: the rows below declare what each grade means, they do not grade anything -->
+
 | Grade | Means |
 |---|---|
 | **[E]** | Empirical — controlled experiment or large-scale observational study |
@@ -11,6 +13,8 @@ Every claim carries a grade. The grade is the point of this document — "accept
 | **[V]** | Vendor methodology — a supplier describing their own practice. **Not outcome evidence.** |
 | **[P]** | Practitioner consensus — widely held, not measured |
 | **[O]** | Open — contested or unresolved |
+
+<!-- end-not-a-claim-block -->
 
 ---
 
@@ -82,13 +86,13 @@ Three things distinguish this from a normal pipeline:
 
 **[V]** stated plainly by vendors — *"the agent that wrote the code has no way to approve it"* — and **[P]** from our own repeated experience: agents asked to assess their own work praise it, and a dedicated reviewer agent will talk itself out of its own findings.
 
-> **This was graded [E] until 2026-10-03, and that was wrong.** "The most reliably reproduced failure in practice" is something we have observed, not a controlled result, and no study in [`SOURCES.md`](SOURCES.md) establishes it. Downgraded to **[P]** rather than given a citation it does not have. The behaviour is still what §3 rests on; what changed is the honesty of the grade.
+> **This was graded [E] until 2026-10-03, and that was wrong.** "The most reliably reproduced failure in practice" is something we have observed, not a controlled result, and no study in [`SOURCES.md`](SOURCES.md) establishes it. Downgraded to **[P]** rather than given a citation it does not have. The behaviour is still what §3 rests on; what changed is the honesty of the grade. <!-- not-a-claim: this records that a grade was wrong and names the old one, the paragraph it is about is graded above -->
 
 **The practice:** `S-NIST-AC5` separation of duties. Whoever produced the change does not grade it. A second, independent evaluator, with criteria written down beforehand. This maps onto maker-checker, which is why it travels well in regulated environments. **[S]**
 
 **An agent may be that evaluator. It may not be the approver.** An agent reviews, comments and flags. The act that unblocks a merge is a natural person's. Two accounts belonging to one vendor's one product is a separation of *identity*, not of duties — measured 2026-10-03 (`S-OURS-APPROVAL-2026-01`), an agent was the sole approving reviewer on 10% of a 300-item sample of pull requests it had authored itself, because the authoring and reviewing accounts differ and the platform evaluates "an author cannot approve their own pull request" per account. **[E]** for the measurement.
 
-**What that requires in configuration. [S]** On a platform where an agent review can satisfy a required-approval rule, the settings that let it do so stay **off**, at every level they exist. On GitHub that is two repository-level toggles — allow an agent to approve, and allow an agent's approval to count toward merge requirements — plus the equivalent at organization and enterprise level.
+**What that requires in configuration. [S]** On a platform where an agent review can satisfy a required-approval rule, the settings that let it do so stay **off**, at every level they exist (`S-NIST-AC5`). On GitHub that is two repository-level toggles — allow an agent to approve, and allow an agent's approval to count toward merge requirements — plus the equivalent at organization and enterprise level.
 
 Two limits on that, both measured and neither comfortable:
 
@@ -171,9 +175,11 @@ Not gaps in this document — open questions in the field, as of Q3 2026.
 
 ## Provenance and maintenance
 
-Every `[E]` and `[S]` claim above cites an ID in [`SOURCES.md`](SOURCES.md), and `bin/validate-standards.sh` refuses one that does not.
+Every `[E]` and `[S]` claim above cites an ID in [`SOURCES.md`](SOURCES.md), and `bin/validate-standards.sh` refuses one that does not. <!-- not-a-claim: this sentence states the rule the gate enforces, it does not grade anything -->
 
-Derived from research conducted Q3 2026. The corpus is in history at `fa7538a`, **not on a branch** — `experiment/0.0.0` was referenced here and in `README.md` and does not exist on origin, which left this document with no reachable evidence at all. Found by the external audit in #22.
+Three places in this document name a grade without using one: the table above that defines what each grade means, and two sentences about the grading scheme rather than graded by it. Each one says so in an HTML comment carrying its reason, and the gate prints how many such declarations it honoured. Until 2026-10-03 the gate instead skipped every line starting with `|` or `> `, which was silent, unconditional, and let a table row and a blockquote carry an uncited grade.
+
+Derived from research conducted Q3 2026. The corpus is in history at `fa7538a`, **not on a branch** — `experiment/0.0.0` was referenced here and in `README.md` and does not exist on origin, which left this document with no reachable evidence at all. Found by the external audit in #22. <!-- dead-pointer: experiment/0.0.0 — named here to record that it never existed on origin, not as a route to anything -->
 
 **The three defects this document named are now corrected in `SOURCES.md` rather than inherited:** one source's population understated fivefold (`S-NBER-2026-01`, 100,000 to 500,000+); the METR supersession unrecorded (now `S-METR-2026-01`, carrying METR's own statement that the replacement results are unreliable); three vendor-affiliated sources filed under non-vendor labels (now marked in the class column). A fourth was found while doing it: §3's self-assessment claim was graded `[E]` and is `[P]`.
 

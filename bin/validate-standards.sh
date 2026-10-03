@@ -35,6 +35,22 @@ refusals=0
 refuse() { printf '%s: refuse[%s]: %s\n' "${1#$ROOT/}" "$2" "$3" >&2; refusals=$((refusals + 1)); }
 
 [ -f "$DOC" ] || { printf 'validate-standards: no such file: %s\n' "$DOC" >&2; exit 2; }
+
+# This gate resolves evidence pointers against the repository it is run in, so it
+# needs a repository with the history in it. Neither of these can be reported as
+# a clean document: a gate that cannot check must say so rather than pass. Same
+# failure as the one AGENTS.md records for validate-claims.sh, where a pattern
+# that would not compile was read as "nothing found" and the tree was reported
+# clean having been evaluated not at all.
+if ! git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+  printf 'validate-standards: %s is not a git repository, so an evidence pointer cannot be resolved\n' "$ROOT" >&2
+  exit 2
+fi
+if [ "$(git -C "$ROOT" rev-parse --is-shallow-repository 2>/dev/null)" = true ]; then
+  printf 'validate-standards: this is a shallow clone, so a pointer into history cannot be resolved. Fetch the full history — in Actions that is actions/checkout with fetch-depth: 0\n' >&2
+  exit 2
+fi
+
 if [ ! -f "$REG" ]; then
   refuse "$REG" "no-register" "there is no source register, so no graded claim can resolve to anything"
   printf 'validate-standards: 1 refusal(s)\n' >&2; exit 1
@@ -64,25 +80,58 @@ EOF
 fi
 
 # --- every graded claim cites an ID ------------------------------------------
-# A claim line is any line carrying an [E] or [S] marker that is not a table row
-# (the grade key at the top of the document is a table) and not a blockquote
-# annotation about a grade having changed.
+# A line GRADES a claim when it carries an [E] or [S] marker, wherever on the
+# line that marker appears and whatever markdown is around it.
+#
+# The previous version skipped any line beginning `|` or `> `, and matched only
+# four marker forms: `**[E]`, `**[S]`, `[E]/[S]`, `[S]/[P]`. So a bare `[E]`, a
+# table row and a blockquote all passed uncited — and a bare marker is this
+# repository's own house style for a graded claim. AGENTS.md writes it that way
+# and so do both discovery topics. The gate was reading markup, not grades.
+#
+# There is no markup stripping here, and that is deliberate. The first version of
+# this fix stripped emphasis, table pipes and the blockquote marker before
+# testing the line, which reads as thorough and does nothing: `[E]`, `**[E]**`,
+# `| **[E]** |` and `> - [E]` all contain the marker already. Mutating each strip
+# out failed no test, which is how the dead code was found. What was actually
+# wrong was the first-character exemption and the four-form pattern, and both are
+# gone.
+#
+# A line is exempt only when it SAYS it is not a claim, in band, with a reason:
+#
+#   <!-- not-a-claim: reason -->          exempts the line it is on
+#   <!-- not-a-claim-block: reason -->    exempts every line until
+#   <!-- end-not-a-claim-block -->
+#
+# This document declares three: the table that defines what each grade means,
+# and two sentences that are about the grading scheme rather than graded by it.
+# Each declaration sits where it applies, carries its reason, greps in one line,
+# and is counted in this gate's summary. The first-character skip it replaces was
+# unconditional, silent and uncounted. A marker carrying no reason does not
+# exempt anything, so a careless one produces a refusal rather than a hole.
+scan="$(awk '
+  /<!--[ \t]*end-not-a-claim-block[ \t]*-->/ { inblock = 0; next }
+  /<!--[ \t]*not-a-claim-block:[^>]*[A-Za-z][^>]*-->/ { inblock = 1; x++; next }
+  inblock { next }
+  /<!--[ \t]*not-a-claim:[^>]*[A-Za-z][^>]*-->/ { x++; next }
+  /\[E\]|\[S\]/ { printf "C%d:%s\n", FNR, $0 }
+  END { printf "X%d\n", x + 0 }
+' "$DOC")"
+exemptions="$(printf '%s\n' "$scan" | sed -n 's/^X//p')"
+
 while IFS= read -r ln; do
+  [ -n "$ln" ] || continue
   n="${ln%%:*}"; text="${ln#*:}"
-  case "$text" in
-    '|'*) continue ;;   # the grade key table
-    '> '*) continue ;;  # an annotation about a claim, not the claim
-  esac
   # Must be a WELL-FORMED id, matched with the same pattern used to extract
   # citations below. A substring test for '`S-' passed a claim citing `S-`,
   # which satisfied "has a citation" while being extracted as none — so neither
   # uncited-claim nor unknown-source fired and the hole was silent. Found by the
   # #29 mutation sweep.
   if printf '%s' "$text" | grep -qE '`S-[A-Z0-9]+[A-Z0-9-]*`'; then :; else
-    refuse "$DOC" "uncited-claim" "line $n carries an [E] or [S] grade and cites no well-formed source ID: the grade is the point of this document, and an uncited grade is an assertion wearing a label"
+    refuse "$DOC" "uncited-claim" "line $n carries an [E] or [S] grade and cites no well-formed source ID: the grade is the point of this document, and an uncited grade is an assertion wearing a label. A line that names a grade without using one declares that in band — <!-- not-a-claim: reason -->"
   fi
 done <<EOF
-$(grep -nE '\*\*\[E\]|\*\*\[S\]|\[E\]/\[S\]|\[S\]/\[P\]|\*\*\[S\]\*\*' "$DOC")
+$(printf '%s\n' "$scan" | sed -n 's/^C//p')
 EOF
 
 # --- every cited ID is in the register ---------------------------------------
@@ -110,33 +159,106 @@ done <<EOF
 $ids
 EOF
 
-# --- no document points at a ref that does not exist -------------------------
+# --- no document points at something git cannot find -------------------------
 # The specific defect that left this document unevidenced: three files pointed
-# at `experiment/0.0.0` as the route to the sources. Checking a backtick-quoted
-# branch-shaped string against the refs actually present catches the class.
-for f in "$DOC" "$REG" "$ROOT/README.md"; do
+# at `experiment/0.0.0` as the route to the sources, and it was never a ref.
+#
+# The check used to match backtick-quoted strings beginning `experiment/` or
+# `branch/`. That enumerated the two namespaces the one known defect happened to
+# use, and left out the pointer the repository now actually depends on — the
+# commit `fa7538a`, which is the only route to the evidence corpus because the
+# corpus is in history and not on any branch. Replacing it with a dead commit
+# left this gate reporting every document clean. `DECIDERS.md` records that the
+# planned identity cleanup is a force-push rewriting every SHA, so the documented
+# next step creates exactly that condition.
+#
+# A backticked token is a pointer — something the document says a reader can go
+# and find — when it is one of two things:
+#
+#   it contains a `/`, so it names a place: a path in the working tree, or a ref
+#
+#   it is 7 to 40 hexadecimal characters, optionally followed by `:<path>` — an
+#   object name, which is how a commit and a file inside a commit are cited here
+#
+# A pointer resolves if the working tree has it as a path OR git has it as an
+# object or a ref. Which of the two it was meant to be does not matter: either
+# way a reader can open it. `github/docs` and `experiment/0.0.0` are the same
+# shape and only one of them needs to be a ref.
+#
+# What this does NOT cover is a one-level branch or tag name. `main` and `v0.1`
+# in backticks are not distinguishable from an ordinary word or a version number
+# in prose, and guessing would refuse `v4.0.1` in a sentence about PCI DSS.
+# CONTROLS.md carries that under what is not controlled.
+is_pointer() { # token -> 0 if the document is pointing at something
+  case "$1" in
+    *' '*|*'<'*|*'>'*) return 1 ;;   # a phrase or an identity, not a pointer
+    *'://'*) return 1 ;;             # a URL resolves on the web, not in here
+  esac
+  printf '%s' "$1" | grep -qE '^[0-9a-f]{7,40}(:.+)?$' && return 0
+  case "$1" in */*) return 0 ;; esac
+  return 1
+}
+
+resolves() { # pointer -> 0 if this repository has it, as a path or in git
+  [ -e "$ROOT/$1" ] && return 0
+  # `^{object}` rather than a bare --verify, and that is load-bearing:
+  # `git rev-parse --verify <40 hex digits>` succeeds on a full-length name
+  # whether or not the object is present, so without the peel a fabricated SHA
+  # resolves. Checked on git 2.50.1.
+  git -C "$ROOT" rev-parse --verify --quiet "$1^{object}" >/dev/null 2>&1 && return 0
+  # The peel does not apply to the `<commit>:<path>` form, which is how a file
+  # inside a commit is cited here. That form proves existence by reading the
+  # tree, so a bare --verify is sound for it and only for it.
+  case "$1" in
+    *:*) git -C "$ROOT" rev-parse --verify --quiet "$1" >/dev/null 2>&1 && return 0 ;;
+  esac
+  git -C "$ROOT" rev-parse --verify --quiet "refs/remotes/origin/$1" >/dev/null 2>&1 && return 0
+  git -C "$ROOT" rev-parse --verify --quiet "refs/heads/$1" >/dev/null 2>&1 && return 0
+  git -C "$ROOT" rev-parse --verify --quiet "refs/tags/$1" >/dev/null 2>&1 && return 0
+  return 1
+}
+
+for f in "$DOC" "$REG" "$ROOT/README.md" "$ROOT/DECIDERS.md"; do
   [ -f "$f" ] || continue
-  refs="$(grep -oE '`(experiment|branch)/[A-Za-z0-9._/-]+`' "$f" 2>/dev/null | tr -d '`' | sort -u)"
+  refs="$(grep -oE '`[^` ]+`' "$f" 2>/dev/null | tr -d '`' | sort -u)"
   while IFS= read -r r; do
     [ -n "$r" ] || continue
-    # Present as a local ref or a remote-tracking ref? Then nothing to check.
-    git -C "$ROOT" rev-parse --verify --quiet "$r" >/dev/null 2>&1 && continue
-    git -C "$ROOT" rev-parse --verify --quiet "origin/$r" >/dev/null 2>&1 && continue
+    is_pointer "$r" || continue
+    resolves "$r" && continue
 
-    # The exemption is PER LINE, not per file. A document is allowed to name a
-    # dead ref in order to say it is dead — but checking the whole file for that
-    # sentence means one such sentence exempts every other mention, including a
-    # new one that points at it as a live route to evidence.
+    # A document is allowed to name a dead pointer in order to record that it is
+    # dead. The exemption has to be scoped as tightly as the thing it exempts,
+    # and it has taken two goes to get there:
     #
-    # The first version did exactly that, and the test caught it. It is the same
-    # defect the external audit found in validate-discovery.sh hours earlier:
-    # grep over the whole file instead of over the scope the check is about.
+    #   per FILE — one sentence saying a ref was dead exempted every mention of
+    #   it in the file, including a new one presenting it as a live route to
+    #   evidence. Caught by a test.
+    #
+    #   per LINE, by phrase — any of four phrases anywhere on the line exempted
+    #   every pointer on that line. `SOURCES.md` line 5 names the dead branch and
+    #   the live commit in one sentence, so replacing the commit with a dead one
+    #   was accepted. Caught by the #55 work, by mutating the commit rather than
+    #   the branch.
+    #
+    # It is now per POINTER, declared in band and naming the pointer it exempts:
+    #
+    #   <!-- dead-pointer: experiment/0.0.0 — never existed on origin -->
+    #
+    # A declaration that does not name this pointer does not exempt it, and one
+    # carrying nothing but the pointer does not exempt it either, because then
+    # there is no reason recorded. Same shape as the not-a-claim declarations
+    # above: explicit, greppable, and reviewable where a phrase match was a guess.
     while IFS= read -r line; do
-      case "$line" in
-        *"does not exist"*|*"not on a branch"*|*"never did"*|*"was referenced"*) continue ;;
+      decl="$(printf '%s' "$line" | sed -n 's/.*<!--[[:space:]]*dead-pointer:\([^>]*\)-->.*/\1/p')"
+      case "$decl" in
+        *"$r"*)
+          case "${decl/$r/}" in
+            *[A-Za-z]*) continue ;;
+          esac
+          ;;
       esac
       refuse "$f" "dangling-ref" \
-        "points at \`$r\`, which is not a ref in this repository: this is the defect that left STANDARDS.md with no reachable evidence"
+        "points at \`$r\`, which this repository has neither as a path nor in git history: this is the defect that left STANDARDS.md with no reachable evidence. If it is somewhere else — another repository, a URL — link it rather than writing it in backticks, because a reader cannot open this. If it is named in order to record that it is dead, say so in band: <!-- dead-pointer: $r — reason -->"
       break
     done <<INNER
 $(grep -F "$r" "$f")
@@ -150,5 +272,5 @@ if [ "$refusals" -gt 0 ]; then
   printf 'validate-standards: %s refusal(s)\n' "$refusals" >&2
   exit 1
 fi
-printf 'validate-standards: %s source(s) cited and resolving, %s in the register, %s not currently cited\n' \
-  "$(printf '%s\n' "$cited" | grep -c . )" "$(printf '%s\n' "$ids" | grep -c .)" "$uncited"
+printf 'validate-standards: %s source(s) cited and resolving, %s in the register, %s not currently cited, %s line(s) declared not a claim\n' \
+  "$(printf '%s\n' "$cited" | grep -c . )" "$(printf '%s\n' "$ids" | grep -c .)" "$uncited" "$exemptions"

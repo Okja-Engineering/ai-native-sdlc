@@ -2,6 +2,8 @@
 
 A decision record's `decided_by:` must name someone on this list. `process/05-deliver/validate-decision.sh` refuses one that does not.
 
+**The list is the `Name` column of the table below, data rows only.** Nothing else in this file authorizes anybody: not the column heading, not an example in a code block, and not a second table added later. Until 2026-10-03 the gate read the first cell of every row in the file, which made `decided_by: Name` — the heading — an authorized decider.
+
 | Name | Since | git identity |
 |---|---|---|
 | Matthew Van Dusen | 2026-10-01 | `Matthew Van Dusen <matt.vandusen@okja.io>` |

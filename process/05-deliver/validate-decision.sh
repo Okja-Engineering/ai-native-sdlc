@@ -64,12 +64,51 @@ line_of() { grep -n "^$2:" "$1" 2>/dev/null | head -1 | cut -d: -f1; }
 DECIDERS="${DECIDERS_FILE:-$ROOT/DECIDERS.md}"
 OBVIOUSLY_NOT_A_PERSON='(^|[^a-z])(team|group|everyone|owner|reviewer|maintainer|claude|gpt|codex|copilot|agent|bot|assistant|automation|llm|model)([^a-z]|$)'
 
+# deciders_listed -> one authorized name per line
+#
+# The allowlist is the `Name` column of whichever tables in DECIDERS.md declare
+# one, DATA ROWS ONLY.
+#
+# It used to be `grep -oE '^\| [^|]+ \|'` — the first cell of every row in the
+# file. That harvested the table HEADER, so `decided_by: Name` was an authorized
+# decider. It also meant anything else in the file shaped like a table row
+# donated its first cell: a second table listing people who have asked to be
+# added would have authorized all of them, and so would an example row inside a
+# fenced block.
+#
+# Keyed to the column's declared heading rather than to its position, so adding
+# or reordering columns cannot quietly move the allowlist, and a table that
+# declares no Name column contributes nothing. A file that declares no such
+# column authorizes nobody — the same choice as a missing file, because the point
+# of an allowlist is that an absent name refuses.
+deciders_listed() {
+  awk -F'|' '
+    function clean(s) {
+      gsub(/[*_`]/, "", s); sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s
+    }
+    /^```/ { fence = !fence; next }
+    fence  { next }
+    /^[|]/ {
+      if (!head) {                 # the first row of a table is its heading row
+        head = 1; sep = 0; col = 0
+        for (i = 2; i < NF; i++) if (tolower(clean($i)) == "name") col = i
+        next
+      }
+      if (!sep) {                  # the second has to be the separator
+        if ($0 ~ /^[|][-: |]+[|][ \t]*$/) sep = 1; else { head = 0; col = 0 }
+        next
+      }
+      if (col) { v = clean($col); if (v != "") print v }
+      next
+    }
+    { head = 0; sep = 0; col = 0 } # a non-table line ends the table
+  ' "$DECIDERS" 2>/dev/null
+}
+
 # authorized <name> -> 0 if the name is a listed decider
 authorized() {
   [ -f "$DECIDERS" ] || return 1
-  grep -oE '^\| [^|]+ \|' "$DECIDERS" 2>/dev/null \
-    | sed -e 's/^| *//' -e 's/ *|$//' \
-    | grep -qxF "$1"
+  deciders_listed | grep -qxF -- "$1"
 }
 
 check_record() {

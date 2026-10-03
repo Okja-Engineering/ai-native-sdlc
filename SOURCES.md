@@ -2,7 +2,7 @@
 
 Every `[E]` and `[S]` claim in [`STANDARDS.md`](STANDARDS.md) cites an ID from this file. `bin/validate-standards.sh` refuses a graded claim whose ID is not here, and refuses an ID here that nothing cites.
 
-**Why this file exists.** `STANDARDS.md` carried 31 graded claims and zero citations. Its only route to evidence was a reference to a branch, `experiment/0.0.0`, which does not exist on origin and never did. From inside the repository every `[E]` claim was an assertion. Found by the external audit in #22; the register was recovered from history at `fa7538a:research/sources/source-register.md`.
+**Why this file exists.** `STANDARDS.md` carried 31 graded claims and zero citations. Its only route to evidence was a reference to a branch, `experiment/0.0.0`, which does not exist on origin and never did. From inside the repository every `[E]` claim was an assertion. Found by the external audit in #22; the register was recovered from history at `fa7538a:research/sources/source-register.md`. <!-- dead-pointer: experiment/0.0.0 — named here to record that it never existed on origin, not as a route to anything -->
 
 **Three defects in the recovered corpus are corrected here**, not inherited. `STANDARDS.md` named them and nothing had acted on it:
 
@@ -72,6 +72,6 @@ Carried forward from the recovered register, because they are what stop this fil
 
 ## What is not in here
 
-**The research corpus this derives from is at `fa7538a`**, not on a branch. `experiment/0.0.0` was referenced in three places and does not exist on origin; those references are corrected to the commit.
+**The research corpus this derives from is at `fa7538a`**, not on a branch. `experiment/0.0.0` was referenced in three places and does not exist on origin; those references are corrected to the commit. <!-- dead-pointer: experiment/0.0.0 — named here to record that it never existed on origin, not as a route to anything -->
 
 Nothing in this file sources the repository's own `[P]` and `[O]` claims, by design — a practitioner observation is ours, and an open question has no source by definition.

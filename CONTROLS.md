@@ -27,6 +27,8 @@
 
 **Evidence.** The decision record, the git commit author, the commit date, and the merge. `chosen: pending` is a valid recorded state, so a decision that has not been made is distinguishable from one that was never asked for.
 
+**Evidence note.** The allowlist was read out of [`DECIDERS.md`](DECIDERS.md) as the first cell of every row in the file, header included, so `decided_by: Name` was an authorized decider until 2026-10-03. It is now the `Name` column of whichever tables declare one, data rows only, skipping fenced examples — so a second table, an example row and the heading itself all donate nothing. A file that declares no such column authorizes nobody, which is the same choice as a missing file.
+
 **What it does not cover.** Whether the named person actually read the change. A name is attributable, not a guarantee of attention — see *What is not controlled*, item 1.
 
 ---
@@ -141,8 +143,8 @@
 | `no-open-section` | no "what could not be established" section |
 | `silent-empty-open` | the section lists nothing and does not say so |
 | `no-verified-by-hand` | coverage has no verified-by-hand part |
-| `empty-verified-by-hand` | the part exists and names nothing |
-| `empty-coverage-part` | a reached or not-reached part asserts a state instead of naming things |
+| `empty-verified-by-hand` | the verified-by-hand part names nothing the artifact carries anywhere else |
+| `empty-coverage-part` | the reached or not-reached part names nothing the artifact carries anywhere else |
 | `no-not-reached` | coverage lists only what was reached |
 | `no-question` | the question is not in the asker's own words |
 | `question-not-quoted` | the question section carries no quotation |
@@ -158,7 +160,9 @@
 
 **Evidence.** Coverage in three parts — reached, not reached, and **verified by hand** — which is what separates *an agent reported this* from *someone checked it*. Both shipped topics pass despite differing in markup, so the gate checks the contract rather than one artifact's formatting.
 
-**What it does not cover.** Two of the checks the contract hoped for are **not mechanisable**, and the gate's own header says so rather than leaving the gap implicit:
+**Evidence note.** Each part's check was two numbers until 2026-10-03 — a minimum separator count and a minimum character count — and the comment above them asserted that a fabricated part "tops out around 43 characters and 2 separators". It does not. A sentence denying that anything was checked passed with two commas added to it, and the same sentence without the commas was refused. The gate now requires each part to name something the artifact carries somewhere else, which is the thing the two numbers were a proxy for.
+
+**What it does not cover.** Three things. The first is the limit of the repaired check, and is in *What is not controlled*, item 11. The other two of the checks the contract hoped for are **not mechanisable**, and the gate's own header says so rather than leaving the gap implicit:
 
 - **"Every claim carries a grade"** and **"every claim carries a source"** need a claim to be a delimited thing. The two topics write claims as prose paragraphs in different markup with no boundary a script can find. Checking this would mean inventing a convention mid-gate. What is checked instead is that the grades *used* are from the enum and that the enum is declared.
 - **"No recommendation language"** is covered under *What is not controlled*, item 3.
@@ -173,18 +177,27 @@
 
 | Refusal | Condition |
 |---|---|
-| `uncited-claim` | an `[E]` or `[S]` claim citing no source ID |
+| `uncited-claim` | a line carrying an `[E]` or `[S]` marker anywhere on it, citing no source ID |
 | `unknown-source` | a cited ID absent from the register |
 | `source-no-link` | a register entry with no URL, DOI or path |
 | `no-register` | no source register at all |
-| `dangling-ref` | a document points at a git ref that does not exist |
+| `dangling-ref` | a document points at a path, commit, branch or tag this repository does not have |
 | `empty-register` | the register declares no IDs |
 
 **Evidence.** [`SOURCES.md`](SOURCES.md) — 22 sources, each with its population, finding and limitation. Vendor-affiliated empirical studies carry that in the class column so it cannot be read past.
 
+**Evidence note on the evidence pointer.** The check matched backtick-quoted strings beginning `experiment/` or `branch/` — the two namespaces the one known defect happened to use. The pointer this repository actually depends on is a commit: the corpus is in history and not on any branch, and `DECIDERS.md` records that the planned identity cleanup is a force-push rewriting every SHA. Replacing that commit with a dead one left the gate reporting every document clean. It now checks any backticked token that contains a `/` or is a hexadecimal object name, against the working tree and against git.
+
+**Evidence note.** Until 2026-10-03 the gate skipped any line starting with `|` or `> ` and matched only four marker forms — `**[E]`, `**[S]`, `[E]/[S]`, `[S]/[P]`. A bare `[E]`, a table row and a blockquote all passed uncited, and a bare marker is this repository's own house style for a graded claim. A marker is now read wherever it appears on a line. Repairing the detection found one real uncited `[S]` claim in the shipped document — §3's configuration requirement — which now cites `S-NIST-AC5`, the standard the practice two paragraphs above it already rests on.
+
 **What it does not cover.**
 
 - **Whether the cited source supports the claim.** The gate checks a citation resolves, not that it is apt. A reader is still the only check on that.
+- **A one-level branch or tag name is not checked.** The gate treats a backticked token as a pointer when it contains a `/` or is a hexadecimal object name. `main` and `v0.1` in backticks cannot be told apart from an ordinary word or a version number in prose, and guessing would refuse `v4.0.1` in a sentence about PCI DSS. A dead branch named without a namespace would pass.
+- **A reference to another repository has to be a link, not backticks.** The cost of the rule above, stated plainly: `owner/name` and `experiment/0.0.0` are the same shape, so a backticked repository slug in one of these four documents is refused. The refusal says to link it instead. That is a deliberate false positive, chosen over leaving a dead branch unchecked, and it is loud rather than silent.
+- **The gate refuses to run in a shallow clone.** It resolves pointers into history, and a depth-1 checkout does not contain the commit the documents cite. It exits 2 — *the gate could not run* — rather than reporting the documents clean having resolved nothing. The `tests` job checks out with `fetch-depth: 0` for that reason.
+- **A pointer declared dead is taken at its word.** A document may record that a pointer is dead, declared in band and naming the pointer: `<!-- dead-pointer: experiment/0.0.0 — reason -->`. The gate checks the declaration names that pointer and carries a reason, not that the reason is true. This was a match on four phrases anywhere on the line until 2026-10-03, which meant `SOURCES.md` line 5 — naming the dead branch and the live commit in one sentence — exempted both, and replacing the live commit with a dead one was accepted.
+- **A line that declares itself not a claim is taken at its word.** Some lines carry a grade marker without grading anything: the table that defines what each grade means, and a sentence about the scheme rather than graded by it. Those are declared in band, `<!-- not-a-claim: reason -->`, and the gate prints how many it honoured — three, at the time of writing. It checks that the declaration is present and carries a reason, not that the reason is true, so an author can exempt a real claim. That is a weaker control than no exemption at all and a stronger one than what it replaced, which exempted every table row and every blockquote in the document, silently and without a reason.
 - **`[P]` and `[O]` claims have no source by design** — a practitioner observation is ours, an open question has none.
 - **Register entries nothing cites are reported, not refused.** The first version refused them, which would have forced deleting real sources or attaching them to claims they do not support.
 
@@ -241,6 +254,18 @@ The section an assessor should read first. Each of these is a real gap, not a fo
 **10. Who committed a decision.** CTRL-1 establishes that `decided_by` names an authorized person. It does not establish that the person, rather than an agent, wrote the field. Three git identity variants exist in this history and two share an address, so `git log` cannot separate the parties — the same shape `STANDARDS.md` 3 convicts a vendor of, one account with two display names.
 
 `bin/validate-authorship.sh` checks it and **refuses today**: a commit setting `chosen:` must be authored by the identity declared in `DECIDERS.md`, and that identity must not be shared. Neither holds. It is deliberately **not wired into CI**, because a gate that cannot pass blocks every branch, and what turns it on is a configuration change plus a workflow change that both belong to the decider. `DECIDERS.md` states exactly what they are, and they are **deferred to a git history cleanup on `main`** — a force-push that rewrites every SHA and therefore every commit citation in the tracked documents. Tracked as issue #51 and not scheduled into a sprint.
+
+**11. Whether a person checked what a coverage part says they checked.** CTRL-7 requires the verified-by-hand part, and the reached and not-reached parts, to name something the artifact carries somewhere else — a file, an id, a measurement, a product, an address. That establishes two things and no more: the part names something checkable, and the artifact itself carries that thing. It does not establish that anybody looked at it.
+
+The sentence below was run against the repaired gate on 2026-10-03 and **passes**:
+
+```
+### Verified by hand
+
+1. Nothing in the GitHub REST API or the SemIf source was verified by hand.
+```
+
+Both names resolve, so the part names things, and the sentence denies checking them. Nothing mechanical closes that, which is why the repaired gate is written as *names a referent* rather than as *was verified*. A reader is still the only check on whether a coverage part is true. What has changed is narrower and worth stating exactly: a part naming nothing at all is now refused however it is punctuated, where before two commas were enough.
 
 **9. Why any individual engineering change was made.** The chain the loop produces is complete in a clone. The chain by which this repository was built is not: issue and pull request bodies live in GitHub's database, so a clone shows that a change was reviewed and merged but not what it was intended to do or how that was to be validated. An assessor holding only a clone can assess the process and not its own construction.
 

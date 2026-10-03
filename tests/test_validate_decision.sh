@@ -91,12 +91,17 @@ assert_contains "$out" "a decision is made by a human" "the message says why"
 # obviously handles: multi-word roles, versioned model names, a vendor prefix, a
 # plausible-looking human who simply is not authorized. If the implementation is
 # rewritten, these must still pass.
+# The list also includes the text the TABLE ITSELF is made of. The allowlist was
+# harvested with `grep -oE '^\| [^|]+ \|'` — the first cell of every row in the
+# file, header included — so `decided_by: Name` was an authorized decider. The
+# column heading is not a person and neither is the separator row.
 for bad in \
   'the team' 'Claude' 'reviewer' \
   'the Platform Engineering Team' 'Claude Opus 5' 'Anthropic Claude Opus 5.1' \
   'Engineering Leadership Group' 'the SRE on call' 'GPT-5' 'our LLM' \
   'nobody' 'TBD' 'A. N. Other' \
-  'Matt' 'Ada' 'Van Dusen' 'Matt Van Dusen and the team' 'matt van dusen'
+  'Matt' 'Ada' 'Van Dusen' 'Matt Van Dusen and the team' 'matt van dusen' \
+  'Name' 'Since' 'name' '---' '-' '|'
 do
   out="$(bash "$GATE" "$(record A "$bad" 2026-10-01)" 2>&1)"; rc=$?
   assert_status 1 "$rc" "refuses decided_by: $bad"
@@ -119,6 +124,50 @@ assert_contains "$out" "not listed in DECIDERS.md" "an unlisted person is told t
 # No decider list at all must fail closed, not open.
 out="$(DECIDERS_FILE=/nonexistent/DECIDERS.md bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01)" 2>&1)"; rc=$?
 assert_status 1 "$rc" "a missing decider list refuses rather than passing everything"
+
+# --- only the list authorizes, not everything else in the file ----------------
+# The extraction was not anchored to the list, so anything shaped like a table
+# row donated its first cell. A decider file grows prose, examples and other
+# tables over time, and none of those authorize anybody.
+cat > "$TMP/DECIDERS-busy.md" <<'DEC'
+# Authorized deciders
+
+| Name | Since |
+|---|---|
+| Ada Lovelace | 2026-01-01 |
+
+Grace Hopper reviewed the first draft of this file.
+
+## Who has asked to be added
+
+| Candidate | Asked |
+|---|---|
+| Alan Turing | 2026-02-02 |
+
+## What the list looks like
+
+```
+| Name | Since |
+|---|---|
+| Edsger Dijkstra | 2026-03-03 |
+```
+DEC
+for outsider in 'Alan Turing' 'Edsger Dijkstra' 'Grace Hopper' 'Candidate'; do
+  out="$(DECIDERS_FILE="$TMP/DECIDERS-busy.md" bash "$GATE" "$(record A "$outsider" 2026-10-01)" 2>&1)"; rc=$?
+  assert_status 1 "$rc" "a name elsewhere in the decider file does not authorize: $outsider"
+done
+out="$(DECIDERS_FILE="$TMP/DECIDERS-busy.md" bash "$GATE" "$(record A 'Ada Lovelace' 2026-10-01)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "and the one on the list still is authorized"
+
+# A decider file that lists nobody authorizes nobody. Same choice as a missing
+# file: the allowlist exists so that the absence of a name refuses.
+cat > "$TMP/DECIDERS-empty.md" <<'DEC'
+# Authorized deciders
+
+Nobody is currently authorized to decide.
+DEC
+out="$(DECIDERS_FILE="$TMP/DECIDERS-empty.md" bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a decider file listing nobody authorizes nobody"
 
 # --- companion checks, equally shape-independent ------------------------------
 out="$(bash "$GATE" "$(record A 'Matt Van Dusen' '')" 2>&1)"

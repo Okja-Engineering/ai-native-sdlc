@@ -24,6 +24,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The full history, because bin/validate-standards.sh resolves the
+          # evidence pointers the documents cite and the research corpus is a
+          # commit that is not on any branch. A depth-1 checkout cannot see it,
+          # and the gate exits 2 rather than reporting the documents clean from a
+          # clone that does not contain what they point at.
+          fetch-depth: 0
 
       - name: Record the shell under test
         run: |
