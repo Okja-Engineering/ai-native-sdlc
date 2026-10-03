@@ -2,10 +2,16 @@
 # branches. (.scuba/.gitignore also self-ignores; this entry is here for legibility.)
 .scuba/
 
-# Evaluation exhaust: per-run inputs/outputs and copied-in snapshots of inspected
-# repositories. Preserved in history at fa7538a so no run data is
-# lost, but kept out of trunk history. Durable state (.devin/roadmap.md) stays tracked.
-.devin/eval/
+# Evaluation exhaust from the prototype: per-run inputs and outputs, and
+# copied-in snapshots of inspected repositories. Preserved in history at
+# fa7538a so no run data is lost, but kept out of trunk.
+#
+# This used to add "Durable state (.devin/roadmap.md) stays tracked", which is
+# why that file survived. It was the prototype's roadmap, not this one's:
+# nothing referenced it, it claimed the repository had no commits and no
+# tracked files, and its resume instructions named fifteen scripts that do not
+# exist. Deleted 2026-10-03; it is in history if anyone wants it.
+.devin/
 
 # macOS
 .DS_Store
