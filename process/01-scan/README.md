@@ -87,4 +87,4 @@ A dismissal is recorded rather than deleted, for two reasons: next cycle needs t
 
 1. How a superseded finding is recorded — amended in place, or a new finding that points at the old one. This matters, because supersession is the kind we most want to catch and the kind most likely to be quietly overwritten. Nothing in the contract settles it yet.
 2. Whether paid search or fetch is in scope, and at what cost per cycle. X was reachable in cycle 2026-09-29 only through unauthenticated surfaces, which leaves reply threads — where retractions sit — uncovered.
-3. Where a dismissal is recorded. This stage writes findings and stops. The phase that reads them is `process/02-discover/`, which was called "assess" when this was written; there is still nowhere a dismissal is recorded, and that is the open part.
+3. Where a dismissal is recorded. This stage writes findings and stops. process/02-discover does not exist.

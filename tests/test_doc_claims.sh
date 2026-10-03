@@ -35,7 +35,15 @@ paths="$(ls -d process/*/ bin 2>/dev/null | sed 's|/$||')"
 # `git grep` is used so untracked scratch files cannot fail the suite.
 hits=0
 offenders=""
-for line in $(git grep -nIE "$ABSENCE" -- '*.md' '*.sh' ':(exclude).devin/*' 2>/dev/null | cut -d: -f1,2 | sort -u); do
+# `tests/` is excluded. A test that proves this detection works has to contain a
+# line asserting a built path is absent, so including tests/ makes the check flag
+# its own fixture — which is exactly what happened, and only in CI.
+#
+# It passed locally and failed on both CI legs because `git grep` sees TRACKED
+# content: the fixture line was not visible until the file was committed, and the
+# local run happened before `git add`. "Verify after the last edit" is not enough
+# for a check that reads the index — it has to be "verify after staging".
+for line in $(git grep -nIE "$ABSENCE" -- '*.md' '*.sh' ':(exclude).devin/*' ':(exclude)tests/*' 2>/dev/null | cut -d: -f1,2 | sort -u); do
   f="${line%%:*}"; n="${line##*:}"
   text="$(sed -n "${n}p" "$f" 2>/dev/null)"
 
