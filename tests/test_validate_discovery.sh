@@ -213,6 +213,44 @@ t="$(fresh nogrades)"
 perl -0pi -e 's/\[([ESVPO])\]//g' "$t/process/02-discover/$NEW"
 assert_contains "$(gate "$t" "$NEW")" "refuse[no-grades]" "an artifact with no graded claims is refused"
 
+# --- the refusals that had no test at all ------------------------------------
+# Found by the external audit in #22: `no-grade-key` and `silent-empty-open`
+# were emitted by the gate and asserted nowhere. `silent-empty-open` is the one
+# guarding whether an artifact actually left anything open, which is directly
+# load-bearing for the audit's sixth question.
+# The key is one line declaring the scheme. Removing only the phrase "never
+# outcome evidence" was not enough — the first version of the check matched any
+# line pairing "vendor" with a [V] marker, and this artifact has several. The
+# mutation has to remove the LINE.
+t="$(fresh gradekey)"
+perl -0pi -e 's/^\*\*Grades\*\* are the.*\n//m' "$t/process/02-discover/$NEW"
+out="$(gate "$t" "$NEW")"
+assert_contains "$out" "refuse[no-grade-key]" "an artifact that does not declare the grade scheme is refused"
+assert_contains "$out" "never outcome evidence" "the message says what a reader cannot know without it"
+
+# And a line declaring only two grades is not a key either.
+t="$(fresh gradekey2)"
+perl -0pi -e 's/^\*\*Grades\*\* are the.*$/**Grades**: `[E]` empirical and `[S]` standard./m' "$t/process/02-discover/$NEW"
+assert_contains "$(gate "$t" "$NEW")" "refuse[no-grade-key]" "a partial key is refused"
+
+# An open section that lists nothing and does not say so. The gate accepts an
+# explicit statement of emptiness and refuses silence, same as Define's outlier
+# check — an omitted list and an empty one look identical otherwise.
+t="$(fresh silentopen)"
+perl -0pi -e 's{(## What could not be established\n).*?(\n## Where this stops)}{$1\nSome prose with no items at all in it.\n$2}s' "$t/process/02-discover/$NEW"
+out="$(gate "$t" "$NEW")"
+assert_contains "$out" "refuse[silent-empty-open]" "an open section listing nothing without saying so is refused"
+
+# And the same section, empty but explicit, is accepted.
+t="$(fresh explicitopen)"
+perl -0pi -e 's{(## What could not be established\n).*?(\n## Where this stops)}{$1\nNothing — everything in scope was established.\n$2}s' "$t/process/02-discover/$NEW"
+out="$(gate "$t" "$NEW")"
+assert_not_contains "$out" "refuse[silent-empty-open]" "an explicitly empty open section is accepted"
+
+t="$(fresh nocoverage)"
+perl -0pi -e 's/^## Coverage$/## Notes/m' "$t/process/02-discover/$NEW"
+assert_contains "$(gate "$t" "$NEW")" "refuse[no-coverage]" "an artifact with no coverage section is refused"
+
 # --- links resolve ------------------------------------------------------------
 # The shipped topics carry only http sources, so a mutation had nothing to
 # break — the first version of this test passed while proving nothing. A broken

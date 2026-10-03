@@ -66,7 +66,7 @@ field()  { sed -n "s/^$2:[[:space:]]*//p" "$1" 2>/dev/null | head -1 | sed 's/[[
 has() { grep -qiE "$2" "$1"; }
 
 check_topic() {
-  local f="$1" grades bad seen cov p low R_LABEL N_LABEL V_LABEL PART_MIN_SEPS PART_MIN_CHARS
+  local f="$1" grades bad seen cov p low R_LABEL N_LABEL V_LABEL PART_MIN_SEPS PART_MIN_CHARS opensec
 
   # --- the fields the contract declares -----------------------------------
   [ -n "$(field "$f" dated)" ] || refuse "$f" "-" "undated" \
@@ -209,8 +209,15 @@ check_topic() {
     # support it, so the range matched nothing on macOS and the check refused
     # every artifact, while passing on the Linux CI leg. Same class of bug as
     # `\b` in git grep, found the same way — by running it on both.
-    seen=$(sed -n '/^#.*could not .*establish/,$p' "$f" | grep -cE '^[-*0-9]|\[O\]')
-    if [ "$seen" -eq 0 ] && ! sed -n '/^#.*could not .*establish/,$p' "$f" | grep -qiE 'none|nothing|everything was'; then
+    # Scoped to the SECTION, not to the end of the file. The range ran to EOF,
+    # so list items in later sections counted as open items and emptying the
+    # open section entirely still passed. Same scope error the audit found in
+    # the coverage checks, in a different place.
+    opensec="$(awk '/^#+.*could not .*establish/ { inside = 1; next }
+                    /^## / { if (inside) exit }
+                    inside { print }' "$f")"
+    seen=$(printf '%s\n' "$opensec" | grep -cE '^[-*0-9]|\[O\]')
+    if [ "$seen" -eq 0 ] && ! printf '%s\n' "$opensec" | grep -qiE 'none|nothing|everything was'; then
       refuse "$f" "-" "silent-empty-open" \
         "the open section lists nothing and does not say so: an artifact with nothing open is making a strong claim and has to make it explicitly"
     fi
@@ -236,8 +243,27 @@ check_topic() {
       "no graded claims at all: a discovery artifact whose claims carry no grade is indistinguishable from an opinion piece"
   fi
 
-  has "$f" '\[V\].*vendor|vendor.*\[V\]|never outcome evidence' || refuse "$f" "-" "no-grade-key" \
-    "the grade scheme is not declared in the document: a reader meeting [V] for the first time has no way to know it is never outcome evidence"
+  # A DECLARATION, not a sentence that happens to pair "vendor" with a [V].
+  #
+  # This matched `\[V\].*vendor|vendor.*\[V\]|never outcome evidence` as an OR,
+  # so any prose line doing that satisfied it — and the newer topic has several.
+  # Removing the actual grade key left the check passing, which a test written
+  # for it immediately found. It also meant the newer topic never had a grade
+  # key at all and the gate never said so.
+  #
+  # A real key names most of the scheme on one line. Three of five is the bar.
+  if ! awk '
+      { n = 0
+        if ($0 ~ /\[E\]/) n++
+        if ($0 ~ /\[S\]/) n++
+        if ($0 ~ /\[V\]/) n++
+        if ($0 ~ /\[P\]/) n++
+        if ($0 ~ /\[O\]/) n++
+        if (n >= 3) found = 1 }
+      END { exit found ? 0 : 1 }' "$f"; then
+    refuse "$f" "-" "no-grade-key" \
+      "the grade scheme is not declared on any one line: a reader meeting [V] for the first time has no way to know it is never outcome evidence"
+  fi
 
   # --- local links resolve -------------------------------------------------
   # Not "every claim has a source" — see the header. This checks the links the

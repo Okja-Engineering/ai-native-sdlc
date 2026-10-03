@@ -116,8 +116,35 @@ check_record() {
   [ -n "$dated" ] || refuse "$f" "${ln:--}" "undated-decision" \
     "chosen is '$chosen' but dated is empty: when a person decided is part of the record"
 
+  # --- the stated problem must be linked ---------------------------------
+  # deliver-contract.md requires `problem:` and nothing read it. Deleting the
+  # line from a decision record left the gate reporting the file within the
+  # contract — the decision-to-problem edge of the chain had no check at all,
+  # and CONTROLS.md did not disclose that. Found by the external audit in #22.
+  local prob prob_path prob_resolved
+  prob="$(field "$f" problem)"
+  if [ -z "$prob" ]; then
+    refuse "$f" "-" "no-problem-link" \
+      "no problem: field — a decision records the problem it decided, or it is an answer with no question"
+  else
+    prob_path="$(printf '%s' "$prob" | sed -n 's/.*](\([^)#]*\)[^)]*).*/\1/p')"
+    if [ -z "$prob_path" ]; then
+      refuse "$f" "-" "problem-not-linked" \
+        "problem: names something but does not link it, so the problem cannot be read from the decision"
+    else
+      prob_resolved="$(cd "$(dirname "$f")" && cd "$(dirname "$prob_path")" 2>/dev/null && pwd)/$(basename "$prob_path")"
+      [ -f "$prob_resolved" ] || refuse "$f" "-" "problem-unresolved" \
+        "the declared problem does not resolve: $prob_path"
+    fi
+  fi
+
   # --- the chosen option must exist --------------------------------------
-  local opts_path=""
+  #
+  # These used to `return` on their own refusals, which made check_amends
+  # unreachable for any record with no resolvable options link — a record could
+  # be missing both and only hear about one. The amends check is independent of
+  # the options check, so it runs either way now.
+  local opts_ok=1 opts_path=""
   case "$opts" in
     *"]("*) opts_path="$(printf '%s' "$opts" | sed -n 's/.*](\([^)]*\)).*/\1/p')" ;;
     "") : ;;
@@ -125,16 +152,16 @@ check_record() {
   esac
   if [ -z "$opts_path" ]; then
     refuse "$f" "-" "no-options-link" "chosen is '$chosen' but no options set is declared to have chosen from"
-    return
+    opts_ok=0
   fi
-  local resolved; resolved="$(cd "$(dirname "$f")" && cd "$(dirname "$opts_path")" 2>/dev/null && pwd)/$(basename "$opts_path")"
-  if [ ! -f "$resolved" ]; then
-    refuse "$f" "-" "options-unresolved" "the declared option set does not resolve: $opts_path"
-    return
-  fi
-  if ! grep -qE "^## $chosen · " "$resolved"; then
-    refuse "$f" "-" "chosen-not-an-option" \
-      "chosen is '$chosen', which is not an option in $(basename "$resolved"): if the right answer was not developed, go back to Develop"
+  if [ "$opts_ok" -eq 1 ]; then
+    local resolved; resolved="$(cd "$(dirname "$f")" && cd "$(dirname "$opts_path")" 2>/dev/null && pwd)/$(basename "$opts_path")"
+    if [ ! -f "$resolved" ]; then
+      refuse "$f" "-" "options-unresolved" "the declared option set does not resolve: $opts_path"
+    elif ! grep -qE "^## $chosen · " "$resolved"; then
+      refuse "$f" "-" "chosen-not-an-option" \
+        "chosen is '$chosen', which is not an option in $(basename "$resolved"): if the right answer was not developed, go back to Develop"
+    fi
   fi
 
   check_amends "$f"
