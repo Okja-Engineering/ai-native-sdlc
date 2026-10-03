@@ -25,8 +25,9 @@ The portable conventions. This file is the cross-tool standard and is read by ag
 
   **"The author field is the author" is not currently true, and the rule needs revisiting rather than quietly contradicting.** Every commit on `main` is authored under one address, `imagineux@gmail.com`, under two display names, so `git log` does not separate an agent-driven commit from a person's — including the two commits that recorded a decision. Run `bin/validate-authorship.sh` for the live tally, or `git log main --format='%an <%ae>' | sort | uniq -c` in a clone; `DECIDERS.md` carries the measurement with the ref and date it was taken against, and this file deliberately does not repeat the numbers. Trailers were banned to keep tool credit out of commit messages; separating authorship needs the opposite of that ban, for a different reason. `DECIDERS.md` sets out the two changes that fix it properly, both of which are the decider's; a trailer would be the weaker substitute, because a trailer can be omitted and an author field cannot.
 - One logical change per commit.
+- **A merge subject is exempt from the convention, and only the subject.** It is generated — by git for a local `git merge`, by the forge for a pull request — so refusing it refuses something nobody wrote. The attribution ban still applies to a merge, because a merge message can be edited.
 
-Enforced by `.githooks/commit-msg`.
+Enforced by `.githooks/commit-msg`, re-checked by `.githooks/pre-push`, and enforced where it cannot be skipped by the `commit-messages` job. **All three now carry the merge exemption; until 2026-10-03 only the CI job did.** `git merge main` on a branch was refused locally for the subject git had just written, and a force-push of a rebased branch was refused for a merge on `main` that the forge wrote — in both cases the only way through was `--no-verify`, which also turns off the secret scan. One rule enforced in three places with the exemption in one of them is the drift CTRL-9 exists to prevent, pointing the other way. `tests/test_hooks.sh` drives both hooks against a throwaway repository and a bare remote.
 
 ## Issues and pull requests
 

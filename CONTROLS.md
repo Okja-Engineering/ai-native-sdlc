@@ -217,7 +217,9 @@
 | Publish disclosure | `.githooks/pre-push` | — | **a hard refusal** if a push would newly publish a never-publish path, having first printed which commits and how many files would become public |
 | Suite integrity | — | the `tests` job | a runner that reports success on a deliberately failing suite — asserted, not trusted |
 
-**Evidence.** The hook scripts, the workflow, and CI's run history.
+**Evidence.** The hook scripts, the workflow, and CI's run history. `tests/test_hooks.sh` drives both hooks end to end against a throwaway repository and a bare remote, so the local half is asserted rather than assumed.
+
+**Evidence note.** This control is about a convention applying only to whoever enabled it. It drifted the other way instead. The conventional-subject rule is enforced in three places — `.githooks/commit-msg`, `.githooks/pre-push`, the `commit-messages` job — and until 2026-10-03 the merge exemption was in the job alone, so both hooks were **stricter** than the thing they mirror. A local `git merge main` was refused for the subject git had just written, and a force-push of a rebased branch was refused for a merge on `main` that the forge wrote. The only way past either was `--no-verify`, which also turns off the secret scan, so the practical effect of the stricter hook was less enforcement. Neither case appears in ordinary use, which is why it sat there: one needs a local merge and the other needs a rebase.
 
 **What it does not cover.**
 
