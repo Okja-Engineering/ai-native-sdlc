@@ -92,7 +92,7 @@ Three things distinguish this from a normal pipeline:
 
 **An agent may be that evaluator. It may not be the approver.** An agent reviews, comments and flags. The act that unblocks a merge is a natural person's. Two accounts belonging to one vendor's one product is a separation of *identity*, not of duties — measured 2026-10-03 (`S-OURS-APPROVAL-2026-01`), an agent was the sole approving reviewer on 10% of a 300-item sample of pull requests it had authored itself, because the authoring and reviewing accounts differ and the platform evaluates "an author cannot approve their own pull request" per account. **[E]** for the measurement.
 
-**What that requires in configuration. [S]** `S-NIST-AC5` On a platform where an agent review can satisfy a required-approval rule, the settings that let it do so stay **off**, at every level they exist. On GitHub that is two repository-level toggles — allow an agent to approve, and allow an agent's approval to count toward merge requirements — plus the equivalent at organization and enterprise level.
+**What that requires in configuration. [S]** On a platform where an agent review can satisfy a required-approval rule, the settings that let it do so stay **off**, at every level they exist (`S-NIST-AC5`). On GitHub that is two repository-level toggles — allow an agent to approve, and allow an agent's approval to count toward merge requirements — plus the equivalent at organization and enterprise level.
 
 Two limits on that, both measured and neither comfortable:
 
