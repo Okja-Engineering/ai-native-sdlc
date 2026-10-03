@@ -1,8 +1,12 @@
 # Source register
 
-Every `[E]` and `[S]` claim in [`STANDARDS.md`](STANDARDS.md) cites an ID from this file. `bin/validate-standards.sh` refuses a graded claim that cites no ID, and refuses a cited ID that is not here.
+Every `[E]` and `[S]` claim in [`STANDARDS.md`](STANDARDS.md) cites an ID from this file. `bin/validate-standards.sh` refuses a graded claim that cites no ID — `uncited-claim` — and refuses a cited ID that is not here — `unknown-source`.
 
-**An ID here that nothing cites is reported, not refused.** This said *"refuses"* until 2026-10-03 and the gate has never done it — `validate-standards.sh` counts them and exits 0, and `CONTROLS.md` already said so. Run it and read the last line:
+**Each enforcement sentence above names the refusal it is claiming**, so a reader can check it against the gate rather than read it and believe it. `tests/test_controls.sh` resolves every code named here against the gate that emits it, and flags a sentence that claims a refusal without naming one. That rule applied to `CONTROLS.md` alone until 2026-10-03, which is how the sentence below went wrong here while the control document had it right.
+
+**An ID here that nothing cites is reported, not refused.** This said *"refuses"* until 2026-10-03 and the gate has never done it: `bin/validate-standards.sh` counts them and exits 0, and `CONTROLS.md` already said so. <!-- not-an-enforcement-claim: this sentence records that the gate does NOT refuse an uncited register entry, so it names no refusal code -->
+
+Run it and read the last line:
 
 ```
 $ bin/validate-standards.sh

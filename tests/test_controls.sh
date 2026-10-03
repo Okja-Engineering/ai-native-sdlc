@@ -64,6 +64,115 @@ for c in nothing-found empty-cycle filename; do
     "scan gate emits '$c' as the document claims"
 done
 
+# --- the other document that makes enforcement claims -------------------------
+# This suite read one document. The enforcement claims live in several, and the
+# one that drifted was in the other: SOURCES.md said `bin/validate-standards.sh`
+# "refuses an ID here that nothing cites". It does not — the gate counts them,
+# prints `8 not currently cited` and exits 0, and CONTROLS.md said so correctly.
+# Comparing a control to its gate caught nothing, because the false sentence was
+# not in the control document.
+#
+# Two rules, both of them the ones already applied to CONTROLS.md above:
+#
+#   1. a sentence saying the gate refuses something names which refusal
+#   2. the refusal it names is one the gate actually emits
+#
+# Rule 1 is what lets rule 2 fire at all. A prose claim carrying no code cannot be
+# resolved against anything, which is how the false one survived a check written
+# to stop exactly this.
+#
+# A line that mentions a refusal without claiming one — the correction above says
+# the gate never refused these, and has to use the word to say so — declares that
+# in band and carries a reason, the same shape the standards gate uses for
+# `not-a-claim` and `dead-pointer`. The count of honoured declarations is asserted,
+# so an exemption cannot be added silently.
+REG_DOC="$ROOT/SOURCES.md"
+STD_GATE="$ROOT/bin/validate-standards.sh"
+assert_file_exists "$REG_DOC" "the source register exists"
+
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+
+# A declaration honoured only when it carries a reason. One copy of the pattern,
+# used by the sweep and by the count, so the two cannot disagree about what
+# counts as declared. An exemption that needs no reason is one nobody justifies.
+DECLARED='not-an-enforcement-claim:[[:space:]]*[A-Za-z0-9`]'
+
+# One implementation, run against the register and against fixtures, so a fixture
+# proves the decision this makes rather than a second copy of it. Prints the
+# offending line numbers and nothing else — a function whose output is captured
+# runs in a subshell, so it cannot report a count by setting a variable.
+unbacked_enforcement_claims() { # <document> <gate> -> offending line numbers
+  local doc="$1" gate="$2" base ln rn text backed c
+  base="$(basename "$gate")"
+  while IFS= read -r ln; do
+    [ -n "$ln" ] || continue
+    rn="${ln%%:*}"; text="${ln#*:}"
+    # Only a sentence naming the gate is a claim about what the gate does.
+    case "$text" in
+      *"$base"*) ;;
+      *) continue ;;
+    esac
+    if printf '%s' "$text" | grep -q -- '<!-- not-an-enforcement-claim:'; then
+      printf '%s' "$text" | grep -qE "$DECLARED" || printf '%s(declared,no-reason) ' "$rn"
+      continue
+    fi
+    # Does it name a refusal the gate emits? The gate writes them as
+    # `refuse "$DOC" "code" "..."`, so the QUOTED form is what resolves — a bare
+    # match would be satisfied by the code appearing in one of the gate's comments.
+    backed=no
+    for c in $(printf '%s' "$text" | grep -oE '`[a-z][a-z-]*[a-z]`' | tr -d '`'); do
+      grep -q -- "\"$c\"" "$gate" && { backed=yes; break; }
+    done
+    [ "$backed" = yes ] || printf '%s ' "$rn"
+  done <<EOF
+$(grep -nE '[Rr]efus(e|es|ed|ing)[^a-z]' "$doc")
+EOF
+}
+
+out="$(unbacked_enforcement_claims "$REG_DOC" "$STD_GATE")"
+assert_eq "" "${out% }" "every enforcement claim in SOURCES.md names a refusal the gate emits"
+
+honoured="$(grep -cE "$DECLARED" "$REG_DOC" || true)"
+[ "${honoured:-0}" -ge 1 ] && any=yes || any=no
+assert_eq "yes" "$any" "it honoured at least one declared non-claim (honoured ${honoured:-0})"
+
+# --- and the detection must be able to fail -----------------------------------
+# Four constructed registers, because a zero result on the real one proves nothing
+# about whether it looked. Each names the gate and claims a refusal; only the last
+# names a refusal the gate emits.
+printf '`bin/validate-standards.sh` refuses an entry whose class column is empty.\n' \
+  > "$TMP/no-code.md"
+assert_eq "1" "$(unbacked_enforcement_claims "$TMP/no-code.md" "$STD_GATE" | tr -d ' ')" \
+  "a prose enforcement claim naming no refusal is flagged"
+
+printf '`bin/validate-standards.sh` refuses an entry with no class — `empty-class`.\n' \
+  > "$TMP/invented.md"
+assert_eq "1" "$(unbacked_enforcement_claims "$TMP/invented.md" "$STD_GATE" | tr -d ' ')" \
+  "a claim naming a refusal the gate does not emit is flagged"
+
+# A code-shaped token the gate CONTAINS but does not emit as a refusal. This is
+# the case that makes the quoted form load-bearing: `not-a-claim` is a declaration
+# the gate reads and honours, never a refusal it emits, and it appears eight times
+# in the script. A bare substring match against the gate accepts it, which is the
+# `uncited-claim` versus `S-` defect in a different place — satisfying "resolves"
+# while resolving to the wrong kind of thing. Found by loosening the comparison,
+# which the fixtures above did not catch.
+printf '`bin/validate-standards.sh` refuses a line declared `not-a-claim`.\n' \
+  > "$TMP/present-not-emitted.md"
+assert_eq "1" "$(unbacked_enforcement_claims "$TMP/present-not-emitted.md" "$STD_GATE" | tr -d ' ')" \
+  "a claim naming a token the gate contains but never refuses is flagged"
+
+printf '`bin/validate-standards.sh` refuses it. <!-- not-an-enforcement-claim: -->\n' \
+  > "$TMP/no-reason.md"
+assert_eq "1(declared,no-reason)" \
+  "$(unbacked_enforcement_claims "$TMP/no-reason.md" "$STD_GATE" | tr -d ' ')" \
+  "a declaration carrying no reason does not exempt the claim"
+
+printf '`bin/validate-standards.sh` refuses a register entry with no link — `source-no-link`.\n' \
+  > "$TMP/good.md"
+assert_eq "" "$(unbacked_enforcement_claims "$TMP/good.md" "$STD_GATE" | tr -d ' ')" \
+  "a claim naming a refusal the gate emits passes"
+
 # --- the honest section is present and not empty ------------------------------
 # The whole document is worth less than nothing if it lists controls and omits
 # what is not controlled.
@@ -94,7 +203,6 @@ out_of_order() {
 assert_eq "" "$(out_of_order "$DOC")" "the not-controlled items are numbered in order"
 
 # The detection must be able to fail, or a section in any order passes.
-TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 printf '## What is not controlled\n\n**8. Eight.**\n\n**10. Ten.**\n\n**9. Nine.**\n' > "$TMP/jumbled.md"
 assert_eq "9 before 10 " "$(out_of_order "$TMP/jumbled.md")" \
   "the detection fires on an item printed out of order"
