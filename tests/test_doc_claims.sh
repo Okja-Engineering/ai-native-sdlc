@@ -92,6 +92,33 @@ exempt=no
 case "$(cat "$TMP/ok.md")" in *Annotated*) exempt=yes ;; esac
 assert_eq "yes" "$exempt" "an annotated historical claim is exempt"
 
+# --- no document claims the whole chain is in git ----------------------------
+# `AGENTS.md` said "All of it in git" about the issue → pull request → merge
+# chain. Issue and pull request bodies live in GitHub's database, and a merge
+# commit carries only the number and title. An external audit caught it.
+#
+# This is a narrow guard on the specific overclaim rather than a general
+# truth-check, because the unqualified form is the one that misleads an assessor
+# reading CONTROLS.md and expecting a clone to hold everything.
+# Lines QUOTING the old claim in order to correct it are exempt — the correction
+# necessarily contains the phrase, and the first version of this check fired on
+# it. Same shape as the Annotated exemption above.
+# `-i`, not just `-I`. The first version used `-nIE`, where `I` means skip
+# binary files and NOT ignore case — so the pattern `all of it in git` missed
+# `All of it in git`, the exact sentence this check exists to catch. The mutation
+# test passed vacuously until that was found.
+overclaim="$(git grep -niIE 'all of it in git|everything is in git|entirely in git' \
+  -- '*.md' ':(exclude)tests/*' 2>/dev/null \
+  | grep -viE 'claimed|until 2026|this said|used to' || true)"
+assert_eq "" "$overclaim" "no document claims the whole chain is in git"
+
+# And the correction has to still be there, or deleting it would silently pass
+# the check above.
+assert_contains "$(cat "$ROOT/AGENTS.md")" "Two chains, and only one of them is in git" \
+  "AGENTS.md distinguishes the two chains"
+assert_contains "$(cat "$ROOT/CONTROLS.md")" "live in GitHub" \
+  "CONTROLS.md says what the evidence trail does not include"
+
 # --- the paths list is not empty ---------------------------------------------
 # If the enumeration returned nothing the loop above would pass everything.
 np="$(printf '%s\n' "$paths" | grep -c .)"
