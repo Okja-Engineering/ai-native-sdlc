@@ -27,6 +27,26 @@ Not "the team." Not "it was agreed." A name. This is the one place in four phase
 | `chosen` | the option id, or `pending` while it waits for a person |
 | `decided_by` | a named human. **Not an agent, not a role, not "the team"** |
 | `dated` | when the person decided, not when the record was drafted |
+| `amends` | the document this decision changes, **linked** — or `none` with the reason nothing changed |
+
+### `amends`, and why Update is not a sixth phase
+
+Added after the second decision, derived from making the change rather than designed ahead of it.
+
+The repository's stated output is *"a proposed change to our standards and our skills"*. Five phases ran without ever producing one, because nothing carried a decision from the record to the document. `README.md` drew a stage called **Update** that was never built, and the implemented phases quietly replaced it.
+
+Building it as `process/06-update/` was the obvious move and would have been wrong. Its only artifact would be a diff to a file that already exists, with a contract describing how to edit Markdown. The decision has already passed a human gate; applying it needs a link, not a phase.
+
+So Update is **a field on the decision plus a reciprocal link on the claim**, and both halves are checked:
+
+- the decision carries `amends:` naming and linking the document
+- the amended claim carries `decided:` linking back to the record
+
+A one-way pointer would be the duplicated-declaration failure again: the standard says one thing, the decision another, and nothing notices. `validate-decision.sh` refuses `amends-not-reciprocated` for exactly that.
+
+**`amends: none` is valid and expected.** A decision to measure before acting changes nothing about how we work. Bare `none` is refused — `bare-none-amends` — because on its own it cannot be told apart from an oversight, which is the same reasoning as the Define contract requiring an empty outlier section to say it is empty.
+
+**What this leaves open.** The stated output is standards *and skills*. Skills are not in this repository, so `amends` currently reaches one of the two, and saying so is better than implying coverage.
 
 `chosen: pending` is a valid and expected state. A record can be drafted — problem, options, tradeoffs laid out — and wait. `bin/cycle.sh` reports a pending decision as awaiting a human, which is the honest reading: the work is done and the gate has not been passed.
 

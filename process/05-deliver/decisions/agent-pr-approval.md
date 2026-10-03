@@ -5,6 +5,7 @@ options: [`process/04-develop/options/agent-pr-approval.md`](../../04-develop/op
 chosen: D
 decided_by: Matthew Van Dusen
 dated: 2026-10-03
+amends: [`STANDARDS.md` §3](../../../STANDARDS.md#3-an-agent-runs-checks-it-does-not-set-them-and-it-cannot-pass-itself)
 
 **Decided.** D — an agent may review, comment and flag. The act that unblocks a merge is a human's.
 

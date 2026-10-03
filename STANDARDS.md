@@ -82,7 +82,15 @@ Three things distinguish this from a normal pipeline:
 
 **[V]** stated plainly by vendors — *"the agent that wrote the code has no way to approve it"* — and **[E]** in the sense that this is the most reliably reproduced failure in practice. Agents asked to assess their own work praise it; a dedicated reviewer agent will talk itself out of its own findings.
 
-**The practice:** separation of duties. Whoever produced the change does not grade it. A second, independent evaluator — human or a *separate* agent with no memory of building it — with criteria written down beforehand. This maps onto maker-checker, which is why it travels well in regulated environments. **[S]**
+**The practice:** separation of duties. Whoever produced the change does not grade it. A second, independent evaluator, with criteria written down beforehand. This maps onto maker-checker, which is why it travels well in regulated environments. **[S]**
+
+**An agent may be that evaluator. It may not be the approver.** An agent reviews, comments and flags. The act that unblocks a merge is a natural person's. Two accounts belonging to one vendor's one product is a separation of *identity*, not of duties — measured 2026-10-03, an agent was the sole approving reviewer on 10% of a 300-item sample of pull requests it had authored itself, because the authoring and reviewing accounts differ and the platform evaluates "an author cannot approve their own pull request" per account. **[E]** for the measurement.
+
+**This is our practice, not an established requirement. [O]** Whether a machine approval can satisfy a regulated separation-of-duties control is unresolved in both directions. NIST SP 800-53 AC-5 is written in terms of *"different individuals or roles"* and routes enforcement through IA-2 *Organizational Users* rather than IA-9 *Service Identification*, saying nothing either way; the PCI DSS clause that would settle it could not be obtained. See unresolved item 4.
+
+decided: [`process/05-deliver/decisions/agent-pr-approval.md`](process/05-deliver/decisions/agent-pr-approval.md) — option D, 2026-10-03
+
+> **What this paragraph used to say:** *"human or a separate agent with no memory of building it."* The word *separate* turned out to carry an entire question — five readings of it were each defensible, and a vendor shipped a feature satisfying one of them. That ambiguity is what produced the decision linked above.
 
 **[P]** Corollary: what an agent must **not** do is more useful to write down than what it should. A prose promise is not a control — if a boundary matters, something has to refuse.
 

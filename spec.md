@@ -34,39 +34,15 @@ There is still no classifier, no CLI, no MCP server, and no scheduled job. Nothi
 
 **No phase contract was designed in advance.** Each was written after the artifact it describes, from what that artifact turned out to need — and is asserted rather than enforced until a second, differently shaped artifact shows which parts were real and which were the first one's accidents. Where a gate exists, it checks only what does not depend on shape.
 
-## The architect loop
+## The loop
 
-Four stages, three human gates. A stage produces one artifact and stops.
+**Drawn once, in [`README.md`](README.md#the-loop).** It used to be drawn twice — here and there — and the two copies disagreed with each other and with `process/` for five phases of real work. One drawing is the declaration; this section says what the drawing does not.
 
-```mermaid
-flowchart TD
-    S["<b>1 · Scan</b><br/>sources → findings"]
-    G1{{"human: interesting?"}}
-    A["<b>2 · Assess</b><br/>finding → impact + blast radius"]
-    G2{{"human: explore it?"}}
-    P["<b>3 · Propose</b><br/>impact → proposed changes"]
-    G3{{"human: adopt?"}}
-    U["<b>4 · Update</b><br/>STANDARDS.md + skills"]
+**A stage produces one artifact and stops.** No phase advances anything.
 
-    S --> G1
-    G1 -->|"yes"| A
-    G1 -->|"no"| X1["dismissed,<br/>recorded with reason"]:::drop
-    G2 -->|"yes"| P
-    G2 -->|"no"| X2["parked,<br/>revisit next cycle"]:::drop
-    A --> G2
-    P --> G3
-    G3 -->|"yes"| U
-    G3 -->|"no"| X3["rejected,<br/>recorded with reason"]:::drop
-    U -. "next cycle" .-> S
+**A dismissal is an outcome, not an absence.** "Not interesting" gets recorded with its reason, because next cycle we need to know we already looked — and because a classifier that suppresses something important is only discoverable if its decisions are written down. The same reasoning covers a parked item and a rejected proposal: both are recorded, neither is silently dropped.
 
-    classDef human fill:#fde68a,stroke:#b45309,color:#1c1917
-    classDef step fill:#e0f2fe,stroke:#0369a1,color:#0c1a2b
-    classDef drop fill:#f5f5f4,stroke:#a8a29e,color:#44403c
-    class G1,G2,G3 human
-    class S,A,P,U step
-```
-
-**A dismissal is an outcome, not an absence.** "Not interesting" gets recorded with its reason, because next cycle we need to know we already looked — and because a classifier that suppresses something important is only discoverable if its decisions are written down.
+**Deliver is itself the last human gate.** A decision requires a named natural person; `validate-decision.sh` refuses a role, a team or a model name. That is the one place in the loop where the thing actually turns.
 
 ## Stage 1 — the scan
 

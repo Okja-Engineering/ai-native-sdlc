@@ -20,24 +20,31 @@ Two examples of that, both real, both in the tree:
 
 ```mermaid
 flowchart LR
-    S["<b>1 · Scan</b><br/>what changed since<br/>we last looked?"]
+    S["<b>01 · Scan</b><br/>what changed since<br/>we last looked?"]
     G1{{"human:<br/>interesting?"}}
-    A["<b>2 · Assess</b><br/>impact and<br/>blast radius for us"]
-    G2{{"human:<br/>explore it?"}}
-    P["<b>3 · Propose</b><br/>changes to our<br/>standards and skills"]
-    G3{{"human:<br/>adopt?"}}
-    U["<b>4 · Update</b><br/>STANDARDS.md<br/>and our skills"]
+    D["<b>02 · Discover</b><br/>what is true about it,<br/>graded and sourced"]
+    G2{{"human:<br/>pursue it?"}}
+    F["<b>03 · Define</b><br/>themes, then one<br/>stated problem"]
+    V["<b>04 · Develop</b><br/>options, each with<br/>its failure mode"]
+    L["<b>05 · Deliver</b><br/>one choice, by a<br/>named person"]
+    U(["<b>amends</b><br/>STANDARDS.md,<br/>linked both ways"])
 
-    S --> G1 --> A --> G2 --> P --> G3 --> U
+    S --> G1 --> D --> G2 --> F --> V --> L --> U
     U -. "next cycle" .-> S
 
     classDef human fill:#fde68a,stroke:#b45309,color:#1c1917
     classDef step fill:#e0f2fe,stroke:#0369a1,color:#0c1a2b
-    class G1,G2,G3 human
-    class S,A,P,U step
+    classDef out fill:#dcfce7,stroke:#15803d,color:#052e16
+    class G1,G2 human
+    class S,D,F,V,L step
+    class U out
 ```
 
-Three human gates. Nothing advances a stage without a person deciding it should.
+Five phases, two human gates between them, and a third at the end: **Deliver is itself a human gate** — a decision needs a named natural person, and the gate refuses a role, a team or a model name.
+
+The last box is not a phase. A decision records `amends:` naming the document it changes, and the amended claim links back to the decision — checked in both directions, so the standard and the decision cannot disagree silently.
+
+> **This diagram said something else until 2026-10-03.** It drew four stages — Scan, Assess, Propose, Update — while `process/` held five differently named ones, and the Update stage was never built. Nobody reconciled them for five phases of real work. The divergence was found by asking why `STANDARDS.md` had never been changed by the loop built to change it.
 
 ## What's here
 

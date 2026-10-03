@@ -100,6 +100,59 @@ check_record() {
     refuse "$f" "-" "chosen-not-an-option" \
       "chosen is '$chosen', which is not an option in $(basename "$resolved"): if the right answer was not developed, go back to Develop"
   fi
+
+  check_amends "$f"
+}
+
+# A decision that changes how we work has to land somewhere. This repository's
+# stated output is a change to our standards, and for five phases nothing
+# carried a decision to the document — the link lived in the head of whoever
+# had just made the call.
+#
+# `amends:` is that link, checked in BOTH directions. A one-way pointer is the
+# same duplicated-declaration failure this repository keeps finding: the
+# standard would say one thing, the decision another, and nothing would notice.
+#
+# `amends: none` is valid and expected. A decision to measure rather than act
+# changes nothing about how we work, and saying so is what makes the absence
+# visible instead of indistinguishable from an omission.
+check_amends() { # file
+  local f="$1" amends target resolved
+  amends="$(field "$f" amends)"
+
+  if [ -z "$amends" ]; then
+    refuse "$f" "-" "no-amends" \
+      "a decided record declares amends: — the document it changes, or 'none' with the reason nothing changed. The stated output of this repository is a change to our standards, and an unlinked decision never reaches one"
+    return
+  fi
+
+  case "$amends" in
+    none|None|none.|none\ |None\ )
+      refuse "$f" "-" "bare-none-amends" \
+        "amends: none needs the reason nothing changed, otherwise it cannot be told apart from an oversight"
+      return ;;
+    none*|None*) return ;;
+  esac
+
+  target="$(printf '%s' "$amends" | sed -n 's/.*](\([^)#]*\)[^)]*).*/\1/p')"
+  if [ -z "$target" ]; then
+    refuse "$f" "-" "amends-not-linked" \
+      "amends: names something but does not link it, so nothing can verify the change landed"
+    return
+  fi
+
+  resolved="$(cd "$(dirname "$f")" && cd "$(dirname "$target")" 2>/dev/null && pwd)/$(basename "$target")"
+  if [ ! -f "$resolved" ]; then
+    refuse "$f" "-" "amends-unresolved" "the amended document does not resolve: $target"
+    return
+  fi
+
+  # The other direction. Without this the pair is one assertion, not two halves
+  # that agree.
+  if ! grep -q "$(basename "$f")" "$resolved"; then
+    refuse "$f" "-" "amends-not-reciprocated" \
+      "$(basename "$resolved") does not cite $(basename "$f"): an amended claim carries a 'decided:' link back to the record that changed it, or the grade on that claim is unsupported"
+  fi
 }
 
 main() {
