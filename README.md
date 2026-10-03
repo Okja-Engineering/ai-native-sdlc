@@ -68,6 +68,7 @@ The last box is not a phase. A decision records `amends:` naming the document it
 | [`process/05-deliver/`](process/05-deliver/) | Converge on one choice, with the accepted cost and a reversal condition |
 | [`process/05-deliver/validate-decision.sh`](process/05-deliver/validate-decision.sh) | Refuses a decision with no named person, no date, or an option that does not exist |
 | [`bin/cycle.sh`](bin/cycle.sh) | Where every cycle is and what is missing. Reads the tree, writes nothing, and announces anything it skipped |
+| [`bin/validate-authorship.sh`](bin/validate-authorship.sh) | A decision commit must be authored by a declared decider. **Refuses today** — see `DECIDERS.md` |
 | [`bin/validate-claims.sh`](bin/validate-claims.sh) | A tripwire for speed and velocity claims in anything we write. Not enforcement — a lexical rule cannot be |
 | [`bin/next.sh`](bin/next.sh) | Starts the next artifact, with its shape read from the contract that declares it. Refuses to overwrite |
 | [`tests/`](tests/) | `run-all.sh` over the suites, and the assertions they use |
