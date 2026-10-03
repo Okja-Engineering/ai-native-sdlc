@@ -134,6 +134,8 @@
 | `no-open-section` | no "what could not be established" section |
 | `silent-empty-open` | the section lists nothing and does not say so |
 | `no-verified-by-hand` | coverage has no verified-by-hand part |
+| `empty-verified-by-hand` | the part exists and names nothing |
+| `empty-coverage-part` | a reached or not-reached part asserts a state instead of naming things |
 | `no-not-reached` | coverage lists only what was reached |
 | `no-question` | the question is not in the asker's own words |
 | `question-not-quoted` | the question section carries no quotation |

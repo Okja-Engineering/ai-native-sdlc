@@ -76,6 +76,117 @@ perl -0pi -e 's/[Nn]ot reached/Other/g' "$t/process/02-discover/$NEW"
 assert_contains "$(gate "$t" "$NEW")" "refuse[no-not-reached]" \
   "coverage that lists only successes is refused"
 
+# --- the hollow artifact the external audit built ----------------------------
+# These checks used to grep the WHOLE FILE for each phrase, so `no-reached` was
+# satisfied by the substring inside "not reached" and `no-verified-by-hand` by a
+# sentence DENYING hand verification. A whole artifact passed.
+hollow() { # heading-for-coverage -> path
+  local p="$TMP/hollow$2.md"
+  cat > "$p" <<EOF
+# Discovery — something
+
+dated: 2026-10-03
+status: discovery complete, not assessed
+
+## The question, in the asker's own words
+
+> should we turn it on
+
+$1
+
+Everything was reached. Nothing was not reached. Nothing was verified by hand — we took the agent's word for all of it.
+
+## Claims
+
+It is completely safe. **[E]**
+
+Grades are the STANDARDS.md scheme: [V] vendor, never outcome evidence.
+
+## What could not be established
+
+Nothing. Everything was established.
+
+## Where this stops
+
+Nowhere.
+EOF
+  printf '%s' "$p"
+}
+
+out="$(bash "$GATE" "$(hollow '## 2 · Coverage' a)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "the hollow artifact is refused"
+assert_contains "$out" "refuse[no-reached]" "a denial does not satisfy the reached part"
+assert_contains "$out" "refuse[no-verified-by-hand]" "a sentence denying hand verification does not satisfy it"
+
+# And not because of the heading. `^#+ *coverage` required the word immediately
+# after the hashes, so a numbered heading was refused while a plain one passed —
+# heading-shape coupling, and the only reason the hollow artifact was caught at
+# all before this change.
+out="$(bash "$GATE" "$(hollow '## Coverage' b)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "the hollow artifact is refused with a plain heading too"
+assert_not_contains "$out" "refuse[no-coverage]" "a numbered coverage heading is accepted"
+
+# --- a part that asserts instead of naming -----------------------------------
+# The subtler version: the parts exist and carry a sentence rather than a list.
+cat > "$TMP/asserting.md" <<'EOF'
+# Discovery — x
+
+dated: 2026-10-03
+status: discovery complete, not assessed
+
+## The question, in the asker's own words
+
+> is it on
+
+## Coverage
+
+**Reached:** a; b; c and several other things we looked at in some detail here
+**Not reached:** nothing, we got everything
+**Verified by hand:** all of it, basically
+
+## Claims
+
+Grades are the STANDARDS.md scheme: [V] vendor, never outcome evidence. **[E]**
+
+## What could not be established
+
+- nothing much [O]
+
+## Where this stops
+
+Here.
+EOF
+out="$(bash "$GATE" "$TMP/asserting.md" 2>&1)"
+assert_contains "$out" "refuse[empty-coverage-part]" "a part asserting a state rather than naming things is refused"
+assert_contains "$out" "refuse[empty-verified-by-hand]" "so is a verified-by-hand part that names nothing"
+
+# The two thresholds are pinned SEPARATELY. The case above fails both at once, so
+# removing either one alone caused no test failure — a mutation sweep found that
+# and it is the #29 lesson applying here: a case that trips two guards together
+# proves neither.
+part_case() { # not-reached-body suffix -> path
+  local p="$TMP/thresh$2.md"
+  sed -e "s|^\*\*Not reached:\*\*.*|**Not reached:** $1|" "$TMP/asserting.md" \
+    | sed -e 's|^\*\*Verified by hand:\*\*.*|**Verified by hand:** one, two, three, four and five other named things|' \
+          -e 's|^\*\*Reached:\*\*.*|**Reached:** one, two, three, four and five other named things we looked at|' > "$p"
+  printf '%s' "$p"
+}
+
+# Long enough, but only one separator: fails the separator threshold alone.
+out="$(bash "$GATE" "$(part_case 'we genuinely did not manage to look at the one thing we wanted to look at here' a)" 2>&1)"
+assert_contains "$out" "refuse[empty-coverage-part]" "a long part with too few separators is refused"
+
+# Two separators, but far too short: fails the length threshold alone. `a; b` was
+# the first attempt and has only ONE separator, so it tripped the other guard and
+# proved nothing — the same mistake twice in one suite.
+out="$(bash "$GATE" "$(part_case 'a; b; c' b)" 2>&1)"
+assert_contains "$out" "refuse[empty-coverage-part]" "a short part with enough separators is still refused"
+
+# And the control: enough of both is accepted, so the thresholds are not just
+# refusing everything.
+out="$(bash "$GATE" "$(part_case 'one, two, three, four and five other named things we did not get to' c)" 2>&1)"
+assert_not_contains "$out" "refuse[empty-coverage-part]" "a part that names things is accepted"
+
 # --- the open section ---------------------------------------------------------
 t="$(fresh open)"
 perl -0pi -e 's/## What could not be established/## Notes/' "$t/process/02-discover/$NEW"

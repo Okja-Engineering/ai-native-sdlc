@@ -66,7 +66,7 @@ field()  { sed -n "s/^$2:[[:space:]]*//p" "$1" 2>/dev/null | head -1 | sed 's/[[
 has() { grep -qiE "$2" "$1"; }
 
 check_topic() {
-  local f="$1" grades bad seen
+  local f="$1" grades bad seen cov p low R_LABEL N_LABEL V_LABEL PART_MIN_SEPS PART_MIN_CHARS
 
   # --- the fields the contract declares -----------------------------------
   [ -n "$(field "$f" dated)" ] || refuse "$f" "-" "undated" \
@@ -85,16 +85,111 @@ check_topic() {
   fi
 
   # --- coverage, in three parts -------------------------------------------
-  # The third is the one a findings-style coverage line does not have, and the
-  # one that separates "an agent reported this" from "someone checked it".
-  has "$f" '^#+ *coverage|^\*\*coverage' || refuse "$f" "-" "no-coverage" \
-    "no coverage section"
-  has "$f" 'reached' || refuse "$f" "-" "no-reached" \
-    "coverage does not say what was reached"
-  has "$f" 'not reached' || refuse "$f" "-" "no-not-reached" \
-    "coverage does not say what was NOT reached: an artifact claiming only successes is claiming completeness it has not earned"
-  has "$f" 'verified by hand' || refuse "$f" "-" "no-verified-by-hand" \
-    "coverage has no 'verified by hand' part: without it there is nothing separating an agent reported this from someone checked it, and a discovery artifact becomes a pile of agent output"
+  #
+  # These checks used to grep the WHOLE FILE for each phrase, and an external
+  # audit walked a hollow artifact straight through them:
+  #
+  #   "Everything was reached. Nothing was not reached. Nothing was verified by
+  #    hand — we took the agent's word for all of it."
+  #
+  # `no-reached` was satisfied by the substring inside "not reached".
+  # `no-verified-by-hand` was satisfied by a sentence DENYING hand verification.
+  # The three-part coverage this repository calls "what separates an agent
+  # reported this from someone checked it" was a presence-of-phrase test.
+  #
+  # So each part is now located INSIDE the coverage section and has to carry
+  # items, not a phrase. An item is a list marker or a separator — the two real
+  # topics use numbered lists, `·` and `;`, and a denial sentence has none.
+  #
+  # The heading match is also loosened. `^#+ *coverage` required the word
+  # immediately after the hashes, so `## Coverage` passed while `## 2 · Coverage`
+  # was refused — heading-shape coupling in a gate whose header says it avoids
+  # exactly that, and the only reason the hollow artifact was refused at all.
+  if ! grep -qiE '^#+[^a-z]*coverage|^\*\*coverage' "$f"; then
+    refuse "$f" "-" "no-coverage" "no coverage section"
+  else
+    cov="$(awk '
+      /^#+[^a-zA-Z]*[Cc]overage|^\*\*[Cc]overage/ { inside = 1; next }
+      /^## / { if (inside) exit }
+      inside { print }' "$f")"
+
+    # part_items <label-regex> — items under one coverage part.
+    #
+    # A part's body runs from its label to the next part label, which the two
+    # topics write differently: `### Verified by hand` in one, a bold inline
+    # `**Verified by hand before recording:**` in the other. Both are matched.
+    #
+    # An item is a list marker, a `;` or a `·`. Those are what both real topics
+    # use, and crucially a denial sentence has none of them — which is what the
+    # audit's hollow artifact relied on.
+    # Input is lowercased before matching rather than using awk's IGNORECASE,
+    # which is a GNU extension. BSD awk ignores it silently, so on macOS the
+    # label `### Verified by hand` never matched a lowercase pattern and every
+    # part counted zero items — refusing both real topics. Third GNU-ism of this
+    # kind in the repository, after `\?` in sed and `\b` in git grep, and found
+    # the same way: by running it.
+    # part_body <label-regex> — the lines belonging to one coverage part.
+    part_body() {
+      printf '%s\n' "$cov" | tr 'A-Z' 'a-z' | awk -v re="$1" '
+        BEGIN { on = 0 }
+        {
+          is_label = ($0 ~ /^#+ /) || ($0 ~ /^[*][*][a-z]/)
+          if (on && is_label && $0 !~ re) exit
+          if ($0 ~ re) { on = 1 }
+          if (on) print
+        }'
+    }
+
+    # A part has to NAME things, which two measures separate from a sentence
+    # asserting a state. Both thresholds were set from the real artifacts rather
+    # than guessed: their parts run 304–2226 characters with 5–32 separators,
+    # while a fabricated part tops out around 43 characters and 2. The bar sits
+    # well below the real floor and well above the fabricated ceiling.
+    PART_MIN_SEPS=2
+    PART_MIN_CHARS=60
+
+    part_ok() { # label-regex -> 0 if the part names things
+      local b s c
+      b="$(part_body "$1")"
+      s="$(printf '%s' "$b" | grep -oE '[;·,]|^[[:space:]]*([0-9]+\.|[-*])[[:space:]]' | grep -c .)"
+      c="$(printf '%s' "$b" | wc -c | tr -d ' ')"
+      [ "$s" -ge "$PART_MIN_SEPS" ] && [ "$c" -ge "$PART_MIN_CHARS" ]
+    }
+
+    # Patterns are anchored to a LABEL — `### reached` or `**reached:**` — not to
+    # the word anywhere. Unanchored, `reached` also matched `not reached`, so the
+    # reached part's scope ran on through its neighbour and counted its items. An
+    # artifact with an empty reached part and a full not-reached part would have
+    # passed.
+    # `[*][*]` rather than `\*\*`: passed through awk's -v the backslashes are
+    # consumed, leaving `**`, which is an invalid ERE — awk printed "illegal
+    # primary" and every count came back empty. A character class survives both
+    # awk and grep unchanged.
+    R_LABEL='^(#+ |[*][*])reached'
+    N_LABEL='^(#+ |[*][*])not reached'
+    V_LABEL='^(#+ |[*][*])verified by hand'
+    low="$(printf '%s\n' "$cov" | tr 'A-Z' 'a-z')"
+
+    printf '%s\n' "$low" | grep -qE "$R_LABEL" || refuse "$f" "-" "no-reached" \
+      "coverage has no 'reached' part"
+    printf '%s\n' "$low" | grep -qE "$N_LABEL" || refuse "$f" "-" "no-not-reached" \
+      "coverage does not say what was NOT reached: an artifact claiming only successes is claiming completeness it has not earned"
+
+    if ! printf '%s\n' "$low" | grep -qE "$V_LABEL"; then
+      refuse "$f" "-" "no-verified-by-hand" \
+        "coverage has no 'verified by hand' part: without it there is nothing separating an agent reported this from someone checked it, and a discovery artifact becomes a pile of agent output"
+    elif ! part_ok "$V_LABEL"; then
+      refuse "$f" "-" "empty-verified-by-hand" \
+        "the 'verified by hand' part names nothing: a sentence saying nothing was checked is not a coverage part, it is the artifact saying it is pure relay. List what was checked"
+    fi
+
+    for p in "$R_LABEL" "$N_LABEL"; do
+      if printf '%s\n' "$low" | grep -qE "$p" && ! part_ok "$p"; then
+        refuse "$f" "-" "empty-coverage-part" \
+          "a coverage part matching /$p/ names nothing: a coverage part lists what was or was not reached, not a sentence asserting it"
+      fi
+    done
+  fi
 
   # --- the open section ----------------------------------------------------
   # Anchored to a heading, not a mention. A first version matched the phrase
