@@ -1,6 +1,6 @@
 # Deliver contract
 
-**Status:** derived alongside the first decision record. The record was drafted first and this describes the shape it needed.
+**Status:** derived alongside the first decision record. This said the record was drafted first; git shows the contract committed one second earlier, so the two were produced as one batch and the order is unverifiable from the repository. Stated that way rather than left as a claim git contradicts.
 
 **The one gate the contract named is now built.** See *The gate* at the end.
 
@@ -99,4 +99,4 @@ Every refusal carries its own message and is asserted by that message in `tests/
 
 1. **Whether a decision needs a review period** before it binds, or takes effect when written.
 2. **Where a reversal lives** — a new record superseding, or an append to the original. The contract forbids silent editing; it does not yet say what replaces it.
-3. **Whether the chosen option should be fed back into `STANDARDS.md`** when it changes how we work, and what keeps those two in step.
+3. ~~**Whether the chosen option should be fed back into `STANDARDS.md`** when it changes how we work, and what keeps those two in step.~~ **Settled 2026-10-03** by the `amends:` field and the reciprocal `decided:` link, described above. Left struck through rather than deleted so the question and its answer stay next to each other.

@@ -73,4 +73,4 @@ What a gate should check when a second problem shows which parts are real, all m
 
 1. **Whether option count should be bounded.** Six felt close to the limit of what stays comparable. Too few is not diverging; too many is a catalogue nobody reads — the same reading-wall problem Define exists to solve, reappearing one phase later.
 2. **Whether Develop should be run more than once on a problem**, as new evidence lands, or produced once and closed.
-3. **Where the choice gets recorded.** Deliver does not exist, so an option set currently has nowhere to resolve to — the same gap Define named one phase earlier, now one phase closer.
+3. **Where the choice gets recorded.** Settled: `process/05-deliver/`, which did not exist when this was written. An option set resolves to a decision record naming the person who chose.

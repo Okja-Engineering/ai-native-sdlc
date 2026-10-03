@@ -6,7 +6,7 @@ status: options developed, none chosen
 
 **What this is.** The divergent half of the second diamond. Several genuinely different ways to produce themes, each with what it costs, what it assumes, and how it fails. Written so a reader can pick, not so they can agree with a preference.
 
-**What this is not.** No recommendation, no ranking, no preferred option. Choosing is Deliver, and Deliver does not exist. If this document reveals which way the author leans, it has failed.
+**What this is not.** No recommendation, no ranking, no preferred option. Choosing is Deliver, which did not exist when this was written. *[Annotated 2026-10-03: Deliver was built, and this option set was decided — option F. The original sentence is preserved rather than corrected, for the reason above.]* If this document reveals which way the author leans, it has failed.
 
 **These are different approaches, not settings on one dial.** Options that differ only by a threshold belong in one entry.
 

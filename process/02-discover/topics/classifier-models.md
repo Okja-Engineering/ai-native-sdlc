@@ -7,7 +7,7 @@ status: discovery complete, not assessed
 
 > I heard about this thing called Jev, I think it's a classifier model, everybody's talking about it. It kind of feels like really good marketing. Classifiers have been around for a while — what's different about it?
 
-**What this document is not.** It contains no recommendation and no view on whether we should use any of this. That is the Define and Develop phases, and neither exists yet. A claim here answers *what is true*, never *what we should do*.
+**What this document is not.** It contains no recommendation and no view on whether we should use any of this. That is the Define and Develop phases, and neither exists yet. *[Annotated 2026-10-03: both were built after this was written. The sentence is left as it stood — a dated artifact records what was true when it was made, and this repository holds that editing a record in place destroys what made it a record.]* A claim here answers *what is true*, never *what we should do*.
 
 **Grades** are the `STANDARDS.md` scheme: `[E]` empirical · `[S]` standard · `[V]` vendor, never outcome evidence · `[P]` practitioner, unmeasured · `[O]` open, could not establish.
 

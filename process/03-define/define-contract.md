@@ -6,9 +6,18 @@
 
 ## What Define is for
 
-Taking what Discover produced — wide, unfiltered, unranked — and **naming what it is about**, so a person decides once per theme instead of once per item.
+Taking a wide, unfiltered, unranked record and **naming what it is about**, so a person decides once per theme instead of once per item.
 
-It is the convergent half of the first diamond. Discover goes wide. Define says what the wide thing was.
+It is the convergent half of the first diamond.
+
+**Define reads the Scan, not Discover — and this contract said otherwise until 2026-10-03.** The artifacts say so plainly: `cycles/2026-09-29.md` carries `from: process/01-scan/findings/2026-09-29.md`, and the Discover topic on the same question is dated two days *later*. Define runs twice in a cycle, and the two runs take different inputs:
+
+| Run | Reads | Produces |
+|---|---|---|
+| Themes | the **Scan's** findings file | a cycle file grouping every finding |
+| A problem | a theme, plus any **Discover** topic that was run on it | one stated problem |
+
+So the real order is Scan → Define(themes) → *human picks a theme* → Discover(topic) → Define(problem) → Develop → Deliver. `bin/cycle.sh` already prints it that way; this contract and the README diagram were the ones that disagreed.
 
 ## The rule everything else follows from
 
