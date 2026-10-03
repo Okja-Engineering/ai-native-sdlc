@@ -153,7 +153,7 @@ check_record() {
 # changes nothing about how we work, and saying so is what makes the absence
 # visible instead of indistinguishable from an omission.
 check_amends() { # file
-  local f="$1" amends target resolved
+  local f="$1" amends target resolved first rest back back_target back_resolved
   amends="$(field "$f" amends)"
 
   if [ -z "$amends" ]; then
@@ -162,13 +162,19 @@ check_amends() { # file
     return
   fi
 
-  case "$amends" in
-    none|None|none.|none\ |None\ )
+  # `none` has to be the WHOLE first word, followed by a reason. The previous
+  # version matched the prefix `none*`, so `amends: nonetheless, we decided not
+  # to say where this lands` was accepted as a declaration that nothing changed.
+  # Found by the external audit in #22.
+  first="$(printf '%s' "$amends" | awk '{print tolower($1)}' | tr -d '.,;:')"
+  if [ "$first" = none ]; then
+    rest="$(printf '%s' "$amends" | sed -e 's/^[Nn]one//' -e 's/^[[:punct:][:space:]]*//')"
+    if [ "${#rest}" -lt 10 ]; then
       refuse "$f" "-" "bare-none-amends" \
         "amends: none needs the reason nothing changed, otherwise it cannot be told apart from an oversight"
-      return ;;
-    none*|None*) return ;;
-  esac
+    fi
+    return
+  fi
 
   target="$(printf '%s' "$amends" | sed -n 's/.*](\([^)#]*\)[^)]*).*/\1/p')"
   if [ -z "$target" ]; then
@@ -185,9 +191,36 @@ check_amends() { # file
 
   # The other direction. Without this the pair is one assertion, not two halves
   # that agree.
-  if ! grep -q "$(basename "$f")" "$resolved"; then
+  #
+  # This was `grep -q "$(basename "$f")"` — a bare filename match anywhere in the
+  # file. An external audit replaced the `decided:` link with the sentence "A
+  # note: the file agent-pr-approval.md exists somewhere in this repository" and
+  # the gate reported the pair reciprocated. A mention is not a link.
+  #
+  # What is required now is a `decided:` line carrying a markdown link whose
+  # target resolves back to THIS record. Same two-way discipline the `from:`
+  # check in Define already uses.
+  back="$(sed -n 's/^decided:[[:space:]]*//p' "$resolved" | head -1)"
+  if [ -z "$back" ]; then
     refuse "$f" "-" "amends-not-reciprocated" \
-      "$(basename "$resolved") does not cite $(basename "$f"): an amended claim carries a 'decided:' link back to the record that changed it, or the grade on that claim is unsupported"
+      "$(basename "$resolved") carries no 'decided:' line: an amended claim links back to the record that changed it, or the grade on that claim is unsupported"
+    return
+  fi
+
+  back_target="$(printf '%s' "$back" | sed -n 's/.*](\([^)#]*\)[^)]*).*/\1/p')"
+  if [ -z "$back_target" ]; then
+    refuse "$f" "-" "amends-not-reciprocated" \
+      "$(basename "$resolved") mentions a decision but does not link it: a filename in prose is not a link, and the pair cannot be verified from a mention"
+    return
+  fi
+
+  back_resolved="$(cd "$(dirname "$resolved")" && cd "$(dirname "$back_target")" 2>/dev/null && pwd)/$(basename "$back_target")"
+  if [ ! -f "$back_resolved" ]; then
+    refuse "$f" "-" "amends-not-reciprocated" \
+      "$(basename "$resolved") links a decision that does not resolve: $back_target"
+  elif [ "$(cd "$(dirname "$f")" && pwd)/$(basename "$f")" != "$back_resolved" ]; then
+    refuse "$f" "-" "amends-not-reciprocated" \
+      "$(basename "$resolved") links back to $(basename "$back_resolved"), not to $(basename "$f"): the two halves name different records, which is the disagreement this check exists to catch"
   fi
 }
 

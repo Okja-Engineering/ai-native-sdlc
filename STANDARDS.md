@@ -88,7 +88,14 @@ Three things distinguish this from a normal pipeline:
 
 **An agent may be that evaluator. It may not be the approver.** An agent reviews, comments and flags. The act that unblocks a merge is a natural person's. Two accounts belonging to one vendor's one product is a separation of *identity*, not of duties — measured 2026-10-03 (`S-OURS-APPROVAL-2026-01`), an agent was the sole approving reviewer on 10% of a 300-item sample of pull requests it had authored itself, because the authoring and reviewing accounts differ and the platform evaluates "an author cannot approve their own pull request" per account. **[E]** for the measurement.
 
-**This is our practice, not an established requirement. [O]** Whether a machine approval can satisfy a regulated separation-of-duties control is unresolved in both directions. NIST SP 800-53 AC-5 is written in terms of *"different individuals or roles"* and routes enforcement through IA-2 *Organizational Users* rather than IA-9 *Service Identification*, saying nothing either way; the PCI DSS clause that would settle it could not be obtained. See unresolved item 4.
+**What that requires in configuration. [S]** On a platform where an agent review can satisfy a required-approval rule, the settings that let it do so stay **off**, at every level they exist. On GitHub that is two repository-level toggles — allow an agent to approve, and allow an agent's approval to count toward merge requirements — plus the equivalent at organization and enterprise level.
+
+Two limits on that, both measured and neither comfortable:
+
+- **It cannot be verified programmatically.** GitHub publishes no API representation for the approvals policy, so the setting is readable only in a user interface. We are committing to a control whose state we cannot query, at three levels, indefinitely. **[E]** — searched in the published OpenAPI description, `S-OURS-APPROVAL-2026-01`
+- **The approval can outlive the diff.** GitHub states an agent's approval is *"dismissed just like a human reviewer's"* on a new push, and separately states that dismissing a stale human approval on push is **optional** per ruleset. On a repository that never enabled it, behaving like a human's means the approval survives the change. No GitHub document reconciles the two. **[O]**
+
+**This is our practice, not an established requirement. [O]** Whether a machine approval can satisfy a regulated separation-of-duties control is unresolved in both directions. NIST SP 800-53 AC-5 is written in terms of *"different individuals or roles"* and routes enforcement through IA-2 *Organizational Users* rather than IA-9 *Service Identification*, saying nothing either way; the PCI DSS clause that would settle it could not be obtained. See [`CONTROLS.md`](CONTROLS.md) *what is not controlled*, item 2.
 
 decided: [`process/05-deliver/decisions/agent-pr-approval.md`](process/05-deliver/decisions/agent-pr-approval.md) — option D, 2026-10-03
 
