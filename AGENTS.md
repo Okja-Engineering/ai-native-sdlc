@@ -26,6 +26,47 @@ The portable conventions. This file is the cross-tool standard and is read by ag
 
 Enforced by `.githooks/commit-msg`.
 
+## Issues and pull requests
+
+Two artifacts, each with one job.
+
+**The issue** carries the intent, at the feature or capability level: title as the problem statement, background, the problem, proposed solution, expected outcome, validation method. The validation method is decided **before** the work starts. Template: [`.github/ISSUE_TEMPLATE/capability.md`](.github/ISSUE_TEMPLATE/capability.md).
+
+**The pull request** links the issue and stays short: what changed, how it was proved and what wasn't, what is deliberately out of scope, and how AI was used. It does not repeat the intent. Template: [`.github/pull_request_template.md`](.github/pull_request_template.md).
+
+Together they give an auditable chain: the issue states the intended change and how it will be validated, the pull request shows what was done and the evidence, and the merge is the approval by a named person. All of it in git.
+
+### Why these are short
+
+An earlier draft of this section had six required headings. The evidence is against that:
+
+- **Length has a measured cost.** Kubernetes audited 1,146 pull requests in release 1.37 and removed a template section that about 92% of contributors ignored — 43.4% deleted it, 39.5% left it empty, 9.2% wrote a placeholder. A stated reason for removing it: contributors who stop reading partway down miss the sections below. `[E]`
+- **Real templates are small.** Of the projects checked, `microsoft/vscode`'s renders nothing at all — 344 bytes, entirely an instruction comment to the author. `rust-lang/rust` renders fourteen lines. `rails` tells contributors to discard the template if they want. `[E]`
+- **Description richness has never been shown to help.** No controlled study measures it. The one direct observation runs the other way: reviewers who read descriptions thoroughly were slower to first comment, and file familiarity rather than description quality predicted depth of feedback (Bacchelli & Bird, ICSE 2013). `[E]`
+- **Accuracy is the thing that has been measured.** Across 23,247 agentic pull requests, those whose description misdescribed the code saw 28.3% acceptance against 80.0%, and took 3.5 times longer to merge; the most common failure was a description claiming changes that were not implemented, at 45.4% (arXiv 2601.04886, correlational). `[E]`
+
+So the rule is **true, not thorough**. A short description that matches the diff beats a complete one that does not.
+
+The widely quoted "200–400 lines, 70–90% defect discovery" figure is **not** evidence for any of this. It is self-published vendor material from 2006 with no stated method and no dataset. `[V]` For scale, Google's median changelist across roughly 9 million changes is **24 lines modified**, and its own written guidance suggests about 100 lines as a judgment call, not a measured threshold. `[E]`
+
+### Declaring what you could not verify
+
+State it. A test you could not run, a claim taken on trust, a platform you did not check. The Linux kernel requires this of patch submissions — *"If the fix could not be built or tested, or if no reproducer could be produced, say so explicitly."* This repository already holds the same rule for scan findings, where `nothing found` is a result.
+
+### Declaring AI use
+
+**Extent and purpose, not the model name.** Whether a tool implemented an idea or produced the idea is what a reviewer needs. Rust's policy puts it directly: *"We don't care which model you used, but we do care whether you used the LLM to implement the idea or to come up with it"* — and a bare "Generated with \<tool\>" is explicitly not acceptable there.
+
+This is deliberately against the common pattern. Of 281 open-source AI policies, 32.8% ask for the tool name and only 13.0% for the extent of use. The two projects with the most developed policies, Linux and Rust, both ask for extent and purpose and both decline the model name.
+
+### Write it the way you would say it
+
+- **Plain words.** "This went stale three times" — not "the duplicate exhibited repeated staleness."
+- **No aphorisms.** Lines like *"documenting a symptom is not repairing it"* sound clever and tell the reader nothing. If a sentence would feel strange said out loud to a colleague, rewrite it.
+- **Don't bold a one-liner for drama.** Bold the word that matters.
+- **Numbers and quotes instead of adjectives.** "875 pull requests, 10% sole approver" beats "a significant proportion."
+- **Say what you are unsure about in the same plain voice.** "I couldn't get the PCI text, so this is unverified" beats a hedge.
+
 ## Pushing
 
 A push is the moment work becomes public, and this repository is public. `.githooks/pre-push` runs three checks in parallel and is expected to finish in well under a second:
