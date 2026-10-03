@@ -73,10 +73,14 @@ while IFS= read -r ln; do
     '|'*) continue ;;   # the grade key table
     '> '*) continue ;;  # an annotation about a claim, not the claim
   esac
-  case "$text" in
-    *'`S-'*) ;;
-    *) refuse "$DOC" "uncited-claim" "line $n carries an [E] or [S] grade and cites no source ID: the grade is the point of this document, and an uncited grade is an assertion wearing a label" ;;
-  esac
+  # Must be a WELL-FORMED id, matched with the same pattern used to extract
+  # citations below. A substring test for '`S-' passed a claim citing `S-`,
+  # which satisfied "has a citation" while being extracted as none — so neither
+  # uncited-claim nor unknown-source fired and the hole was silent. Found by the
+  # #29 mutation sweep.
+  if printf '%s' "$text" | grep -qE '`S-[A-Z0-9]+[A-Z0-9-]*`'; then :; else
+    refuse "$DOC" "uncited-claim" "line $n carries an [E] or [S] grade and cites no well-formed source ID: the grade is the point of this document, and an uncited grade is an assertion wearing a label"
+  fi
 done <<EOF
 $(grep -nE '\*\*\[E\]|\*\*\[S\]|\[E\]/\[S\]|\[S\]/\[P\]|\*\*\[S\]\*\*' "$DOC")
 EOF

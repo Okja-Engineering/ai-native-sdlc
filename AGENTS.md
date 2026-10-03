@@ -59,6 +59,23 @@ State it. A test you could not run, a claim taken on trust, a platform you did n
 
 This is deliberately against the common pattern. Of 281 open-source AI policies, 32.8% ask for the tool name and only 13.0% for the extent of use. The two projects with the most developed policies, Linux and Rust, both ask for extent and purpose and both decline the model name.
 
+### Gates: enumerate what is allowed, not what is not
+
+A denylist fails **open**. Every miss is silent, and the set of things that are wrong is usually unbounded.
+
+`decided_by` was checked against twenty words — `team`, `reviewer`, `claude`, `bot`. An external audit passed `the Platform Engineering Team` and `Claude Opus 5` through it in one try. Widening the list would not have fixed it; the shape was wrong. It is now an allowlist in [`DECIDERS.md`](DECIDERS.md), and a missing list refuses rather than passing everything.
+
+The model already in the repository is the Discover gate's grade check — `case "$g" in E|S|V|P|O)`. It enumerates the five valid grades rather than guessing at the invalid ones.
+
+### Tests: pin the invariant, not the literals
+
+The tests that were supposed to catch the `decided_by` defect asserted exactly `the team`, `Claude` and `reviewer` — **the three strings the regex was written for.** They proved the list contained three words. They never tested whether `decided_by` denotes a person, so the gate and its suite agreed with each other and both were wrong.
+
+Two rules follow:
+
+- **Include inputs the implementation was not written for.** Multi-word forms, versioned names, truncations, case variants, a plausible value that is simply not authorized. If a reasonable rewrite of the check would still pass the suite, the suite is pinning behaviour; if only this implementation passes, it is pinning the implementation.
+- **Mutation-test the comparison, not just the guard.** Deleting a check and seeing red proves the check is *reachable*. Loosening it — exact match to substring, anchored to unanchored — proves it is *sufficient*. A sweep of all five gates found two more instances of this the first way had missed, one of them in a gate written an hour earlier.
+
 ### Write it the way you would say it
 
 - **Plain words.** "This went stale three times" — not "the duplicate exhibited repeated staleness."
