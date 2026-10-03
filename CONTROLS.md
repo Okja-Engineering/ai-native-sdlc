@@ -144,9 +144,36 @@
 
 ---
 
+## CTRL-8 · Every graded claim in STANDARDS.md resolves to something a reader can open
+
+**What it prevents.** The loop's output document asserting evidence it does not have. `STANDARDS.md:5` says *"Every claim carries a grade. The grade is the point of this document"* — and until 2026-10-03 it carried 31 graded claims, zero citations, and one route to evidence that was a branch which does not exist on origin.
+
+**Enforced by** `bin/validate-standards.sh`.
+
+| Refusal | Condition |
+|---|---|
+| `uncited-claim` | an `[E]` or `[S]` claim citing no source ID |
+| `unknown-source` | a cited ID absent from the register |
+| `source-no-link` | a register entry with no URL, DOI or path |
+| `no-register` | no source register at all |
+| `dangling-ref` | a document points at a git ref that does not exist |
+| `empty-register` | the register declares no IDs |
+
+**Evidence.** [`SOURCES.md`](SOURCES.md) — 22 sources, each with its population, finding and limitation. Vendor-affiliated empirical studies carry that in the class column so it cannot be read past.
+
+**What it does not cover.**
+
+- **Whether the cited source supports the claim.** The gate checks a citation resolves, not that it is apt. A reader is still the only check on that.
+- **`[P]` and `[O]` claims have no source by design** — a practitioner observation is ours, an open question has none.
+- **Register entries nothing cites are reported, not refused.** The first version refused them, which would have forced deleting real sources or attaching them to claims they do not support.
+
+---
+
 ## What is not controlled
 
 The section an assessor should read first. Each of these is a real gap, not a formality.
+
+**0. Whether a cited source actually supports the claim it is cited for.** CTRL-8 establishes that a citation resolves. Nothing establishes that the paper says what the sentence says it says. Four of the register's entries carry limitations that materially bound the claim — three are vendor-affiliated, and `S-METR-2026-01` carries its own authors' statement that the results are unreliable. A reader who does not open the register will not know.
 
 **1. Whether an approver actually reviewed.** CTRL-1 makes a decision attributable. It cannot distinguish a person who read the change from one who clicked approve. `STANDARDS.md` §3 now requires a natural person to hold the approving position, and the decision that set that policy records the cost explicitly: a machine approval is visible in a platform audit log, a human rubber stamp is not, so the policy **moves a detectable failure into an undetectable one.**
 

@@ -36,6 +36,12 @@ jobs:
       - name: Validate every findings file
         run: /bin/bash process/01-scan/validate-findings.sh
 
+      - name: Validate STANDARDS.md cites its sources
+        # The document the loop exists to keep true was the only artifact with no
+        # gate. An external audit found 31 graded claims, zero citations, and a
+        # route to evidence that was a branch which does not exist.
+        run: /bin/bash bin/validate-standards.sh
+
       - name: Validate every discovery topic
         # Fields, the question in the asker's own words, coverage in three parts,
         # the open section, and that grades come from the enum. The macOS leg

@@ -3,7 +3,7 @@
 .scuba/
 
 # Evaluation exhaust: per-run inputs/outputs and copied-in snapshots of inspected
-# repositories. Preserved in full on the experiment/0.0.0 branch so no run data is
+# repositories. Preserved in history at fa7538a so no run data is
 # lost, but kept out of trunk history. Durable state (.devin/roadmap.md) stays tracked.
 .devin/eval/
 
