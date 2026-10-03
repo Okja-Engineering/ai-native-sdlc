@@ -7,19 +7,27 @@
 #
 # CONTROLS.md gives CTRL-1's evidence as "the decision record, the git commit
 # author, the commit date, and the merge". An external audit found that evidence
-# does not distinguish the parties:
+# does not distinguish the parties: every commit on `main` is authored under one
+# address, `imagineux@gmail.com`, under two display names.
 #
-#   71  imagineux <imagineux@gmail.com>          <- agent-driven commits
-#   29  Matthew Van Dusen <imagineux@gmail.com>  <- the web merges
-#    7  imagineux <matt.vandusen@okja.io>
-#
-# Every commit that wrote a decision record was authored by the first of those.
-# DECIDERS.md names "Matthew Van Dusen". So the record says a human decided, and
-# the commit that wrote that name is indistinguishable from an agent's.
+# Every commit that wrote a decision record was authored by the same identity an
+# agent uses. DECIDERS.md names "Matthew Van Dusen". So the record says a human
+# decided, and the commit that wrote that name is indistinguishable from an
+# agent's.
 #
 # STANDARDS.md 3 convicts a vendor of exactly this: "Two accounts belonging to
 # one vendor's one product is a separation of identity, not of duties." Here it
 # is one account with two display names.
+#
+# THE TALLY IS PRINTED, NOT TRANSCRIBED
+#
+# This comment carried a hand-typed tally until 2026-10-03, and so did
+# DECIDERS.md, AGENTS.md and CONTROLS.md. All four were wrong the same way: the
+# numbers came from a working tree holding unpushed branches, so nobody reading
+# the public repository could reproduce them. A number a script computes does not
+# need transcribing, so this gate now prints it and the documents name the
+# command. DECIDERS.md carries the one transcribed copy, labelled with the ref
+# and the date it was measured.
 #
 # WHAT THIS CHECKS, AND WHY IT CURRENTLY REFUSES
 #
@@ -38,6 +46,8 @@
 # exit 0  every decision-setting commit is attributable to a decider
 # exit 1  at least one is not
 # exit 2  could not run
+#
+# env MEASURE_REF  the ref the identity tally is measured against, default `main`
 set -u
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -95,6 +105,32 @@ for c in $commits; do
       "$short is authored under <$email>, which carries $names different author names — a commit under it is not attributable to one party"
   fi
 done
+
+# --- what the history actually carries ---------------------------------------
+# Printed, never refused. This is a measurement, not a rule: the tally changes
+# every time anyone commits, so holding it to a value would make the gate a
+# staleness alarm instead of a control.
+#
+# Measured against one named ref rather than `--all`, because `--all` also counts
+# whatever branches happen to be open when it runs — which is how the transcribed
+# version came to say 107 commits where `main` carries 95. `main` where the
+# checkout has it, HEAD where it does not, and the ref is printed either way so
+# the reader knows which was measured.
+MEASURE_REF="${MEASURE_REF:-main}"
+git rev-parse --verify --quiet "$MEASURE_REF" >/dev/null 2>&1 || MEASURE_REF=HEAD
+printf 'validate-authorship: author identities on %s\n' "$MEASURE_REF"
+git log "$MEASURE_REF" --format='%an <%ae>' 2>/dev/null | sort | uniq -c | sort -rn | sed 's/^/  /'
+
+# And whether each declared identity authors anything at all. DECIDERS.md said
+# one of them "already appears in this history" while it appeared zero times,
+# which is what transcribing instead of measuring buys you.
+while IFS= read -r id; do
+  [ -n "$id" ] || continue
+  n="$(git log "$MEASURE_REF" --format='%an <%ae>' 2>/dev/null | grep -cxF "$id" || true)"
+  printf '  declared identity %s authors %s commit(s) on %s\n' "$id" "${n:-0}" "$MEASURE_REF"
+done <<EOF
+$identities
+EOF
 
 if [ "$refusals" -gt 0 ]; then
   printf '\nvalidate-authorship: %s refusal(s) across %s decision-setting commit(s)\n' "$refusals" "$checked" >&2

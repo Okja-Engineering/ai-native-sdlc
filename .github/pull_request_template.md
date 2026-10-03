@@ -22,9 +22,3 @@ Closes #
 ## Not in this change
 
 <!-- Scope deliberately left out, so a reviewer does not go looking for it. -->
-
-## AI use
-
-<!-- The extent and the purpose, not the model name. Whether a tool wrote the
-     code or came up with the idea is the part that matters to a reviewer.
-     "Generated with <tool>" on its own says nothing. -->

@@ -43,9 +43,12 @@ assert_status 0 "$rc" "the shipped tree carries no speed claim"
 assert_contains "$out" "no speed claims" "it says so"
 
 # --- the six forms the audit used --------------------------------------------
-# Each is asserted separately. The audit's document contained all six at once,
-# so catching any one of them would have made the suite pass while five walked
-# through — the trip-two-guards-with-one-case failure from #29.
+# Each is asserted separately. The audit's document contained all six at once, so
+# catching any one of them would have made the suite pass while five walked
+# through: a test input that trips two guards together proves neither, because a
+# guard that never fires on its own cannot be told from one that does not work.
+# The rule is in AGENTS.md, "Tests: pin the invariant, not the literals", from
+# issue #29 — which a clone cannot read, hence the sentence rather than the number.
 for c in \
   'This loop makes our team quicker.' \
   'We ship 3x quicker than before.' \

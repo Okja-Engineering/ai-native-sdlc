@@ -109,6 +109,46 @@ perl -0pi -e 's/\| `Ada Lovelace <shared\@example\.invalid>` \|/| |/' "$R2/DECID
 out="$(cd "$R2" && bash bin/validate-authorship.sh 2>&1)"
 assert_contains "$out" "refuse[no-identities]" "a decider list with no git identity is refused"
 
+# --- the gate prints the measurement rather than anyone transcribing it -------
+# Four tracked files hand-typed a tally of author identities and all four were
+# wrong, because the numbers had been taken from a working tree holding branches
+# that were never pushed. The gate measures it now. Asserted against the fixtures
+# rather than the real history, so the assertion does not depend on how deep the
+# checkout is — the coupling that already failed once on both CI legs.
+#
+# `$R` is the fixture built above: three commits by `An Agent` — the setup, the
+# pending draft, and the decision it was refused for — one by `Ada Lovelace`, and
+# `Ada Lovelace <ada@example.invalid>` is the declared identity.
+out="$(cd "$R" && bash bin/validate-authorship.sh 2>&1)"
+assert_contains "$out" "author identities on" "the gate prints which ref it measured"
+assert_contains "$out" "3 An Agent <agent@example.invalid>" \
+  "it prints the count for the identity that authored three commits"
+assert_contains "$out" "1 Ada Lovelace <ada@example.invalid>" \
+  "and for the one that authored one"
+assert_contains "$out" "declared identity Ada Lovelace <ada@example.invalid> authors 1 commit(s)" \
+  "it says how many commits each declared identity authors"
+
+# The case the wrong claim was about: DECIDERS.md said its declared address
+# "already appears in this history" when it appeared zero times. A declared
+# identity that authors nothing must be reported as authoring nothing, not
+# omitted — an absent line reads as if the question was never asked.
+R3="$TMP/absent"
+mkdir -p "$R3/process/05-deliver/decisions" "$R3/bin"
+cp "$GATE" "$R3/bin/"
+cat > "$R3/DECIDERS.md" <<'DEC'
+# Authorized deciders
+
+| Name | Since | git identity |
+|---|---|---|
+| Grace Hopper | 2026-01-01 | `Grace Hopper <grace@example.invalid>` |
+DEC
+( cd "$R3" && git init -q . \
+  && git -c user.name='An Agent' -c user.email='agent@example.invalid' \
+       commit -q --allow-empty -m 'chore: set up' ) 2>/dev/null
+out="$(cd "$R3" && bash bin/validate-authorship.sh 2>&1)"
+assert_contains "$out" "declared identity Grace Hopper <grace@example.invalid> authors 0 commit(s)" \
+  "a declared identity that authors nothing is reported as authoring nothing"
+
 # --- it is deliberately not in CI --------------------------------------------
 # A gate that cannot pass would block every branch. If someone wires it in
 # before the identities are separated, this fails and says why.

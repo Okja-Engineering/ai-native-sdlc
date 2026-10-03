@@ -1,6 +1,19 @@
 # Source register
 
-Every `[E]` and `[S]` claim in [`STANDARDS.md`](STANDARDS.md) cites an ID from this file. `bin/validate-standards.sh` refuses a graded claim whose ID is not here, and refuses an ID here that nothing cites.
+Every `[E]` and `[S]` claim in [`STANDARDS.md`](STANDARDS.md) cites an ID from this file. `bin/validate-standards.sh` refuses a graded claim that cites no ID — `uncited-claim` — and refuses a cited ID that is not here — `unknown-source`.
+
+**Each enforcement sentence above names the refusal it is claiming**, so a reader can check it against the gate rather than read it and believe it. `tests/test_controls.sh` resolves every code named here against the gate that emits it, and flags a sentence that claims a refusal without naming one. That rule applied to `CONTROLS.md` alone until 2026-10-03, which is how the sentence below went wrong here while the control document had it right.
+
+**An ID here that nothing cites is reported, not refused.** This said *"refuses"* until 2026-10-03 and the gate has never done it: `bin/validate-standards.sh` counts them and exits 0, and `CONTROLS.md` already said so. <!-- not-an-enforcement-claim: this sentence records that the gate does NOT refuse an uncited register entry, so it names no refusal code -->
+
+Run it and read the last line:
+
+```
+$ bin/validate-standards.sh
+validate-standards: 14 source(s) cited and resolving, 22 in the register, 8 not currently cited
+```
+
+The register is the corpus the research was done from, not an index of this document's footnotes. Refusing an uncited entry would force someone to delete a real source or attach it to a claim it does not support, and both are worse than a row nothing points at.
 
 **Why this file exists.** `STANDARDS.md` carried 31 graded claims and zero citations. Its only route to evidence was a reference to a branch, `experiment/0.0.0`, which does not exist on origin and never did. From inside the repository every `[E]` claim was an assertion. Found by the external audit in #22; the register was recovered from history at `fa7538a:research/sources/source-register.md`. <!-- dead-pointer: experiment/0.0.0 — named here to record that it never existed on origin, not as a route to anything -->
 

@@ -23,10 +23,11 @@ The portable conventions. This file is the cross-tool standard and is read by ag
 - Subject ≤ 72 characters. Add a body only when the *why* isn't obvious from the subject.
 - **No attribution trailers.** No `Co-Authored-By`, no tool or model credit, in commit messages or pull request bodies. The author field is the author.
 
-  **"The author field is the author" is not currently true, and the rule needs revisiting rather than quietly contradicting.** Three identity variants exist in this history and two share an address, so `git log` does not separate an agent-driven commit from a person's — including the two commits that recorded a decision. Trailers were banned to keep tool credit out of commit messages; separating authorship needs the opposite of that ban, for a different reason. `DECIDERS.md` sets out the two changes that fix it properly, both of which are the decider's; a trailer would be the weaker substitute, because a trailer can be omitted and an author field cannot.
+  **"The author field is the author" is not currently true, and the rule needs revisiting rather than quietly contradicting.** Every commit on `main` is authored under one address, `imagineux@gmail.com`, under two display names, so `git log` does not separate an agent-driven commit from a person's — including the two commits that recorded a decision. Run `bin/validate-authorship.sh` for the live tally, or `git log main --format='%an <%ae>' | sort | uniq -c` in a clone; `DECIDERS.md` carries the measurement with the ref and date it was taken against, and this file deliberately does not repeat the numbers. Trailers were banned to keep tool credit out of commit messages; separating authorship needs the opposite of that ban, for a different reason. `DECIDERS.md` sets out the two changes that fix it properly, both of which are the decider's; a trailer would be the weaker substitute, because a trailer can be omitted and an author field cannot.
 - One logical change per commit.
+- **A merge subject is exempt from the convention, and only the subject.** It is generated — by git for a local `git merge`, by the forge for a pull request — so refusing it refuses something nobody wrote. The attribution ban still applies to a merge, because a merge message can be edited.
 
-Enforced by `.githooks/commit-msg`.
+Enforced by `.githooks/commit-msg`, re-checked by `.githooks/pre-push`, and enforced where it cannot be skipped by the `commit-messages` job. **All three now carry the merge exemption; until 2026-10-03 only the CI job did.** `git merge main` on a branch was refused locally for the subject git had just written, and a force-push of a rebased branch was refused for a merge on `main` that the forge wrote — in both cases the only way through was `--no-verify`, which also turns off the secret scan. One rule enforced in three places with the exemption in one of them is the drift CTRL-9 exists to prevent, pointing the other way. `tests/test_hooks.sh` drives both hooks against a throwaway repository and a bare remote.
 
 ## Issues and pull requests
 
@@ -34,7 +35,7 @@ Two artifacts, each with one job.
 
 **The issue** carries the intent, at the feature or capability level: title as the problem statement, background, the problem, proposed solution, expected outcome, validation method. The validation method is decided **before** the work starts. Template: [`.github/ISSUE_TEMPLATE/capability.md`](.github/ISSUE_TEMPLATE/capability.md).
 
-**The pull request** links the issue and stays short: what changed, how it was proved and what wasn't, what is deliberately out of scope, and how AI was used. It does not repeat the intent. Template: [`.github/pull_request_template.md`](.github/pull_request_template.md).
+**The pull request** links the issue and stays short: what changed, how it was proved and what wasn't, and what is deliberately out of scope. It does not repeat the intent. Template: [`.github/pull_request_template.md`](.github/pull_request_template.md).
 
 Together they give an auditable chain: the issue states the intended change and how it will be validated, the pull request shows what was done and the evidence, and the merge is the approval by a named person.
 
@@ -75,12 +76,6 @@ The widely quoted "200–400 lines, 70–90% defect discovery" figure is **not**
 ### Declaring what you could not verify
 
 State it. A test you could not run, a claim taken on trust, a platform you did not check. The Linux kernel requires this of patch submissions — *"If the fix could not be built or tested, or if no reproducer could be produced, say so explicitly."* This repository already holds the same rule for scan findings, where `nothing found` is a result.
-
-### Declaring AI use
-
-**Extent and purpose, not the model name.** Whether a tool implemented an idea or produced the idea is what a reviewer needs. Rust's policy puts it directly: *"We don't care which model you used, but we do care whether you used the LLM to implement the idea or to come up with it"* — and a bare "Generated with \<tool\>" is explicitly not acceptable there.
-
-This is deliberately against the common pattern. Of 281 open-source AI policies, 32.8% ask for the tool name and only 13.0% for the extent of use. The two projects with the most developed policies, Linux and Rust, both ask for extent and purpose and both decline the model name.
 
 ### Gates: enumerate what is allowed, not what is not
 

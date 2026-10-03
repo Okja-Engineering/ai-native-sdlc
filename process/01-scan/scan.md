@@ -36,7 +36,7 @@ State these as obligations, not as things the agent may do:
 - **You must return the ground you actually covered**, including ground you could not reach — a paywall, a rate limit, a search that returned nothing. One line, specific enough that a reader can tell a quiet month from a shallow look.
 - **You must look for counter-evidence**: a retraction, a supersession, a correction, a study that undercuts something already believed. Nothing markets these, so they are the easiest kind to miss and the most valuable to catch. `STANDARDS.md` carries a supersession that a previous review missed entirely.
 - **You must record a vendor's claim as a claim.** "A vendor states X about their own tool" is the finding. "X" is not.
-- **You must not judge what an item means for us.** No consequence beyond the `consequence guess` value, no recommendation, no next step. That judgment is the next stage, behind a human gate, and it does not exist yet.
+- **You must not judge what an item means for us.** No consequence beyond the `consequence guess` value, no recommendation, no next step. That judgment belongs to Define, behind a human gate. This said *"the next stage ... does not exist yet"* until 2026-10-03, which was true when the scan was the only phase built and is a live instruction rather than a dated record, so it is corrected rather than annotated.
 - **You must not rank, filter to a top N, or drop an item because it looks minor.** Suppression is a judgment too, and an item dropped silently leaves no trace that it was ever seen.
 - **You must not return an item without a date.** When the thing happened is part of the record; when you found it is not.
 

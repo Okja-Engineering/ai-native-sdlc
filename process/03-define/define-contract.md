@@ -17,7 +17,9 @@ It is the convergent half of the first diamond.
 | Themes | the **Scan's** findings file | a cycle file grouping every finding |
 | A problem | a theme, plus any **Discover** topic that was run on it | one stated problem |
 
-So the real order is Scan → Define(themes) → *human picks a theme* → Discover(topic) → Define(problem) → Develop → Deliver. `bin/cycle.sh` already prints it that way; this contract and the README diagram were the ones that disagreed.
+So the real order is Scan → Define(themes) → *human picks a theme* → Discover(topic), where the theme needs one → Define(problem) → Develop → Deliver. Discover is conditional: `agent-pr-approval` ran it and its problem file carries `rests on:`, `producing-themes` did not and carries only `from:`.
+
+`bin/cycle.sh` prints the per-cycle steps in that order. It lists Discover topics in a separate block after them rather than inside the cycle, because a topic hangs off a problem and not off a cycle — this contract said the script "already prints it that way" until 2026-10-03, which overstated what the output shows. The order the script agrees with is the one above; where it differs is that Discover has no in-cycle position to print.
 
 ## The rule everything else follows from
 

@@ -144,7 +144,10 @@ assert_not_contains "$out" "refuse[no-coverage]" "a numbered coverage heading is
 # benchmark — so that a coverage part has something it can resolve against. The
 # three coverage parts are supplied per case, and the two not under test always
 # name things, so one case trips one guard. A case that trips two guards at once
-# proves neither; that is the #29 lesson, and this suite broke it twice.
+# proves neither, because a guard that never fires alone cannot be told from one
+# that does not work — and this suite broke that rule twice. The rule is in
+# AGENTS.md, "Tests: pin the invariant, not the literals", from issue #29, which a
+# clone cannot read.
 artifact() { # reached not-reached verified-by-hand suffix -> path
   local p="$TMP/cov$4.md"
   cat > "$p" <<EOF

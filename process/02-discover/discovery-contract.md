@@ -19,7 +19,7 @@ It is the divergent half of the first diamond. It goes wide, records what it fin
 
 ## What it must never do
 
-**Discovery contains no recommendation.** Not "we should", not "this suggests we", not a next step, not a preferred option. The moment an artifact says what to do, the decision has been made without a human gate — and the phase that owns that decision does not exist yet.
+**Discovery contains no recommendation.** Not "we should", not "this suggests we", not a next step, not a preferred option. The moment an artifact says what to do, the decision has been made without a human gate — and Deliver, the phase that owns that decision, has been bypassed. This said *"the phase that owns that decision does not exist yet"* until 2026-10-03. Deliver is built, and it was the phase being referred to.
 
 The test: a reader should finish the artifact able to reach their own conclusion, and unable to tell which one the author reached.
 

@@ -8,7 +8,7 @@ A decision record's `decided_by:` must name someone on this list. `process/05-de
 |---|---|---|
 | Matthew Van Dusen | 2026-10-01 | `Matthew Van Dusen <matt.vandusen@okja.io>` |
 
-**The git identity column is not yet true, and `bin/validate-authorship.sh` says so.** It declares the identity a decision commit *must* carry. Today no decision commit carries it — both were authored as `imagineux <imagineux@gmail.com>`, the same identity agent-driven commits use. See *Who committed the decision* below.
+**The git identity column is a target, not a record, and `bin/validate-authorship.sh` says so.** It declares the identity a decision commit *must* carry. `Matthew Van Dusen <matt.vandusen@okja.io>` authors **no commits at all** — not the two decision commits, not anything else, on any ref. Both decisions were authored as `imagineux <imagineux@gmail.com>`, the same identity agent-driven commits use. Nothing in this file should be read as evidence that a commit exists under the declared address. See *Who committed the decision* below for the measurement and the command.
 
 ---
 
@@ -41,21 +41,43 @@ Adding a decider is now an explicit, reviewable change to a tracked file — whi
 
 An allowlist establishes that `decided_by` names an authorized person. It does not establish that the person, rather than an agent, wrote the field.
 
-**Git cannot currently tell them apart.** Three identity variants exist in this repository's history and two share an address:
+**Git cannot currently tell them apart, because every commit on `main` is authored under one address.** Two author identities exist and both use `imagineux@gmail.com`.
+
+Measured against `main` in a fresh clone on 2026-10-03:
 
 ```
-71  imagineux <imagineux@gmail.com>          <- agent-driven commits, including both decisions
-29  Matthew Van Dusen <imagineux@gmail.com>  <- the web merges
- 7  imagineux <matt.vandusen@okja.io>
+$ git clone https://github.com/Okja-Engineering/ai-native-sdlc.git && cd ai-native-sdlc
+$ git log main --format='%an <%ae>' | sort | uniq -c | sort -rn
+  63 imagineux <imagineux@gmail.com>          <- agent-driven commits, including both decisions
+  32 Matthew Van Dusen <imagineux@gmail.com>  <- 31 web merges, plus 6142a91 Initial commit
+$ git rev-list main --count
+95
 ```
+
+**And the declared identity is absent entirely:**
+
+```
+$ git log --all --format='%an <%ae>%n%cn <%ce>' | grep -c 'matt.vandusen@okja.io'
+0
+```
+
+Zero as an author and zero as a committer, across every ref a clone fetches. Its only occurrence in the repository is this file.
+
+**Why the measurement is labelled with a ref and a date.** The first version of this block read `71 / 29 / 7` across three variants totalling 107 commits, and so did `AGENTS.md`, `CONTROLS.md` and `bin/validate-authorship.sh`. All four were taken from a working tree carrying branches that were never pushed, so no reader of the public repository could reproduce any of them. `main` rather than `--all`, because `--all` also counts whatever branches happen to be open when it runs — a clone today sees 100 commits across all refs and 95 on `main`, and only the second number is stable enough to write down.
+
+`bin/validate-authorship.sh` prints the same tally from the live history every time it runs, so this block can be checked against the repository rather than trusted. It also prints how many commits each declared identity authors, which is the line that would have caught the claim below.
 
 `STANDARDS.md` §3 convicts a vendor of this exact shape: *"Two accounts belonging to one vendor's one product is a separation of identity, not of duties."* Here it is one account with two display names, in the document that says so.
 
 **`bin/validate-authorship.sh` checks it and refuses today.** A commit that sets `chosen:` to anything but `pending` must be authored by the identity declared above, and that identity must not be shared. Neither holds:
 
+Run `bin/validate-authorship.sh`. It emits both refusals for each of the two decision-setting commits — four in total — then prints the tally above:
+
 ```
 refuse[author-not-a-decider]  59b7cd2 set chosen: D, authored by "imagineux <imagineux@gmail.com>"
-refuse[identity-shared]       <imagineux@gmail.com> carries 2 different author names
+refuse[identity-shared]       59b7cd2 is authored under <imagineux@gmail.com>, which carries 2 different author names
+refuse[author-not-a-decider]  f808ff5 set chosen: F, authored by "imagineux <imagineux@gmail.com>"
+refuse[identity-shared]       f808ff5 is authored under <imagineux@gmail.com>, which carries 2 different author names
 ```
 
 **It is deliberately not wired into CI**, because a gate that cannot pass blocks every branch and this one needs a change an agent should not make.
@@ -64,7 +86,7 @@ refuse[identity-shared]       <imagineux@gmail.com> carries 2 different author n
 
 Two things, and both are the decider's:
 
-1. **Configure a distinct identity for agent-driven commits**, so `git log` separates them without anyone's testimony. The address above already appears in this history and is distinct from the one agent commits use.
+1. **Configure a distinct identity for agent-driven commits**, so `git log` separates them without anyone's testimony. This said *"the address above already appears in this history"* until 2026-10-03 and it never did — `matt.vandusen@okja.io` authors nothing, as the measurement above shows. So the step is to start using it, not to reuse something already present: configure the decider's git identity on the machine the decider commits from, and leave agent-driven commits on `imagineux@gmail.com`. One address per party, and the separation is then readable from `git log` alone.
 2. **Make the decision commit yourself.** The act being gated is setting `chosen:`. An agent may draft the record and leave it `pending` — which the contract already treats as a valid state — and the commit that fills it is the human's. That is a workflow change, not a code change, and it is what makes the control real rather than described.
 
 **Both are deferred to a git history cleanup on `main`**, tracked as issue #51. That is a force-push to a public branch which rewrites every SHA, so it has to take the commit citations in `spec.md`, `SOURCES.md` and `STANDARDS.md` with it — `fa7538a` among them. Not an operation to run piecemeal, and not an agent's to run at all.

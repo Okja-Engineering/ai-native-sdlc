@@ -217,11 +217,13 @@
 | Publish disclosure | `.githooks/pre-push` | — | **a hard refusal** if a push would newly publish a never-publish path, having first printed which commits and how many files would become public |
 | Suite integrity | — | the `tests` job | a runner that reports success on a deliberately failing suite — asserted, not trusted |
 
-**Evidence.** The hook scripts, the workflow, and CI's run history.
+**Evidence.** The hook scripts, the workflow, and CI's run history. `tests/test_hooks.sh` drives both hooks end to end against a throwaway repository and a bare remote, so the local half is asserted rather than assumed.
+
+**Evidence note.** This control is about a convention applying only to whoever enabled it. It drifted the other way instead. The conventional-subject rule is enforced in three places — `.githooks/commit-msg`, `.githooks/pre-push`, the `commit-messages` job — and until 2026-10-03 the merge exemption was in the job alone, so both hooks were **stricter** than the thing they mirror. A local `git merge main` was refused for the subject git had just written, and a force-push of a rebased branch was refused for a merge on `main` that the forge wrote. The only way past either was `--no-verify`, which also turns off the secret scan, so the practical effect of the stricter hook was less enforcement. Neither case appears in ordinary use, which is why it sat there: one needs a local merge and the other needs a rebase.
 
 **What it does not cover.**
 
-- **The hooks are local and bypassable.** That is what the server-side half is for, and only two of the five have one. The secret scan and the publish disclosure exist **only** as hooks, so a push from a machine that never ran `git config core.hooksPath .githooks` is unguarded by either.
+- **The hooks are local and bypassable.** That is what the server-side half is for, and the table above shows how little of it there is. Three of the five controls exist as a local hook — conventional commits, the secret scan, the publish disclosure — and of those three, **only conventional commits has a server-side counterpart**. The secret scan and the publish disclosure exist **only** as hooks, so a push from a machine that never ran `git config core.hooksPath .githooks` is unguarded by either. (This read *"only two of the five have one"* until 2026-10-03. No reading of the table gives two: three rows carry a server-side entry and three carry a local one.)
 - **The publish disclosure cannot run in CI.** It is about a push that has not happened yet.
 - The `commit-messages` job skipped a direct push to main until 2026-10-03. Two commits on main still predate the convention and have never been checked.
 
@@ -251,7 +253,17 @@ The section an assessor should read first. Each of these is a real gap, not a fo
 
 **8. This is not an audit.** No external party has assessed any of the above. The first attempt to have someone outside the team try to break the chain was run on 2026-10-03 against a clean clone, and an agent with no prior context is a cheap proxy for a colleague who has never seen the repository, not an equivalent.
 
-**10. Who committed a decision.** CTRL-1 establishes that `decided_by` names an authorized person. It does not establish that the person, rather than an agent, wrote the field. Three git identity variants exist in this history and two share an address, so `git log` cannot separate the parties — the same shape `STANDARDS.md` 3 convicts a vendor of, one account with two display names.
+**9. Why any individual engineering change was made.** The chain the loop produces is complete in a clone. The chain by which this repository was built is not: issue and pull request bodies live in GitHub's database, so a clone shows that a change was reviewed and merged but not what it was intended to do or how that was to be validated. An assessor holding only a clone can assess the process and not its own construction.
+
+Three ways to close it were weighed and none chosen yet, because each has a real cost: stop claiming it — done, this is that; mirror merged pull request bodies into tracked files, which is more duplicated state of the kind this repository keeps being burned by; or move the intent itself into git and leave the GitHub issue as a pointer, which is the most honest and the largest change.
+
+**And it went further than this section admitted until 2026-10-03.** The gap was stated as *why a change was made*. Part of the **process's own design rationale** was out there too: two structural decisions — that applying a decision is a field plus a link rather than a sixth phase, which is why the `STANDARDS.md` gate lives in `bin/`, and the test method that a guard has to be mutated as well as deleted — were cited nine times across the gates and their suites as a bare issue number and nowhere else. `AGENTS.md` carries the rule those citations broke: *"a document naming an issue states the gap in the same sentence rather than pointing at it."* Each of those nine now states the substance and names the tracked document that holds the full reasoning.
+
+Nothing mechanical checks this, and it is not a candidate for one: a rule telling design rationale from plain attribution would be guessing at what a sentence is for, and *"found by the external audit in #22"* is a legitimate use of a number.
+
+**10. Who committed a decision.** CTRL-1 establishes that `decided_by` names an authorized person. It does not establish that the person, rather than an agent, wrote the field. Every commit on `main` is authored under one address, `imagineux@gmail.com`, under two display names, so `git log` cannot separate the parties — the same shape `STANDARDS.md` 3 convicts a vendor of, one account with two display names. The identity `DECIDERS.md` declares a decision commit must carry authors no commits at all.
+
+Run `bin/validate-authorship.sh` for the live tally, or `git log main --format='%an <%ae>' | sort | uniq -c` in a clone. The numbers are not repeated here on purpose: this section carried a transcribed tally until 2026-10-03 and it was wrong, because it had been measured in a working tree holding unpushed branches. `DECIDERS.md` holds the one transcribed copy, labelled with the ref and the date.
 
 `bin/validate-authorship.sh` checks it and **refuses today**: a commit setting `chosen:` must be authored by the identity declared in `DECIDERS.md`, and that identity must not be shared. Neither holds. It is deliberately **not wired into CI**, because a gate that cannot pass blocks every branch, and what turns it on is a configuration change plus a workflow change that both belong to the decider. `DECIDERS.md` states exactly what they are, and they are **deferred to a git history cleanup on `main`** — a force-push that rewrites every SHA and therefore every commit citation in the tracked documents. Tracked as issue #51 and not scheduled into a sprint.
 
@@ -267,6 +279,21 @@ The sentence below was run against the repaired gate on 2026-10-03 and **passes*
 
 Both names resolve, so the part names things, and the sentence denies checking them. Nothing mechanical closes that, which is why the repaired gate is written as *names a referent* rather than as *was verified*. A reader is still the only check on whether a coverage part is true. What has changed is narrower and worth stating exactly: a part naming nothing at all is now refused however it is punctuated, where before two commas were enough.
 
-**9. Why any individual engineering change was made.** The chain the loop produces is complete in a clone. The chain by which this repository was built is not: issue and pull request bodies live in GitHub's database, so a clone shows that a change was reviewed and merged but not what it was intended to do or how that was to be validated. An assessor holding only a clone can assess the process and not its own construction.
+**12. A gate refuses on the authority of a document nobody accepted.** [`bin/validate-claims.sh`](bin/validate-claims.sh) enforces the rule against speed and velocity claims and names [`intent.md`](intent.md) as the authority when it refuses. `intent.md` is marked *draft, unaccepted*, and six other tracked files cite it as binding; its status line now lists all seven. So a reviewer asking what authorized a refusal is told the root document is a draft nobody accepted.
 
-Three ways to close it were weighed and none chosen yet, because each has a real cost: stop claiming it — done, this is that; mirror merged pull request bodies into tracked files, which is more duplicated state of the kind this repository keeps being burned by; or move the intent itself into git and leave the GitHub issue as a pointer, which is the most honest and the largest change.
+Stated rather than closed, for one reason: accepting `intent.md` is a decision by a named decider under [`DECIDERS.md`](DECIDERS.md), and an agent writing "accepted" into a status line would be item 10's defect wearing different clothes — a document asserting a state nothing produced. The check that would close it is *no gate names a document that declares itself unaccepted*. It cannot pass until the decider acts, which is the same position `bin/validate-authorship.sh` is in, so it is written down here and not added.
+
+**13. Whether the documents are true.** This is the limit of the two checks added on 2026-10-03, and it is worth stating exactly because the checks are easy to read as more than they are.
+
+`tests/test_doc_claims.sh` and `tests/test_controls.sh` catch **two specific mechanical contradictions** between a document and the repository:
+
+- a line asserting that a path or a **phase** this repository has does not exist, and a transcribed git measurement with no command above it to reproduce it
+- a sentence in `CONTROLS.md` or `SOURCES.md` claiming a named gate refuses something, where the refusal it names is not one that gate emits
+
+That is the whole of it. **The documents are not otherwise verified, and nothing mechanical does that.** Three known gaps in the two checks, each probed deliberately rather than assumed:
+
+- **An absence claim with a long qualifier escapes.** The phase has to sit within about forty characters of the claim, because that window is what distinguishes the subject of a sentence from a mention elsewhere in it. *"Define, the convergent half of the first diamond that groups every finding, does not exist"* passes. Widening the window brings four true sentences back in as false positives, including this document's own note about the Update stage that was genuinely never built.
+- **An absence claim that does not name the phase escapes.** *"the next stage ... does not exist yet"* and *"the phase that owns that decision does not exist yet"* were two of the three survivors, and neither names what it means. Both are corrected by hand. A check for an unnamed referent would fire on honest prose about something that really is not built.
+- **A true-looking claim that cites a real refusal for the wrong condition escapes.** The check establishes that a named refusal is one the gate emits, not that the gate emits it for the reason the sentence gives.
+
+Everything else a document asserts — that a number is right, that a description matches what a script does, that a limitation bounds a claim the way it says — is a reader's job and is not covered.
