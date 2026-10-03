@@ -30,7 +30,11 @@ export DECIDERS_FILE="$TMP/DECIDERS.md"
 
 # A record beside a real option set, so the options link resolves and the thing
 # under test is the only thing wrong with the file.
-mkdir -p "$TMP/process/04-develop/options" "$TMP/process/05-deliver/decisions"
+# The problem file has to exist too. `problem:` was a required field nothing
+# read until 2026-10-03, so the fixture declared a path that was never resolved.
+mkdir -p "$TMP/process/04-develop/options" "$TMP/process/05-deliver/decisions" \
+         "$TMP/process/03-define/problems"
+printf '# Problem — thing\n' > "$TMP/process/03-define/problems/thing.md"
 cat > "$TMP/process/04-develop/options/thing.md" <<'OPTS'
 # Develop — thing
 ## A · First way
@@ -214,6 +218,38 @@ cp "$TMP/STANDARD.bak" "$TMP/STANDARD.md"
 
 out="$(bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01)" 2>&1)"; rc=$?
 assert_status 0 "$rc" "a reciprocated link is accepted once restored"
+
+# --- the stated problem must be linked ---------------------------------------
+# `problem:` was a required field in the contract and nothing read it. Deleting
+# the line left the gate reporting the record within the contract, so the
+# decision-to-problem edge of the chain had no check at all. Found by the audit.
+REC="$TMP/process/05-deliver/decisions/thing.md"
+
+record A 'Matt Van Dusen' 2026-10-01 >/dev/null
+grep -v '^problem:' "$REC" > "$REC.tmp" && mv "$REC.tmp" "$REC"
+out="$(bash "$GATE" "$REC" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a decision with no problem: field exits 1"
+assert_contains "$out" "refuse[no-problem-link]" "the refusal is no-problem-link"
+assert_contains "$out" "an answer with no question" "the message says what a problemless decision is"
+
+record A 'Matt Van Dusen' 2026-10-01 >/dev/null
+sed 's|^problem: .*|problem: the thing we talked about|' "$REC" > "$REC.tmp" && mv "$REC.tmp" "$REC"
+assert_contains "$(bash "$GATE" "$REC" 2>&1)" "refuse[problem-not-linked]" \
+  "a problem named but not linked is refused"
+
+record A 'Matt Van Dusen' 2026-10-01 >/dev/null
+sed 's|problems/thing.md|problems/gone.md|' "$REC" > "$REC.tmp" && mv "$REC.tmp" "$REC"
+assert_contains "$(bash "$GATE" "$REC" 2>&1)" "refuse[problem-unresolved]" \
+  "a problem link that does not resolve is refused"
+
+# --- the amends check runs even when the options link is broken --------------
+# It sat after two early returns, so a record missing both an options link and
+# an amends field only ever heard about one of them.
+record A 'Matt Van Dusen' 2026-10-01 OMIT >/dev/null
+sed 's|^options: .*|options: [o](../../04-develop/options/gone.md)|' "$REC" > "$REC.tmp" && mv "$REC.tmp" "$REC"
+out="$(bash "$GATE" "$REC" 2>&1)"
+assert_contains "$out" "refuse[options-unresolved]" "an unresolved options link is still refused"
+assert_contains "$out" "refuse[no-amends]" "and the amends check still runs"
 
 # --- the shipped records ------------------------------------------------------
 # These use the REAL DECIDERS.md, because they are checking real records. The

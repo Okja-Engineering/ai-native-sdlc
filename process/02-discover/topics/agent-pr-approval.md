@@ -25,6 +25,10 @@ Scaled down from the three passes the classifier topic used. That question was "
 
 ## Claims
 
+**Grades** are the `STANDARDS.md` scheme: `[E]` empirical · `[S]` standard · `[V]` vendor, never outcome evidence · `[P]` practitioner, unmeasured · `[O]` open, could not establish.
+
+> *Added 2026-10-03.* This artifact never declared the scheme, and the gate did not say so: its grade-key check matched any prose line pairing the word "vendor" with a `[V]` marker, which this artifact has several of. A reader meeting `[V]` here for the first time had no way to know it is never outcome evidence. The check is tightened and the key is where it should have been — a reader aid added, not a claim changed.
+
 ### The capability
 
 **GitHub states the feature is in public preview:** *"This feature is available in public preview to GitHub Copilot Pro, Pro+, Max, Business, and Enterprise plans."* **[V]** — [changelog, 2026-09-01](https://github.blog/changelog/2026-09-01-copilot-code-review-can-now-approve-pull-requests/)

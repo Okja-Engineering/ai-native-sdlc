@@ -42,8 +42,13 @@
 | `no-options-link` | a decided record declares no option set |
 | `options-unresolved` | the declared option set does not resolve |
 | `chosen-not-an-option` | `chosen:` names something absent from that set |
+| `no-problem-link` | no `problem:` field — a decision with no question |
+| `problem-not-linked` | names a problem without linking it |
+| `problem-unresolved` | links a problem that does not exist |
 
 **Evidence.** The options artifact, dated before the decision, with each option's cost, assumption, failure mode and the condition that would make it right.
+
+**Evidence note.** `problem:` was a required field in the contract that nothing read until 2026-10-03 — deleting it left the gate reporting the record within the contract, so the decision-to-problem edge had no check. Found by the external audit, and it was not disclosed here either.
 
 **What it does not cover.** Whether the option set covered the real space. Both option sets written so far state explicitly that they have no entry for an answer nobody proposed.
 
@@ -147,6 +152,9 @@
 | `link-unresolved` | a local link that does not resolve |
 | `undated` | no `dated:` field |
 | `no-status` | no `status:` field |
+| `no-coverage` | no coverage section at all |
+| `no-reached` | coverage has no reached part |
+| `no-grade-key` | the grade scheme is not declared in the document |
 
 **Evidence.** Coverage in three parts — reached, not reached, and **verified by hand** — which is what separates *an agent reported this* from *someone checked it*. Both shipped topics pass despite differing in markup, so the gate checks the contract rather than one artifact's formatting.
 
@@ -179,6 +187,30 @@
 - **Whether the cited source supports the claim.** The gate checks a citation resolves, not that it is apt. A reader is still the only check on that.
 - **`[P]` and `[O]` claims have no source by design** — a practitioner observation is ours, an open question has none.
 - **Register entries nothing cites are reported, not refused.** The first version refused them, which would have forced deleting real sources or attaching them to claims they do not support.
+
+---
+
+## CTRL-9 · The conventions are enforced where they cannot be skipped
+
+**What it prevents.** A convention from applying only to whoever remembered to enable it. The hooks in `.githooks/` are bypassable — `--no-verify` defeats them and they run only for someone who has set `core.hooksPath` — so the ones that can have a server-side counterpart.
+
+**An external audit found this document omitted all of these.** An assessor told to start here got five of the repository's refusals and missed five more, including a hard refusal protecting the local-to-remote boundary.
+
+| Control | Local | Server-side | What it refuses |
+|---|---|---|---|
+| Conventional commits | `.githooks/commit-msg` | the `commit-messages` job | a non-conventional subject, one over 72 characters, or an attribution trailer |
+| No speed claims | — | the `claims` job, via [`bin/validate-claims.sh`](bin/validate-claims.sh) | the obvious forms of a speed or velocity claim. A **tripwire**, not enforcement |
+| Secret scan | `.githooks/pre-push` | — | a built-in pattern scan over the commits being pushed, plus `gitleaks` where installed. The built-in always runs, so the guard is never simply absent |
+| Publish disclosure | `.githooks/pre-push` | — | **a hard refusal** if a push would newly publish a never-publish path, having first printed which commits and how many files would become public |
+| Suite integrity | — | the `tests` job | a runner that reports success on a deliberately failing suite — asserted, not trusted |
+
+**Evidence.** The hook scripts, the workflow, and CI's run history.
+
+**What it does not cover.**
+
+- **The hooks are local and bypassable.** That is what the server-side half is for, and only two of the five have one. The secret scan and the publish disclosure exist **only** as hooks, so a push from a machine that never ran `git config core.hooksPath .githooks` is unguarded by either.
+- **The publish disclosure cannot run in CI.** It is about a push that has not happened yet.
+- The `commit-messages` job skipped a direct push to main until 2026-10-03. Two commits on main still predate the convention and have never been checked.
 
 ---
 

@@ -9,7 +9,7 @@
 
 **What turned out to be the first topic's accident.** *"Several independent passes, briefed to fail differently"* was written from a run of three. The second ran **two**: the first topic's third pass existed to advocate a counter-case against a marketing judgment and had nothing distinct to do on a mechanics question. The rule is the independence and the differing briefs; the number scales to the question. Corrected below.
 
-**Gated**, as `validate-discovery.sh`. Twelve refusals, each asserted by message in `tests/test_validate_discovery.sh`. Both shipped topics pass despite differing in markup, which is the property that mattered — a gate keyed to the newer artifact's formatting would have encoded its accidents as rules. See *The gate* at the end, including the two checks named here that turned out **not** to be mechanisable.
+**Gated**, as `validate-discovery.sh`, with every refusal asserted by message in `tests/test_validate_discovery.sh`. No count is stated here: the contract said twelve while the gate emitted seventeen, and a number in prose beside a number in code is the duplicated-declaration failure this repository keeps finding. `tests/test_controls.sh` checks that every refusal the gate emits is documented. Both shipped topics pass despite differing in markup, which is the property that mattered — a gate keyed to the newer artifact's formatting would have encoded its accidents as rules. See *The gate* at the end, including the two checks named here that turned out **not** to be mechanisable.
 
 ## What discovery is for
 
