@@ -258,7 +258,7 @@ for f in "$DOC" "$REG" "$ROOT/README.md" "$ROOT/DECIDERS.md"; do
           ;;
       esac
       refuse "$f" "dangling-ref" \
-        "points at \`$r\`, which this repository has neither as a path nor in git history: this is the defect that left STANDARDS.md with no reachable evidence. If it is named in order to record that it is dead, say so in band — <!-- dead-pointer: $r — reason -->"
+        "points at \`$r\`, which this repository has neither as a path nor in git history: this is the defect that left STANDARDS.md with no reachable evidence. If it is somewhere else — another repository, a URL — link it rather than writing it in backticks, because a reader cannot open this. If it is named in order to record that it is dead, say so in band: <!-- dead-pointer: $r — reason -->"
       break
     done <<INNER
 $(grep -F "$r" "$f")

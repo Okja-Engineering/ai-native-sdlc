@@ -236,6 +236,15 @@ t="$(fresh dangling_noreason)"
 printf '\nThe corpus is on `archive/0.0.0`. <!-- dead-pointer: archive/0.0.0 -->\n' >> "$t/STANDARDS.md"
 assert_contains "$(gate "$t")" "refuse[dangling-ref]" "a declaration with no reason does not exempt"
 
+# The known cost of reading `a/b` as a pointer: a reference to another repository
+# has the same shape as a dead branch, so it is refused and the refusal says to
+# link it instead. Asserted rather than left as a surprise.
+t="$(fresh dangling_slug)"
+printf '\nThe mechanics were read from `github/docs`.\n' >> "$t/STANDARDS.md"
+out="$(gate "$t")"
+assert_contains "$out" "refuse[dangling-ref]" "a backticked repository slug is refused"
+assert_contains "$out" "link it rather than" "and the refusal says to link it instead"
+
 # Prose that says a pointer is dead, without declaring it, no longer exempts it.
 # The four phrases the gate used to match were a guess at what a sentence meant.
 t="$(fresh dangling_prose)"
