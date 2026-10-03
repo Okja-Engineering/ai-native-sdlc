@@ -64,25 +64,58 @@ EOF
 fi
 
 # --- every graded claim cites an ID ------------------------------------------
-# A claim line is any line carrying an [E] or [S] marker that is not a table row
-# (the grade key at the top of the document is a table) and not a blockquote
-# annotation about a grade having changed.
+# A line GRADES a claim when it carries an [E] or [S] marker, wherever on the
+# line that marker appears and whatever markdown is around it.
+#
+# The previous version skipped any line beginning `|` or `> `, and matched only
+# four marker forms: `**[E]`, `**[S]`, `[E]/[S]`, `[S]/[P]`. So a bare `[E]`, a
+# table row and a blockquote all passed uncited — and a bare marker is this
+# repository's own house style for a graded claim. AGENTS.md writes it that way
+# and so do both discovery topics. The gate was reading markup, not grades.
+#
+# There is no markup stripping here, and that is deliberate. The first version of
+# this fix stripped emphasis, table pipes and the blockquote marker before
+# testing the line, which reads as thorough and does nothing: `[E]`, `**[E]**`,
+# `| **[E]** |` and `> - [E]` all contain the marker already. Mutating each strip
+# out failed no test, which is how the dead code was found. What was actually
+# wrong was the first-character exemption and the four-form pattern, and both are
+# gone.
+#
+# A line is exempt only when it SAYS it is not a claim, in band, with a reason:
+#
+#   <!-- not-a-claim: reason -->          exempts the line it is on
+#   <!-- not-a-claim-block: reason -->    exempts every line until
+#   <!-- end-not-a-claim-block -->
+#
+# This document declares three: the table that defines what each grade means,
+# and two sentences that are about the grading scheme rather than graded by it.
+# Each declaration sits where it applies, carries its reason, greps in one line,
+# and is counted in this gate's summary. The first-character skip it replaces was
+# unconditional, silent and uncounted. A marker carrying no reason does not
+# exempt anything, so a careless one produces a refusal rather than a hole.
+scan="$(awk '
+  /<!--[ \t]*end-not-a-claim-block[ \t]*-->/ { inblock = 0; next }
+  /<!--[ \t]*not-a-claim-block:[^>]*[A-Za-z][^>]*-->/ { inblock = 1; x++; next }
+  inblock { next }
+  /<!--[ \t]*not-a-claim:[^>]*[A-Za-z][^>]*-->/ { x++; next }
+  /\[E\]|\[S\]/ { printf "C%d:%s\n", FNR, $0 }
+  END { printf "X%d\n", x + 0 }
+' "$DOC")"
+exemptions="$(printf '%s\n' "$scan" | sed -n 's/^X//p')"
+
 while IFS= read -r ln; do
+  [ -n "$ln" ] || continue
   n="${ln%%:*}"; text="${ln#*:}"
-  case "$text" in
-    '|'*) continue ;;   # the grade key table
-    '> '*) continue ;;  # an annotation about a claim, not the claim
-  esac
   # Must be a WELL-FORMED id, matched with the same pattern used to extract
   # citations below. A substring test for '`S-' passed a claim citing `S-`,
   # which satisfied "has a citation" while being extracted as none — so neither
   # uncited-claim nor unknown-source fired and the hole was silent. Found by the
   # #29 mutation sweep.
   if printf '%s' "$text" | grep -qE '`S-[A-Z0-9]+[A-Z0-9-]*`'; then :; else
-    refuse "$DOC" "uncited-claim" "line $n carries an [E] or [S] grade and cites no well-formed source ID: the grade is the point of this document, and an uncited grade is an assertion wearing a label"
+    refuse "$DOC" "uncited-claim" "line $n carries an [E] or [S] grade and cites no well-formed source ID: the grade is the point of this document, and an uncited grade is an assertion wearing a label. A line that names a grade without using one declares that in band — <!-- not-a-claim: reason -->"
   fi
 done <<EOF
-$(grep -nE '\*\*\[E\]|\*\*\[S\]|\[E\]/\[S\]|\[S\]/\[P\]|\*\*\[S\]\*\*' "$DOC")
+$(printf '%s\n' "$scan" | sed -n 's/^C//p')
 EOF
 
 # --- every cited ID is in the register ---------------------------------------
@@ -150,5 +183,5 @@ if [ "$refusals" -gt 0 ]; then
   printf 'validate-standards: %s refusal(s)\n' "$refusals" >&2
   exit 1
 fi
-printf 'validate-standards: %s source(s) cited and resolving, %s in the register, %s not currently cited\n' \
-  "$(printf '%s\n' "$cited" | grep -c . )" "$(printf '%s\n' "$ids" | grep -c .)" "$uncited"
+printf 'validate-standards: %s source(s) cited and resolving, %s in the register, %s not currently cited, %s line(s) declared not a claim\n' \
+  "$(printf '%s\n' "$cited" | grep -c . )" "$(printf '%s\n' "$ids" | grep -c .)" "$uncited" "$exemptions"

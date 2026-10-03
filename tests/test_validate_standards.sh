@@ -58,6 +58,86 @@ t="$(fresh uncited_combo)"
 printf '\nSomething is true. **[E]/[S]** because of reasons.\n' >> "$t/STANDARDS.md"
 assert_contains "$(gate "$t")" "refuse[uncited-claim]" "an uncited combined grade is refused"
 
+# Markup does not exempt a line. The gate used to skip anything beginning `|` or
+# `> ` and to match only four marker forms, so a bare `[E]`, a table row and a
+# blockquote all passed uncited — and a bare marker is this repository's own
+# house style for a graded claim, which both discovery topics and AGENTS.md use.
+#
+# The forms below are deliberately NOT the four from the finding. They are
+# chosen to sit outside whatever an implementation would obviously handle: a
+# nested blockquote, a list item, a heading, a grade in a table's second cell, an
+# indented line, bold-italic, and the backticked bare marker the rest of the
+# repository writes. The invariant is that markdown around a grade marker does
+# not decide whether the sentence is a claim. A rewrite that strips markup some
+# other way still passes this.
+i=0
+while IFS= read -r form; do
+  i=$((i + 1))
+  t="$(fresh "markup$i")"
+  printf '\n%s\n' "$form" >> "$t/STANDARDS.md"
+  out="$(gate "$t")"; rc=$?
+  assert_status 1 "$rc" "an uncited claim written as: $form"
+  assert_contains "$out" "refuse[uncited-claim]" "and the refusal is uncited-claim, not a pass"
+done <<'FORMS'
+Agents never hallucinate in production. `[E]`
+>> **[E]** Agents never hallucinate in production.
+- Agents never hallucinate in production. [E]
+### [S] Agents never hallucinate in production
+    Agents never hallucinate in production. [E]
+***[E]*** Agents never hallucinate in production.
+FORMS
+
+# A table row with the grade in the second cell rather than the first.
+t="$(fresh markuprow)"
+printf '\n| Agents never hallucinate in production. | **[E]** |\n' >> "$t/STANDARDS.md"
+out="$(gate "$t")"; rc=$?
+assert_status 1 "$rc" "a table row with the grade in the second cell is not exempt"
+assert_contains "$out" "refuse[uncited-claim]" "the refusal is uncited-claim"
+
+# --- an exemption has to be declared, and has to say why ----------------------
+# Some lines carry a grade marker and do not grade anything: the table that
+# declares what each grade means, and a sentence about the scheme rather than
+# graded by it. Those are declared in band with a reason, which is greppable and
+# reviewable, where the old skip-by-first-character was silent.
+t="$(fresh exempt_ok)"
+printf '\nThe grade `[E]` is the strongest one. <!-- not-a-claim: names the marker, does not use it -->\n' >> "$t/STANDARDS.md"
+out="$(gate "$t")"; rc=$?
+assert_status 0 "$rc" "a line declared not a claim, with a reason, is accepted"
+assert_contains "$out" "declared not a claim" "the summary reports how many exemptions are declared"
+
+# A marker with no reason is not a declaration, so the line is still checked.
+# Otherwise the exemption is an unconditional escape hatch again.
+t="$(fresh exempt_bare)"
+printf '\nThe grade `[E]` is the strongest one. <!-- not-a-claim: -->\n' >> "$t/STANDARDS.md"
+assert_contains "$(gate "$t")" "refuse[uncited-claim]" "an exemption with no reason does not exempt"
+
+# The sharpest pair: the SAME table row, inside the declared block and outside
+# it. The grade key is a table and must not be read as a pile of uncited claims;
+# an identical row appended elsewhere is a claim. Identical markup, and the
+# declaration is what differs.
+t="$(fresh exempt_block)"
+printf '\n<!-- not-a-claim-block: these rows declare what a grade means -->\n| **[E]** | Empirical, something |\n<!-- end-not-a-claim-block -->\n' >> "$t/STANDARDS.md"
+out="$(gate "$t")"; rc=$?
+assert_status 0 "$rc" "a row inside a declared not-a-claim block is accepted"
+
+t="$(fresh exempt_outside)"
+printf '\n| **[E]** | Empirical, something |\n' >> "$t/STANDARDS.md"
+assert_contains "$(gate "$t")" "refuse[uncited-claim]" "the same row outside the block is refused"
+
+# The block form needs a reason for the same reason the line form does. Found by
+# mutating the block rule rather than the line rule: dropping the reason from one
+# of them failed a test and dropping it from the other failed none.
+t="$(fresh exempt_block_bare)"
+printf '\n<!-- not-a-claim-block: -->\n| **[E]** | Empirical, something |\n<!-- end-not-a-claim-block -->\n' >> "$t/STANDARDS.md"
+assert_contains "$(gate "$t")" "refuse[uncited-claim]" "a block exemption with no reason does not open a block"
+
+# A cited claim in any of those forms must still pass, or the gate is refusing
+# markup rather than reading grades.
+t="$(fresh cited_bare)"
+printf '\nAgents are reviewed by people. `[E]` `S-NBER-2026-01`\n' >> "$t/STANDARDS.md"
+out="$(gate "$t")"; rc=$?
+assert_status 0 "$rc" "a bare-marker claim that cites a source is accepted"
+
 # --- a citation that resolves to nothing -------------------------------------
 t="$(fresh unknown)"
 perl -0pi -e 's/`S-NBER-2026-01`/`S-INVENTED-9999-01`/' "$t/STANDARDS.md"
@@ -124,8 +204,18 @@ assert_contains "$out" "not currently cited" "they are reported in the summary i
 
 # --- the grade key table is not a claim --------------------------------------
 # It carries [E] and [S] markers and must not be read as uncited claims, or the
-# gate refuses its own document for existing.
+# gate refuses its own document for existing. The key sits inside a declared
+# not-a-claim block, so what is checked is that the declaration is honoured. The
+# previous version asserted the string "line 9", which went stale as soon as
+# anything above line 9 moved and then passed for the wrong reason.
 t="$(fresh key)"
-assert_not_contains "$(gate "$t")" "line 9" "the grade key table is not treated as a claim"
+out="$(gate "$t")"; rc=$?
+assert_status 0 "$rc" "the shipped document, grade key included, is within the contract"
+
+# And the key rows are exempt because they are DECLARED, not because they are a
+# table. Strip the declarations out and the gate reads them as claims.
+t="$(fresh key_undeclared)"
+grep -v 'not-a-claim' "$t/STANDARDS.md" > "$t/S.tmp" && mv "$t/S.tmp" "$t/STANDARDS.md"
+assert_contains "$(gate "$t")" "refuse[uncited-claim]" "with the declarations removed, the key rows are read as claims"
 
 assert_done

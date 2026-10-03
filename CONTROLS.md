@@ -175,7 +175,7 @@
 
 | Refusal | Condition |
 |---|---|
-| `uncited-claim` | an `[E]` or `[S]` claim citing no source ID |
+| `uncited-claim` | a line carrying an `[E]` or `[S]` marker anywhere on it, citing no source ID |
 | `unknown-source` | a cited ID absent from the register |
 | `source-no-link` | a register entry with no URL, DOI or path |
 | `no-register` | no source register at all |
@@ -184,9 +184,12 @@
 
 **Evidence.** [`SOURCES.md`](SOURCES.md) — 22 sources, each with its population, finding and limitation. Vendor-affiliated empirical studies carry that in the class column so it cannot be read past.
 
+**Evidence note.** Until 2026-10-03 the gate skipped any line starting with `|` or `> ` and matched only four marker forms — `**[E]`, `**[S]`, `[E]/[S]`, `[S]/[P]`. A bare `[E]`, a table row and a blockquote all passed uncited, and a bare marker is this repository's own house style for a graded claim. A marker is now read wherever it appears on a line. Repairing the detection found one real uncited `[S]` claim in the shipped document — §3's configuration requirement — which now cites `S-NIST-AC5`, the standard the practice two paragraphs above it already rests on.
+
 **What it does not cover.**
 
 - **Whether the cited source supports the claim.** The gate checks a citation resolves, not that it is apt. A reader is still the only check on that.
+- **A line that declares itself not a claim is taken at its word.** Some lines carry a grade marker without grading anything: the table that defines what each grade means, and a sentence about the scheme rather than graded by it. Those are declared in band, `<!-- not-a-claim: reason -->`, and the gate prints how many it honoured — three, at the time of writing. It checks that the declaration is present and carries a reason, not that the reason is true, so an author can exempt a real claim. That is a weaker control than no exemption at all and a stronger one than what it replaced, which exempted every table row and every blockquote in the document, silently and without a reason.
 - **`[P]` and `[O]` claims have no source by design** — a practitioner observation is ours, an open question has none.
 - **Register entries nothing cites are reported, not refused.** The first version refused them, which would have forced deleting real sources or attaching them to claims they do not support.
 
