@@ -67,8 +67,14 @@ PCT='[0-9]+ *% +(faster|quicker|more productive|improvement in (velocity|through
 # real phrasings. Two claims slipped through without them — "makes **our team**
 # quicker" and "throughput **is** up 60%" — and both only showed up once each
 # claim was asserted on its own line. In the audit's single document they were
-# hidden behind other claims matching on the same line, which is the
-# one-case-trips-two-guards failure from #29 wearing different clothes.
+# hidden behind other claims matching on the same line.
+#
+# That is the one-case-trips-two-guards failure wearing different clothes: when a
+# single test input satisfies two guards at once, a passing result proves neither
+# of them, and a guard that never fires alone is indistinguishable from a guard
+# that does not work. The rule and the sweep that established it are in AGENTS.md,
+# section "Tests: pin the invariant, not the literals"; the finding was issue #29,
+# which a clone cannot read.
 OWN='(our |the |your |my |their )?'
 LINK='(is |was |are |were |has |have )?'
 

@@ -5,12 +5,19 @@
 # route to evidence being a branch that does not exist. This suite is what stops
 # that recurring.
 #
-# NOTE ON METHOD, carried from #29. That finding was that a gate's tests asserted
-# the three literal strings its regex was written for, which proved the allowlist
-# contained three words and not that the invariant held. So these cases are
-# written against the invariant — "a graded claim resolves to something openable"
-# — and include inputs chosen to be outside what the implementation obviously
-# handles, not just the ones it was built for.
+# NOTE ON METHOD. The `decided_by` gate's tests asserted the three literal strings
+# its regex was written for, which proved the allowlist contained three words and
+# not that the invariant held — and the gate and its suite agreed with each other
+# while both were wrong. Two rules follow: include inputs the implementation was
+# not written for, and mutate the comparison as well as deleting the guard,
+# because deleting proves a check is reachable and loosening proves it is
+# sufficient.
+#
+# So these cases are written against the invariant — "a graded claim resolves to
+# something openable" — and include inputs chosen to be outside what the
+# implementation obviously handles. The rules in full are in AGENTS.md, "Tests:
+# pin the invariant, not the literals"; the finding was issue #29, which a clone
+# cannot read.
 set -u
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$TEST_DIR/lib/assert.sh"
@@ -170,10 +177,12 @@ out="$(gate "$t")"
 assert_contains "$out" "refuse[unknown-source]" "a citation absent from the register is refused"
 assert_contains "$out" "reads as evidence" "the message says why a dangling citation is worse than none"
 
-# A TRUNCATED id must also be refused. Found by the #29 mutation sweep: swapping
-# the exact match for a substring match caused zero test failures, so the suite
-# did not pin exactness — the same defect #29 exists for, in a gate written an
-# hour before. `S-NBER` is a prefix of a real id and is not an id.
+# A TRUNCATED id must also be refused. Found by loosening the comparison rather
+# than deleting it — see the note on method at the top of this file: swapping the
+# exact match for a substring match caused zero test failures, so the suite pinned
+# that the check was reachable and not that it was sufficient. The same defect as
+# the `decided_by` allowlist, in a gate written an hour before. `S-NBER` is a
+# prefix of a real id and is not an id.
 t="$(fresh trunc_prefix)"
 perl -0pi -e 's/`S-NBER-2026-01`/`S-NBER`/' "$t/STANDARDS.md"
 assert_contains "$(gate "$t")" "refuse[unknown-source]" "a truncated id that is still well-formed is refused"

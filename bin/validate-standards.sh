@@ -18,9 +18,20 @@
 #
 # The other gates sit beside the phase whose artifact they check. STANDARDS.md
 # is not a phase artifact — it is the loop's output, amended by a decision
-# rather than produced by a stage. #18 established that applying a decision is a
-# field plus a link, not a sixth phase, so there is no phase directory for this
-# to belong to. It sits in bin/ with the other repository-level tools.
+# rather than produced by a stage.
+#
+# Applying a decision is a FIELD PLUS A LINK, not a sixth phase: the decision
+# carries `amends:` naming and linking the document it changes, the amended claim
+# carries `decided:` linking back, and validate-decision.sh refuses either half
+# missing. A `process/06-update/` phase would have had one artifact — a diff to a
+# file that already exists — and a contract describing how to edit Markdown. So
+# there is no phase directory for this gate to belong to, and it sits in bin/ with
+# the other repository-level tools.
+#
+# The full reasoning is in process/05-deliver/deliver-contract.md, section
+# "`amends`, and why Update is not a sixth phase", and in that contract's open
+# question 3, struck through where it was settled. Decided in issue #18, which a
+# clone cannot read — hence the summary here.
 #
 # exit 0  every graded claim resolves
 # exit 1  at least one refusal
@@ -125,8 +136,13 @@ while IFS= read -r ln; do
   # Must be a WELL-FORMED id, matched with the same pattern used to extract
   # citations below. A substring test for '`S-' passed a claim citing `S-`,
   # which satisfied "has a citation" while being extracted as none — so neither
-  # uncited-claim nor unknown-source fired and the hole was silent. Found by the
-  # #29 mutation sweep.
+  # uncited-claim nor unknown-source fired and the hole was silent.
+  #
+  # Found by LOOSENING the comparison rather than deleting it: swapping the exact
+  # match for a substring match broke no test, which showed the suite pinned that
+  # the check was reachable and not that it was sufficient. The method is in
+  # AGENTS.md, "Tests: pin the invariant, not the literals"; it came out of issue
+  # #29, which a clone cannot read.
   if printf '%s' "$text" | grep -qE '`S-[A-Z0-9]+[A-Z0-9-]*`'; then :; else
     refuse "$DOC" "uncited-claim" "line $n carries an [E] or [S] grade and cites no well-formed source ID: the grade is the point of this document, and an uncited grade is an assertion wearing a label. A line that names a grade without using one declares that in band — <!-- not-a-claim: reason -->"
   fi
