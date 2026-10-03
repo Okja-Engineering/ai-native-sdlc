@@ -149,6 +149,78 @@ for s in $(grep -oE '[A-Za-z0-9_./-]+\.sh' "$TMP/dead.md"); do
 done
 assert_eq "yes" "$found" "the detection fires on a script path that does not exist"
 
+# --- a transcribed git measurement carries the command that produces it -------
+# Four tracked files hand-transcribed a tally of git author identities — reading
+# `71 / 29 / 7` across three variants, 107 commits — and none of them said how it
+# was produced. It had been measured in a working tree holding branches that were
+# never pushed. A clone measures two variants and 95 commits on `main`, so no
+# reader of the public repository could reproduce any of the four numbers, and
+# nothing noticed for as long as nobody re-ran it by hand.
+#
+# The invariant: a transcribed git measurement is immediately preceded by the
+# command that produces it. Not that the number is right — that is below, under
+# what this does not establish — but that a reader has a way to find out.
+#
+# A tally line is a count, then a name, then a bracketed address: the output shape
+# of `git log --format='%an <%ae>' | sort | uniq -c`. A markdown table row is not
+# one, because it starts with `|`.
+TALLY='^[[:space:]]*#?[[:space:]]*[0-9]+[[:space:]]+[^|]*<[^>]*@[^>]*>'
+# The command has to ask git for an author identity. `%ae` is the part that cannot
+# be left out, whatever else the pipeline does.
+COMMAND='git log.*%ae'
+# Within the ten lines above, not anywhere in the file. File scope was the first
+# version and it was too weak to catch the worst case: `bin/validate-authorship.sh`
+# carried the wrong tally in its header comment and a correct `git log --format`
+# eighty lines further down, inside the gate's own logic, so a file-wide search
+# declared it sourced. The number and the command have to be in the same
+# transcript for a reader to connect them.
+WINDOW=10
+
+# One implementation, used for the real sweep and for the fixtures below. A
+# fixture that re-implements the check proves the re-implementation works, which
+# is the vacuous assertion this repository has shipped before.
+unsourced_tallies() {
+  for hit in $(grep -nE "$TALLY" "$@" /dev/null 2>/dev/null | cut -d: -f1,2 | sort -u); do
+    f="${hit%%:*}"; n="${hit##*:}"
+    from=$((n - WINDOW)); [ "$from" -lt 1 ] && from=1
+    sed -n "${from},${n}p" "$f" | grep -qE "$COMMAND" || printf '%s ' "$hit"
+  done
+}
+
+# `git grep` to enumerate, because untracked scratch files must not fail the
+# suite — and because a check that reads the index has to be verified after
+# staging, not after the last edit.
+# shellcheck disable=SC2046
+unsourced="$(unsourced_tallies $(git grep -lIE "$TALLY" -- '*.md' '*.sh' ':(exclude)tests/*' 2>/dev/null))"
+assert_eq "" "${unsourced% }" "a transcribed git author tally is preceded by the command that produces it"
+
+# The detection has to fire, or an empty result means nothing was looked at.
+printf '```\n  71 somebody <shared@example.invalid>\n```\n' > "$TMP/tally-bare.md"
+assert_eq "$TMP/tally-bare.md:2 " "$(unsourced_tallies "$TMP/tally-bare.md")" \
+  "the detection fires on a transcribed tally with no command"
+
+# And it has to stop firing once the command is there, or it is refusing the
+# measurement rather than the missing method.
+printf '```\n$ git log main --format=%%an <%%ae>\n  71 somebody <shared@example.invalid>\n```\n' \
+  > "$TMP/tally-sourced.md"
+assert_eq "" "$(unsourced_tallies "$TMP/tally-sourced.md")" \
+  "a transcribed tally that names its command passes"
+
+# The window is load-bearing, so prove it bounds. A command far enough above the
+# tally is not in the same transcript, and must not exempt it.
+{ printf '$ git log main --format=%%an <%%ae>\n'
+  i=0; while [ "$i" -lt "$WINDOW" ]; do printf 'filler\n'; i=$((i + 1)); done
+  printf '  71 somebody <shared@example.invalid>\n'
+} > "$TMP/tally-far.md"
+assert_eq "$TMP/tally-far.md:$((WINDOW + 2)) " "$(unsourced_tallies "$TMP/tally-far.md")" \
+  "a command outside the window does not exempt the tally"
+
+# The tally pattern must not swallow a markdown table row, or every table of
+# people would be demanding a git command.
+printf '| Name | git identity |\n| Ada | `Ada <ada@example.invalid>` |\n' > "$TMP/table.md"
+assert_eq "" "$(grep -E "$TALLY" "$TMP/table.md" || true)" \
+  "a markdown table row naming an address is not read as a tally"
+
 # --- the paths list is not empty ---------------------------------------------
 # If the enumeration returned nothing the loop above would pass everything.
 np="$(printf '%s\n' "$paths" | grep -c .)"
