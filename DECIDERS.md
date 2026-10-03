@@ -2,9 +2,11 @@
 
 A decision record's `decided_by:` must name someone on this list. `process/05-deliver/validate-decision.sh` refuses one that does not.
 
-| Name | Since |
-|---|---|
-| Matthew Van Dusen | 2026-10-01 |
+| Name | Since | git identity |
+|---|---|---|
+| Matthew Van Dusen | 2026-10-01 | `Matthew Van Dusen <matt.vandusen@okja.io>` |
+
+**The git identity column is not yet true, and `bin/validate-authorship.sh` says so.** It declares the identity a decision commit *must* carry. Today no decision commit carries it — both were authored as `imagineux <imagineux@gmail.com>`, the same identity agent-driven commits use. See *Who committed the decision* below.
 
 ---
 
@@ -33,4 +35,34 @@ Adding a decider is now an explicit, reviewable change to a tracked file — whi
 
 **That the named person read the change.** `CONTROLS.md` records this under *what is not controlled*, and it is unchanged by this file. An allowlist makes `decided_by` attributable to an authorized individual. It cannot distinguish someone who reviewed carefully from someone who did not.
 
-**That the person, rather than an agent, wrote the field.** Issue #38 covers that: two git identities currently share one email, and the agent alias authored the commit that wrote the name into the record. An allowlist narrows the gap; it does not close it.
+## Who committed the decision
+
+An allowlist establishes that `decided_by` names an authorized person. It does not establish that the person, rather than an agent, wrote the field.
+
+**Git cannot currently tell them apart.** Three identity variants exist in this repository's history and two share an address:
+
+```
+71  imagineux <imagineux@gmail.com>          <- agent-driven commits, including both decisions
+29  Matthew Van Dusen <imagineux@gmail.com>  <- the web merges
+ 7  imagineux <matt.vandusen@okja.io>
+```
+
+`STANDARDS.md` §3 convicts a vendor of this exact shape: *"Two accounts belonging to one vendor's one product is a separation of identity, not of duties."* Here it is one account with two display names, in the document that says so.
+
+**`bin/validate-authorship.sh` checks it and refuses today.** A commit that sets `chosen:` to anything but `pending` must be authored by the identity declared above, and that identity must not be shared. Neither holds:
+
+```
+refuse[author-not-a-decider]  59b7cd2 set chosen: D, authored by "imagineux <imagineux@gmail.com>"
+refuse[identity-shared]       <imagineux@gmail.com> carries 2 different author names
+```
+
+**It is deliberately not wired into CI**, because a gate that cannot pass blocks every branch and this one needs a change an agent should not make.
+
+### What turns it on
+
+Two things, and both are the decider's:
+
+1. **Configure a distinct identity for agent-driven commits**, so `git log` separates them without anyone's testimony. The address above already appears in this history and is distinct from the one agent commits use.
+2. **Make the decision commit yourself.** The act being gated is setting `chosen:`. An agent may draft the record and leave it `pending` — which the contract already treats as a valid state — and the commit that fills it is the human's. That is a workflow change, not a code change, and it is what makes the control real rather than described.
+
+Until both hold, `CONTROLS.md` carries this under *what is not controlled*.

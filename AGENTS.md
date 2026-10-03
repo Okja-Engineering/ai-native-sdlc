@@ -22,6 +22,8 @@ The portable conventions. This file is the cross-tool standard and is read by ag
 - Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
 - Subject ≤ 72 characters. Add a body only when the *why* isn't obvious from the subject.
 - **No attribution trailers.** No `Co-Authored-By`, no tool or model credit, in commit messages or pull request bodies. The author field is the author.
+
+  **"The author field is the author" is not currently true, and the rule needs revisiting rather than quietly contradicting.** Three identity variants exist in this history and two share an address, so `git log` does not separate an agent-driven commit from a person's — including the two commits that recorded a decision. Trailers were banned to keep tool credit out of commit messages; separating authorship needs the opposite of that ban, for a different reason. `DECIDERS.md` sets out the two changes that fix it properly, both of which are the decider's; a trailer would be the weaker substitute, because a trailer can be omitted and an author field cannot.
 - One logical change per commit.
 
 Enforced by `.githooks/commit-msg`.
