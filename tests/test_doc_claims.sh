@@ -119,6 +119,36 @@ assert_contains "$(cat "$ROOT/AGENTS.md")" "Two chains, and only one of them is 
 assert_contains "$(cat "$ROOT/CONTROLS.md")" "live in GitHub" \
   "CONTROLS.md says what the evidence trail does not include"
 
+# --- every script a document names must exist --------------------------------
+# `.devin/roadmap.md` was tracked state from the prototype. Nothing referenced
+# it, it claimed the repository had no commits and no tracked files, and its
+# "Resume instructions" sent a reader to fifteen scripts that do not exist. It
+# was the only file named "roadmap" and the only one with a resume section, so
+# someone starting there by filename intuition was lost before they began.
+#
+# Deleted. This is the check that stops the class returning: a document that
+# tells a reader to run something must name something runnable.
+missing=""
+for s in $(git grep -ohIE '[A-Za-z0-9_./-]+\.sh' -- '*.md' 2>/dev/null \
+           | grep -oE '[A-Za-z0-9_./-]+\.sh' | sort -u); do
+  case "$s" in
+    # A bare filename with no directory is prose, not an instruction — e.g. a
+    # sentence naming `run-all.sh` while pointing at `tests/` elsewhere.
+    */*) ;;
+    *) continue ;;
+  esac
+  [ -e "$s" ] || missing="$missing $s"
+done
+assert_eq "" "$missing" "every script path a tracked document names exists"
+
+# And the detection must be able to fail, or zero hits means nothing.
+printf 'Run `tests/does-not-exist.sh` to begin.\n' > "$TMP/dead.md"
+found=no
+for s in $(grep -oE '[A-Za-z0-9_./-]+\.sh' "$TMP/dead.md"); do
+  [ -e "$s" ] || found=yes
+done
+assert_eq "yes" "$found" "the detection fires on a script path that does not exist"
+
 # --- the paths list is not empty ---------------------------------------------
 # If the enumeration returned nothing the loop above would pass everything.
 np="$(printf '%s\n' "$paths" | grep -c .)"
