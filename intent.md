@@ -20,6 +20,34 @@ So: a repository that states how we work, and a process that keeps that statemen
 
 **The ability to change ourselves deliberately.** When something does matter, the output isn't a link. It's a proposed change to our standards and our skills, that a person accepts or rejects.
 
+## What drives how we work here
+
+If this repository documents AI-native practice, it has to be built the way we would defend. We take that from three existing sources rather than inventing one:
+
+- **Agile** — working software over comprehensive documentation. Responding to change over following a plan.
+- **Lean Startup** — build, measure, learn. Validated learning before more building.
+- **XP** — communication, simplicity, feedback, courage, respect. Small releases. Test first. Refactor rather than accrete.
+
+### Where we currently break them
+
+A value with no tension named is decoration. These are real and they are ours:
+
+| The value | How we break it | How we are resolving it |
+|---|---|---|
+| Working software over comprehensive documentation | Four documents existed before any working tool. Prose about the process has repeatedly outgrown the process | Tooling before more prose. A document that restates what a script computes gets deleted, not corrected |
+| Simplicity | The scan keeps every finding in full, which is hard to defend as simple | Kept, but for a different reason — see the SOC 2 note below. Completeness of the record is a control, not a completeness habit |
+| Small releases | One pull request has carried a research artifact, a problem statement, a contract change and two document rewrites | One capability per pull request. Split when it needs the word "and" |
+| Communication | Pull request bodies were written in a voice no one speaks in, which made review slower | The structure and voice rules in [`AGENTS.md`](AGENTS.md) |
+| Validated learning | We have built tooling on an n of 1 more than once | Decision F is the correction: measure two more cycles before building a themer |
+
+### What SOC 2 changes
+
+We work in a regulated environment, so one Agile value gets bounded rather than followed straight.
+
+"Working software over comprehensive documentation" does not mean fewer records. An auditable change trail is not documentation about the work — it is part of the work. So the things that look like paperwork and are actually controls stay: a complete findings record, a decision naming a natural person, a date, a reason each rejected option was rejected.
+
+The test we apply: **would an auditor ask for this?** If yes it stays and gets written as a control. If no, and it only describes what the code or a script already shows, it goes.
+
 ## What we think is true
 
 Stated so they can be attacked. Graded, because not all of these are equally supported — the grades and sources are in [`STANDARDS.md`](STANDARDS.md).
