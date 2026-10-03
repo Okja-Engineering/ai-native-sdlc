@@ -66,7 +66,7 @@
 **What it does not cover.** Two things, both stated in the contract rather than implied:
 
 - **Skills.** The stated output is "standards *and our skills*". Skills are not in this repository, so this reaches one of the two.
-- **The reciprocal check is a substring match**, not anchor-aware. A document that mentions the decision's filename anywhere satisfies it.
+- **The reciprocal check verifies a link, not a mention.** It was a bare filename match until 2026-10-03, when an external audit replaced the `decided:` link with the sentence *"A note: the file agent-pr-approval.md exists somewhere in this repository"* and the gate reported the pair reciprocated. It now requires a `decided:` line carrying a link that resolves back to that record, and refuses a back-link pointing at a different one.
 
 ---
 
@@ -198,7 +198,7 @@ The section an assessor should read first. Each of these is a real gap, not a fo
 
 **5. Develop has no gate.** One options artifact existed when its contract was written, so a gate would have encoded that artifact's accidents. The reasoning that justified waiting still holds.
 
-**6. Configuration drift.** §3 requires two repository toggles to stay off. GitHub publishes **no API representation** for that approvals policy, so the setting cannot be read, set or drift-checked programmatically. It is a UI setting and a promise. Nobody has verified the current state of our own repositories.
+**6. Configuration drift.** §3 now states the requirement explicitly — the toggles that let an agent approval satisfy a merge gate stay off at every level. GitHub publishes **no API representation** for that policy, so the setting cannot be read, set or drift-checked programmatically. It is a UI setting and a promise, and nobody has verified the current state of our own repositories. §3 also records that the approval can outlive the diff, because dismissing a stale approval on push is optional per ruleset.
 
 **7. Cadence.** Nothing is scheduled. A missed cycle is invisible, which also means the first early-reversal condition of decision `producing-themes` cannot currently fire.
 

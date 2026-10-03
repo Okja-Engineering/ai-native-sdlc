@@ -141,6 +141,27 @@ assert_contains "$out" "never reaches one" "the message says why an unlinked dec
 out="$(bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01 none)" 2>&1)"
 assert_contains "$out" "refuse[bare-none-amends]" "a bare 'none' cannot be told from an oversight"
 
+# `none` must be the WHOLE first word. The previous version matched the prefix
+# `none*`, so a word merely STARTING with those letters was read as a
+# declaration that nothing changed. The audit used "nonetheless".
+for sneaky in \
+  'nonetheless, we decided not to say where this lands' \
+  'nonexistent, so nothing to point at' \
+  'nones of this applies'
+do
+  out="$(bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01 "$sneaky")" 2>&1)"; rc=$?
+  assert_status 1 "$rc" "refuses amends starting with none but not meaning it: ${sneaky%%,*}"
+done
+
+# And the legitimate forms still pass, including a trailing punctuation variant.
+for ok in \
+  'none — chose to measure first, nothing about how we work changed' \
+  'none. The decision defers, so no document changes yet.'
+do
+  out="$(bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01 "$ok")" 2>&1)"; rc=$?
+  assert_status 0 "$rc" "accepts a real 'none' with a reason: ${ok%%,*}"
+done
+
 out="$(bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01 'none — chose to measure first, nothing about how we work changed')" 2>&1)"; rc=$?
 assert_status 0 "$rc" "'none' with a reason is accepted"
 
@@ -154,8 +175,41 @@ assert_contains "$out" "refuse[amends-unresolved]" "an amended document that doe
 cp "$TMP/STANDARD.md" "$TMP/STANDARD.bak"
 grep -v '^decided:' "$TMP/STANDARD.bak" > "$TMP/STANDARD.md"
 out="$(bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01)" 2>&1)"
-assert_contains "$out" "refuse[amends-not-reciprocated]" "an amended document that does not cite the decision is refused"
+assert_contains "$out" "refuse[amends-not-reciprocated]" "an amended document with no decided: line is refused"
 assert_contains "$out" "the grade on that claim is unsupported" "the message says what the missing back-link costs"
+cp "$TMP/STANDARD.bak" "$TMP/STANDARD.md"
+
+# A MENTION is not a link. This was `grep -q "$(basename "$f")"` — a bare
+# filename match anywhere in the file — and an external audit replaced the
+# decided: link with a sentence naming the file in prose. The gate reported the
+# pair reciprocated.
+# Two shapes, because the audit's exploit sits between them. Dropping the
+# `decided:` prefix entirely hits the no-line branch; keeping the prefix and
+# naming the file in prose hits the not-a-link branch. Both were accepted by the
+# old filename match.
+printf '# A standard\n\nSome claim.\n\nA note: the file thing.md exists somewhere in this repository.\n' > "$TMP/STANDARD.md"
+out="$(bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01)" 2>&1)"
+assert_contains "$out" "refuse[amends-not-reciprocated]" "a filename in prose with no decided: line does not reciprocate"
+
+printf '# A standard\n\nSome claim.\n\ndecided: see thing.md, somewhere in this repository\n' > "$TMP/STANDARD.md"
+out="$(bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01)" 2>&1)"
+assert_contains "$out" "refuse[amends-not-reciprocated]" "a decided: line naming a file without linking it does not reciprocate"
+assert_contains "$out" "not a link" "the message says a mention is not a link"
+
+# A decided: line that links a DIFFERENT record. The two halves then name
+# different decisions, which is exactly the disagreement this check exists for
+# and which a filename match could never see.
+printf '# A standard\n\nSome claim.\n\ndecided: [other](process/05-deliver/decisions/other.md)\n' > "$TMP/STANDARD.md"
+: > "$TMP/process/05-deliver/decisions/other.md"
+out="$(bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01)" 2>&1)"
+assert_contains "$out" "refuse[amends-not-reciprocated]" "a back-link to a different record is refused"
+assert_contains "$out" "name different records" "the message says the two halves disagree"
+rm -f "$TMP/process/05-deliver/decisions/other.md"
+
+# A decided: line linking something that does not exist.
+printf '# A standard\n\nSome claim.\n\ndecided: [gone](process/05-deliver/decisions/gone.md)\n' > "$TMP/STANDARD.md"
+out="$(bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01)" 2>&1)"
+assert_contains "$out" "refuse[amends-not-reciprocated]" "a back-link that does not resolve is refused"
 cp "$TMP/STANDARD.bak" "$TMP/STANDARD.md"
 
 out="$(bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01)" 2>&1)"; rc=$?
