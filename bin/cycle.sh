@@ -44,11 +44,23 @@ cycle_report() {
 
   # A problem is the bridge from a theme to Develop. Zero is a valid state:
   # it means the human has not picked a theme to pursue yet.
-  local probs; probs=$(ls process/03-define/problems/*.md 2>/dev/null | wc -l | tr -d ' ')
+  # Problems are filtered by the cycle their own `from:` field names. The first
+  # version globbed every problem into every cycle's report, so with two cycles
+  # it would have attributed both problems to both — a defect the code had never
+  # run against, since only one cycle exists. Derived from the artifact rather
+  # than from a new field: `problems/*.md` already carry
+  # `from: [../cycles/<cycle>.md]`.
+  local mine="" probs=0
+  for p in process/03-define/problems/*.md; do
+    [ -f "$p" ] || continue
+    if grep -q "cycles/$c\.md" "$p" 2>/dev/null; then
+      mine="$mine $p"; probs=$((probs + 1))
+    fi
+  done
   printf '%s   problems  %s stated\n' "$no" "$probs"
 
   local any=0
-  for p in process/03-define/problems/*.md; do
+  for p in $mine; do
     [ -f "$p" ] || continue
     any=1
     local slug; slug=$(basename "$p" .md)
@@ -77,13 +89,27 @@ cycle_report() {
 main() {
   local want="${1:-}" found=0
 
+  # An example file is not reported as a cycle, but the skip is ANNOUNCED. The
+  # first version skipped silently, and an external audit inserted `example: yes`
+  # into the only real findings file: the cycle, its 64 findings, its themes and
+  # both decisions vanished from this report with no refusal anywhere, and both
+  # gates still passed. A status tool that can lose a cycle to a two-word edit
+  # without saying so is worse than none.
+  local skipped=""
   for f in process/01-scan/findings/*.md; do
     [ -f "$f" ] || continue
     local c; c=$(basename "$f" .md)
-    grep -q '^example: yes' "$f" 2>/dev/null && continue
+    if grep -q '^example: yes' "$f" 2>/dev/null; then
+      skipped="$skipped $c"
+      continue
+    fi
     [ -n "$want" ] && [ "$want" != "$c" ] && continue
     found=1
     cycle_report "$c"
+  done
+
+  for s in $skipped; do
+    printf '\n%s\n%sskipped     marked `example: yes`, so not reported as a cycle\n' "$s" "$no"
   done
 
   if [ -n "$want" ] && [ "$found" -eq 0 ]; then
@@ -92,12 +118,33 @@ main() {
 
   [ -n "$want" ] && return 0
 
-  local topics=0
+  # Topics are reported by whether anything references them. The first version
+  # printed them all under a bare `topics` heading with no linkage, which hid
+  # that one of them is referenced by nothing at all — an orphan the status tool
+  # listed as though it had a parent.
+  #
+  # A topic has no `from:` field of its own, so the link is read from the other
+  # direction: a problem's `rests on:`. Stated rather than invented — giving
+  # topics a parent field is a contract change, and this reports the gap instead
+  # of papering over it.
+  local topics=0 orphans=""
   for t in process/02-discover/topics/*.md; do
     [ -f "$t" ] || continue
+    local slug; slug=$(basename "$t" .md)
+    local ref; ref=$(grep -rl "topics/$slug\.md" process/03-define/problems/ 2>/dev/null | head -1)
+    if [ -n "$ref" ]; then
+      [ "$topics" -eq 0 ] && printf '\ntopics\n'
+      topics=1
+      printf '%s02 discover  %-22s rests under %s\n' "$ok" "$slug" "$(basename "$ref" .md)"
+    else
+      orphans="$orphans $slug"
+    fi
+  done
+
+  for o in $orphans; do
     [ "$topics" -eq 0 ] && printf '\ntopics\n'
     topics=1
-    printf '%s02 discover  %s\n' "$ok" "$(basename "$t" .md)"
+    printf '%s02 discover  %-22s referenced by no problem\n' "$miss" "$o"
   done
 
   printf '\n'

@@ -67,11 +67,11 @@ The last box is not a phase. A decision records `amends:` naming the document it
 | [`process/04-develop/`](process/04-develop/) | Diverge a problem into options, each with its cost and its failure mode. Chooses nothing |
 | [`process/05-deliver/`](process/05-deliver/) | Converge on one choice, with the accepted cost and a reversal condition |
 | [`process/05-deliver/validate-decision.sh`](process/05-deliver/validate-decision.sh) | Refuses a decision with no named person, no date, or an option that does not exist |
-| [`bin/cycle.sh`](bin/cycle.sh) | Where every cycle is and what is missing. Reads the tree, writes nothing |
+| [`bin/cycle.sh`](bin/cycle.sh) | Where every cycle is and what is missing. Reads the tree, writes nothing, and announces anything it skipped |
 | [`bin/next.sh`](bin/next.sh) | Starts the next artifact, with its shape read from the contract that declares it. Refuses to overwrite |
 | [`tests/`](tests/) | `run-all.sh` over the suites, and the assertions they use |
 
-Each phase's contract was written **after** the artifact it describes, from what that artifact turned out to need — and is asserted rather than enforced until a second, differently shaped artifact shows which parts were real.
+**Most** phase contracts were written after the artifact they describe, from what that artifact turned out to need — and each is asserted rather than enforced until a second, differently shaped artifact shows which parts were real. It holds for Define, Develop and Discover; git shows Scan's contract landing before its worked example, and Deliver's one second before its first record. Three of five, and `spec.md` has the detail. (Corrected here on 2026-10-03 — `spec.md` was fixed for this and this copy was missed.)
 
 ## Status
 
@@ -79,7 +79,9 @@ Each phase's contract was written **after** the artifact it describes, from what
 bin/cycle.sh
 ```
 
-That is the status. It reads the tree, so it is correct by construction. Counts are deliberately not repeated here — a hand-typed copy of what a script already computes went stale three times in days, caught by a reader every time and by a check never.
+That is the status. Counts are deliberately not repeated here — a hand-typed copy of what a script already computes went stale three times in days, caught by a reader every time and by a check never.
+
+> **It is not "correct by construction", and this said so until 2026-10-03.** Reading the tree removes one class of staleness. It does not make a reporting tool trustworthy against an edited tree: an external audit inserted `example: yes` into the only real findings file and the whole cycle vanished from the report with no refusal anywhere. The skip is announced now, and `tests/test_cycle.sh` pins it, but the phrase was an overclaim and is retired.
 
 **Nothing is scheduled and nothing runs on its own.** A person starts every cycle, and a person writes every judgement — `next.sh` produces the skeleton, and the gates refuse that skeleton until it is filled in.
 

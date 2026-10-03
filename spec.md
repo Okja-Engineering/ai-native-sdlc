@@ -22,7 +22,7 @@ Originally scoped as four documents and one stage specification, with no code. I
 | `bin/cycle.sh` | Where every cycle is and what is missing. Reads the tree, writes nothing |
 | `bin/next.sh` | Start the next artifact, with its shape read from the contract that declares it |
 
-**Where each phase has actually got to is not written here.** Run `bin/cycle.sh`. It reads the tree, so it is correct by construction and cannot go stale.
+**Where each phase has actually got to is not written here.** Run `bin/cycle.sh`. It reads the tree rather than a hand-maintained register — which removes one class of staleness, not all of them. See the note in `README.md`: the phrase "correct by construction" was an overclaim and is retired.
 
 That is a deliberate repair, not an omission. This section previously carried hand-typed counts — findings, themes, options, how many times a phase had run — duplicating what `cycle.sh` already computes. It went stale three times in days, was caught by a reader every time and by a check never, and the response each time was to correct the copy and add a note observing that it keeps happening. Documenting a symptom three times is not fixing it. The duplicate is gone, so there is nothing left to go stale.
 
