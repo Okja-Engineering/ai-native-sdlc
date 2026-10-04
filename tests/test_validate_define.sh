@@ -220,6 +220,16 @@ out="$(gate "$t")"
 assert_contains "$out" "refuse[silent-empty-outliers]" \
   "a sentence stating the section is empty is not the declared form either"
 
+# A declaration inside a FENCED BLOCK declares nothing. Found by attacking this
+# check after writing it, and the same class `field` above already skips fences
+# for: a fenced example of `rests on: none` donated itself as the real field's
+# value. A cycle that documents the convention must not thereby satisfy it.
+t="$(fresh_tree empty_outliers_fenced)"
+empty_outliers "$t" '```\n<!-- declared-empty: all themed -->\n```'
+out="$(gate "$t")"
+assert_contains "$out" "refuse[silent-empty-outliers]" \
+  "a declaration shown inside a fenced block does not declare the section empty"
+
 # A declaration carrying no reason does not declare anything — the same rule the
 # `not-a-claim` and `dead-pointer` declarations are held to.
 t="$(fresh_tree empty_outliers_noreason)"

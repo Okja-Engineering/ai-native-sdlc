@@ -408,6 +408,25 @@ out="$(bash "$GATE" "$(topic '<!-- declared-empty: -->' noreason)" 2>&1)"
 assert_contains "$out" "refuse[silent-empty-open]" \
   "a declaration with no reason does not declare a section empty"
 
+# A declaration inside a FENCED BLOCK declares nothing. Found by attacking this
+# check after writing it, and the third time this repository has paid for the same
+# class: a fenced example of `rests on: none` donated itself as the real field's
+# value, and an example row in a fenced block in DECIDERS.md would have authorized
+# everyone it named. An artifact documenting the convention must not thereby
+# satisfy it.
+out="$(bash "$GATE" "$(topic '```'$'\n''<!-- declared-empty: every question was answered -->'$'\n''```' fenced)" 2>&1)"
+assert_contains "$out" "refuse[silent-empty-open]" \
+  "a declaration shown inside a fenced block does not declare the section empty"
+
+# An indented line is not a list item — four spaces is a code block in Markdown, so
+# a reader does not see an item where the gate counted one. Found by the same
+# attack. The leading-whitespace tolerance this removes bought nothing: both shipped
+# topics write their items flush left, and a nested item always has a parent that
+# counts.
+out="$(bash "$GATE" "$(topic '    - nothing was left open [O]' indented)" 2>&1)"
+assert_contains "$out" "refuse[silent-empty-open]" \
+  "an indented line carrying [O] is not an open item"
+
 # And the declaration has to be IN the section. One in a later section exempts
 # nothing: the same scope error that let a heading satisfy Define's outlier check.
 p="$(topic "$HOLLOW" elsewhere)"
