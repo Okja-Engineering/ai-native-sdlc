@@ -51,7 +51,29 @@ PROBLEMS="${DEFINE_PROBLEMS_DIR:-$SCRIPT_DIR/problems}"
 refusals=0
 
 refuse() { printf '%s:%s: refuse[%s]: %s\n' "$1" "$2" "$3" "$4" >&2; refusals=$((refusals + 1)); }
-field()  { sed -n "s/^$2:[[:space:]]*//p" "$1" 2>/dev/null | head -1 | sed 's/[[:space:]]*$//'; }
+# field <file> <key> -> the first value outside a fenced block, trimmed
+#
+# A FENCED BLOCK is skipped. This was `sed -n "s/^$2:...//p" | head -1`, so a
+# document showing what a field looks like donated the example as the field's
+# value: a fenced `rests on: none — ...` ahead of the real field satisfied the
+# check and the real link was never read. Found by attacking the problem check
+# after writing it, and the same class this repository has already paid for once —
+# an example row in a fenced block in `DECIDERS.md` would have authorized everyone
+# it named, which is why the deciders list skips fences.
+#
+# `index` rather than a regex, because a key can contain a space (`rests on`) and
+# a key is not a pattern.
+field() {
+  awk -v key="$2" '
+    /^[ \t]*(```|~~~)/ { fence = !fence; next }
+    fence { next }
+    index($0, key ":") == 1 {
+      v = substr($0, length(key) + 2)
+      sub(/^[ \t]+/, "", v); sub(/[ \t]+$/, "", v)
+      print v; exit
+    }
+  ' "$1" 2>/dev/null
+}
 
 check_cycle() {
   local f="$1" src src_path resolved outliers declared src_ids uniq_declared missing extra dupes themes_sum accounted_n

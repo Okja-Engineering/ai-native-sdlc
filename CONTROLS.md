@@ -291,6 +291,8 @@ This control enforces by exit status rather than by refusal codes, so it has no 
 
 **Evidence.** The `rests on:` field on each problem, and the Discover topic it resolves to. Both shipped problems carry one. `bin/cycle.sh` prints the resulting linkage per topic, so a topic no problem names is visible in the status report as well as refused at the gate.
 
+**Evidence note.** A field shown as an **example** is not the field. Attacking the new check found that a fenced `rests on: none — ...` ahead of the real field was read as the field's value, so the real link was never looked at. The field reader in this gate now skips fenced blocks, which also closes the same hole for a cycle's `method:` and `from:`. The same class is in `process/05-deliver/validate-decision.sh` and `process/02-discover/validate-discovery.sh`, which share the field-reader shape and have not been changed here.
+
 **Evidence note.** No gate read a problem or an option at all until 2026-10-04, and `rests on:` was declared nowhere — `define-contract.md` listed the **cycle's** fields only. `bin/next.sh` scaffolded a problem from that list, so a scaffolded problem got `method:` and never got `rests on:`. The only thing that noticed the missing edge was `bin/cycle.sh` printing *"classifier-models referenced by no problem"* in a status report nothing fails on. And the repository had read that absence the wrong way round: `producing-themes` drew every figure in its cost argument from that topic, so the discovery had run and the record did not say so.
 
 **What it does not cover.**

@@ -257,6 +257,24 @@ perl -0pi -e 's|^rests on: .*|rests on: [`../cycles/2026-09-29.md`](../cycles/20
 out="$(pgate "$t")"
 assert_contains "$out" "refuse[rests-on-not-a-topic]" "a link to something that is not a Discover topic is refused"
 
+# A field shown as an EXAMPLE is not the field. Found by attacking this check
+# after writing it: a fenced `rests on: none — ...` ahead of the real field was
+# read as the field's value, so the real link was never looked at and the gate
+# reported the problem within the contract. Same class as the example row in
+# DECIDERS.md that would have authorized everyone it named.
+t="$(fresh_tree fenced)"
+perl -0pi -e 's|^# Problem|# Problem\n\n```\nrests on: none — what the skip form looks like\n```\n|' "$t/$PROBLEM_REL"
+perl -0pi -e 's|^rests on: \[|rests on: [|m' "$t/$PROBLEM_REL"
+out="$(pgate "$t")"; rc=$?
+assert_status 0 "$rc" "a fenced example does not stop the real rests on: being read"
+
+t="$(fresh_tree fenced2)"
+perl -0pi -e 's|^rests on: .*\n||m' "$t/$PROBLEM_REL"
+perl -0pi -e 's|^# Problem|# Problem\n\n```\nrests on: none — what the skip form looks like\n```\n|' "$t/$PROBLEM_REL"
+out="$(pgate "$t")"; rc=$?
+assert_status 1 "$rc" "and a fenced example on its own does not satisfy the field"
+assert_contains "$out" "refuse[no-rests-on]" "the refusal is no-rests-on"
+
 # And problems are in the denominator of a bare run, not only of an explicit one.
 # A check nobody invokes is not a control, and CI invokes this with no arguments.
 t="$(fresh_tree bare_run)"
