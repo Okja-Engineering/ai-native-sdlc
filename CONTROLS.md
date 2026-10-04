@@ -353,3 +353,24 @@ That is the whole of it. **The documents are not otherwise verified, and nothing
 - **A fabricated refusal code in prose is not detectable.** The check refuses a code a gate really emits appearing outside its control's table, because it can recognise those. A backticked word that was never a refusal code anywhere reads as ordinary prose, and nothing can tell the difference.
 
 Everything else a document asserts — that a number is right, that a description matches what a script does, that a limitation bounds a claim the way it says — is a reader's job and is not covered.
+
+**13. A gate that read nothing is still not refused, only disclosed.** Every gate and both hooks were read for one shape: *the input is absent, so there is nothing to refuse, so the check passes*. Two instances were fail-open and are fixed, four more claimed conformance over nothing and now say so instead, and this item states what is still not covered.
+
+The rule the repository now holds everywhere is the one `process/01-scan/validate-findings.sh` already stated for its contract — a list that is empty or missing means the gate would pass everything, so it refuses to run. The same sentence had to be applied in six more places, and the fact that it had to be applied one site at a time is itself the gap: there is no shared library, so nothing stops a seventh gate being written without it.
+
+What was found, and what each one does now:
+
+| Where | It used to | It now |
+|---|---|---|
+| `.githooks/pre-push`, the never-publish guard | pass when the list was missing, unreadable, or had every pattern commented out | refuse, naming whether the problem is the list or its contents |
+| `process/02-discover/validate-discovery.sh`, the link check | pass a broken link when its scratch path could not be written, and refuse a sound artifact when a directory sat at that path | hold the result in a variable, so no state outside the artifact can change the verdict |
+| `bin/validate-claims.sh` | report no speed claims whether it read every tracked document or none, because `git grep` exits 1 for both | refuse to run when its pathspec matches no document, and print the count on the clean path |
+| `bin/validate-authorship.sh` | read a `git log` failure as an empty range, so a misspelled ref printed every commit attributable and exited 0 | refuse to run when the history cannot be read |
+| the four process gates | print *0 file(s) within the contract* over an empty phase directory | say nothing was checked |
+
+**What this does not cover, stated plainly.**
+
+- **The four process gates still exit 0 over an empty phase directory.** CI runs all four with no arguments, so emptying or moving a phase directory leaves the build green. What changed is that the log now says nothing was checked instead of claiming the files conform. A phase with no artifact is a real state — `validate-findings.sh` has always called it a first run — so turning it into a refusal is a decision about this repository's lifecycle rather than a bug fix, and it belongs to the decider.
+- **Fixing a fail-open does not make a hook enforcement.** The never-publish guard and the secret scan still exist only as hooks, and a push from a machine that never ran `git config core.hooksPath .githooks` is unguarded by either. CTRL-9 says this already and it stays true: a guard that fails closed locally is still bypassable by not installing it at all.
+- **There is no mechanical check for the shape.** The sweep was a person reading every gate and both hooks and running each one with its input taken away. Nothing refuses a new gate written with the same shape, and the only thing that would is a convention nobody can enforce from inside a shell script.
+- **One mutant is known to be uncaught.** Replacing the discovery gate's variable with a `mktemp` whose write is not checked re-opens the fail-open, and no suite catches it, because it only fails when the temp area itself is broken. Recorded in `tests/test_validate_discovery.sh` at the site, with the reason the obvious test for it does not work.
