@@ -611,33 +611,43 @@ assert_eq "yes" "$ok" "a document carries the signature check CTRL-1 rests on (f
 
 # The detection has to fire. The expected transcript is built from what git reports
 # for this checkout, never from `N` typed here, so it cannot drift into agreement.
-sig_head="$(git log -1 --format='%G?' HEAD 2>/dev/null)"
-[ -n "$sig_head" ] && ok=yes || ok=no
-assert_eq "yes" "$ok" "git reports a signature status for this checkout (got '$sig_head')"
+# The fixtures name a commit found in this history rather than `HEAD`. `HEAD` on a
+# pull-request checkout is the merge commit the forge made, which the forge signs —
+# so fixtures built on it were refused as signed on both CI legs while passing
+# locally. A fixture pinned to a property of the current checkout is the same defect
+# as a document pinned to the reader's keyring, one layer down.
+sig_unsigned=""
+for c in $(git rev-list -n 300 HEAD); do
+  if ! carries_signature "$c"; then sig_unsigned="$c"; break; fi
+done
+[ -n "$sig_unsigned" ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "the history holds an unsigned commit to build fixtures on"
+sig_status="$(git log -1 --format='%G?' "$sig_unsigned" 2>/dev/null)"
+assert_eq "N" "$sig_status" "an unsigned commit reports N, on any machine"
 
 sig_fixture() { # <file> <row...>
   local out="$1"; shift
-  { printf '```\n$ git log --no-walk %s HEAD\n' "$SIG_COMMAND"
+  { printf '```\n$ git log --no-walk %s %s\n' "$SIG_COMMAND" "$sig_unsigned"
     printf '%s\n' "$@"
     printf '```\n'
   } > "$out"
 }
 
-sig_fixture "$TMP/sig-true.md" "HEAD $sig_head"
+sig_fixture "$TMP/sig-true.md" "$sig_unsigned $sig_status"
 assert_eq "" "$(sig_transcripts "$TMP/sig-true.md")" \
   "a transcript that agrees with git on every row passes"
 
-sig_fixture "$TMP/sig-wrong.md" "HEAD G"
+sig_fixture "$TMP/sig-wrong.md" "$sig_unsigned G"
 case "$(sig_transcripts "$TMP/sig-wrong.md")" in
-  "$TMP/sig-wrong.md:2(HEAD doc:G|git:$sig_head)"*) fires=yes ;; *) fires=no ;;
+  "$TMP/sig-wrong.md:2($sig_unsigned doc:G|git:$sig_status)"*) fires=yes ;; *) fires=no ;;
 esac
 assert_eq "yes" "$fires" "the detection fires on a row git does not agree with"
 
 # One true row must not cover a false one, or a transcript could be padded into
 # passing.
-sig_fixture "$TMP/sig-mixed.md" "HEAD $sig_head" "HEAD G"
+sig_fixture "$TMP/sig-mixed.md" "$sig_unsigned $sig_status" "$sig_unsigned G"
 case "$(sig_transcripts "$TMP/sig-mixed.md")" in
-  *"(HEAD doc:G|git:$sig_head)"*) fires=yes ;; *) fires=no ;;
+  *"($sig_unsigned doc:G|git:$sig_status)"*) fires=yes ;; *) fires=no ;;
 esac
 assert_eq "yes" "$fires" "a true row does not cover a false one in the same transcript"
 
