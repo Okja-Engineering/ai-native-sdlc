@@ -70,6 +70,57 @@ run "$t" 2026-09-29 >/dev/null
 assert_contains "$(cat "$t/process/03-define/cycles/2026-09-29.md")" "reviewed_by:" \
   "a field added to the contract appears in the scaffold, with no script edit"
 
+# --- a problem is scaffolded from a PROBLEM's declaration ---------------------
+# The problem skeleton was emitted from the cycle's field list, because the
+# contract declared one table for two different artifacts. So a scaffolded
+# problem carried `method:` — how a grouping was produced, which says nothing
+# about a problem — and never carried `rests on:`, the field that links it to the
+# Discover topic it was stated from. The Discover-to-Define edge was in no
+# contract and no scaffold.
+t="$(fresh problem)"
+rm -f "$t/process/03-define/problems/producing-themes.md"
+out="$(run "$t" 2026-09-29 producing-themes)"; rc=$?
+assert_status 0 "$rc" "scaffolding a problem exits 0"
+
+made="$t/process/03-define/problems/producing-themes.md"
+assert_file_exists "$made" "the problem skeleton exists"
+assert_contains "$(cat "$made")" "rests on:" "it carries the rests on: field a problem's contract declares"
+assert_not_contains "$(cat "$made")" "method:" "and not the cycle's method:, which says nothing about a problem"
+
+# The same property as above, for the problem's own table: the contract is the
+# single declaration of a problem's shape. Two words on purpose — `rests on` has
+# a space in it, and a field list read by word splitting would break on that.
+t="$(fresh problem-contract)"
+perl -0pi -e 's/\| `rests on` \|/| `checked by` | who read the topic |\n| `rests on` |/' \
+  "$t/process/03-define/define-contract.md"
+rm -f "$t/process/03-define/problems/producing-themes.md"
+run "$t" 2026-09-29 producing-themes >/dev/null
+assert_contains "$(cat "$t/process/03-define/problems/producing-themes.md")" "checked by:" \
+  "a field added to the problem's table appears in the problem scaffold, with no script edit"
+
+# And the two declarations stay apart. One contract now declares fields for two
+# artifacts, so a scaffold has to read the table its own artifact declares
+# whatever order the contract lists them in. The tables are swapped here for that
+# reason: with the problem's table first, a heading matched as a prefix hands the
+# cycle the problem's fields, and asserting this against the shipped order would
+# pass either way.
+t="$(fresh split)"
+perl -0777 -pi -e 's/(## Required fields\n.*?)(## Required fields — a problem\n.*?)(## Required sections\n)/$2$1$3/s' \
+  "$t/process/03-define/define-contract.md"
+assert_eq "## Required fields — a problem" \
+  "$(grep -m1 '^## Required fields' "$t/process/03-define/define-contract.md")" \
+  "the fixture really did put the problem's table first"
+rm -f "$t/process/03-define/cycles/2026-09-29.md"
+rm -f "$t/process/03-define/problems/producing-themes.md"
+run "$t" 2026-09-29 >/dev/null
+made="$t/process/03-define/cycles/2026-09-29.md"
+assert_contains "$(cat "$made")" "method:" "a cycle skeleton still carries the cycle's fields"
+assert_not_contains "$(cat "$made")" "rests on:" "and does not inherit the problem's"
+run "$t" 2026-09-29 producing-themes >/dev/null
+made="$t/process/03-define/problems/producing-themes.md"
+assert_contains "$(cat "$made")" "rests on:" "a problem skeleton still carries the problem's fields"
+assert_not_contains "$(cat "$made")" "method:" "and does not inherit the cycle's"
+
 # --- it does not touch a complete cycle ---------------------------------------
 # `write_once`'s refusal is defensive: the phase chain only calls it when the
 # file is absent, so no invocation reaches it. Asserting on that refusal passed

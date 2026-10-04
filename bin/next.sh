@@ -23,16 +23,31 @@ cd "$ROOT" || exit 2
 die()    { printf '%s\n' "$*" >&2; exit 2; }
 refuse() { printf 'refuse: %s\n' "$*" >&2; exit 1; }
 
-# fields <contract> -> one field name per line, from the Required fields table
-fields() {
-  sed -n '/^## Required fields/,/^## /p' "$1" 2>/dev/null \
-    | sed -n 's/^| `\([a-z_]*\)` *|.*/\1/p'
+# A contract may declare fields for MORE THAN ONE artifact. Define does: a cycle
+# and a problem are both Define's output and they do not have the same shape.
+# Which table to read is therefore named by the caller rather than assumed, and
+# the heading is matched EXACTLY — a prefix match would make `## Required fields`
+# re-open at `## Required fields — a problem` and hand the cycle a problem's
+# fields.
+#
+# A field name may contain a space (`rests on`), so a field list is read a line at
+# a time. Word splitting would turn one field into two.
+FIELDS_HEADING='## Required fields'
+
+# declared <contract> <heading> -> that heading's table, one `| field | hint |` row per line
+declared() {
+  sed -n "/^$2\$/,/^## /p" "$1" 2>/dev/null | sed -n 's/^| `\([a-z_ ]*\)` *|\(.*\)$/\1|\2/p'
 }
 
-# hint <contract> <field> -> the contract's own description of that field
+# fields <contract> [heading] -> one field name per line
+fields() {
+  declared "$1" "${2:-$FIELDS_HEADING}" | sed 's/|.*//'
+}
+
+# hint <contract> <field> [heading] -> the contract's own description of that field
 hint() {
-  sed -n '/^## Required fields/,/^## /p' "$1" 2>/dev/null \
-    | sed -n "s/^| \`$2\` *| *\(.*[^ ]\) *|$/\1/p" | head -1 \
+  declared "$1" "${3:-$FIELDS_HEADING}" \
+    | sed -n "s/^$2|[[:space:]]*\(.*[^ ]\)[[:space:]]*|\$/\1/p" | head -1 \
     | sed -e 's/\*\*//g' -e 's/`//g'
 }
 
@@ -42,17 +57,20 @@ sections() {
     | sed -n 's/^### //p'
 }
 
-emit() { # contract title extra-frontmatter
-  local c="$1" f
+emit() { # contract title extra-frontmatter [fields-heading]
+  local c="$1" h="${4:-$FIELDS_HEADING}" f
   printf '# %s\n\n' "$2"
   [ -n "${3:-}" ] && printf '%s\n' "$3"
-  for f in $(fields "$c"); do
+  fields "$c" "$h" | while IFS= read -r f; do
+    [ -n "$f" ] || continue
     case "$3" in *"$f:"*) continue ;; esac
     printf '%s:\n' "$f"
   done
-  printf '\n<!-- Fields above are read from %s. Each one, and why:\n' "${c#$ROOT/}"
-  for f in $(fields "$c"); do
-    printf '     %-12s %s\n' "$f" "$(hint "$c" "$f")"
+  printf '\n<!-- Fields above are read from %s, under "%s". Each one, and why:\n' \
+    "${c#$ROOT/}" "${h#\#\# }"
+  fields "$c" "$h" | while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    printf '     %-12s %s\n' "$f" "$(hint "$c" "$f" "$h")"
   done
   # `--` is not a format string: printf would read it as end-of-options and the
   # comment would never close, swallowing every section below it.
@@ -111,7 +129,8 @@ if [ ! -f "$problem" ]; then
   c="process/03-define/define-contract.md"
   write_once "$problem" emit "$c" "Problem — $slug" \
 "from: [\`$define\`](../cycles/$cycle.md)
-status: defined, not solved"
+status: defined, not solved" \
+    '## Required fields — a problem'
   exit 0
 fi
 

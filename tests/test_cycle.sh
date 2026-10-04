@@ -77,9 +77,18 @@ rm -f "$SB/process/01-scan/findings/2026-11-01.md" \
       "$SB/process/04-develop/options/cadence.md"
 
 # --- a topic nothing references is reported as such --------------------------
+# The orphan is constructed. It used to be `classifier-models` in the shipped
+# tree, which made this assertion rest on data: that topic is what the
+# `producing-themes` problem's whole cost argument is drawn from, and once the
+# problem declared the `rests on:` link it had always relied on in prose, the
+# only orphan in the tree disappeared and so did the assertion's subject.
+printf '# Discovery — a topic no problem points at\n\ndated: 2026-09-29\n' \
+  > "$SB/process/02-discover/topics/unreferenced-topic.md"
 out="$(run)"
 assert_contains "$out" "rests under" "a referenced topic says what references it"
 assert_contains "$out" "referenced by no problem" "an unreferenced topic is reported as an orphan"
+assert_contains "$out" "unreferenced-topic" "and names which topic has no parent"
+rm -f "$SB/process/02-discover/topics/unreferenced-topic.md"
 
 # --- one cycle by name --------------------------------------------------------
 out="$(run 2026-09-29)"; rc=$?
