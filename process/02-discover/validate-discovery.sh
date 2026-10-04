@@ -100,7 +100,7 @@ referents() {
 }
 
 check_topic() {
-  local f="$1" grades bad seen cov R_LABEL N_LABEL V_LABEL opensec
+  local f="$1" grades bad bad_links seen cov R_LABEL N_LABEL V_LABEL opensec
 
   # --- the fields the contract declares -----------------------------------
   [ -n "$(field "$f" dated)" ] || refuse "$f" "-" "undated" \
@@ -317,16 +317,40 @@ check_topic() {
   # --- local links resolve -------------------------------------------------
   # Not "every claim has a source" — see the header. This checks the links the
   # artifact does carry actually go somewhere.
-  grep -oE '\]\(([^)h][^)]*)\)' "$f" 2>/dev/null | sed 's/](\(.*\))/\1/' | sed 's/#.*//' | sort -u \
-  | while IFS= read -r p; do
-      [ -n "$p" ] || continue
-      ( cd "$(dirname "$f")" && [ -e "$p" ] ) || printf '%s\n' "$p"
-    done > /tmp/_vd_bad.$$ 2>/dev/null
-  if [ -s /tmp/_vd_bad.$$ ]; then
+  #
+  # The unresolved links are held in a VARIABLE. They used to be collected in
+  # `/tmp/_vd_bad.$$` — the only temp path in this repository not from `mktemp` —
+  # and the refusal then asked `[ -s ]` about that file, which made the gate's
+  # answer depend on something outside the artifact. Both directions were
+  # reproduced:
+  #
+  #   an unwritable file already at the path   the redirect fails, the `while`
+  #                                            body never runs, `[ -s ]` is false,
+  #                                            and a broken link PASSED. Exit 0.
+  #   a directory already at the path          `[ -s ]` is true of a directory, so
+  #                                            the gate REFUSED artifacts with no
+  #                                            broken link, with an empty refusal
+  #                                            list, and `rm -f` could not clear
+  #                                            it so every later run refused too.
+  #
+  # The repair is to remove the failure mode rather than to handle it: with no file
+  # there is no write to fail, no path to collide on, and nothing to clean up. A
+  # `mktemp` with a checked write would also have closed the fail-open, and would
+  # still have been scratch state the verdict depends on.
+  # `bad_links` and not `bad`: `bad` already carries the out-of-enum grades in this
+  # same function, and one name for two meanings is how the next reader gets it
+  # wrong.
+  bad_links="$(
+    grep -oE '\]\(([^)h][^)]*)\)' "$f" 2>/dev/null | sed 's/](\(.*\))/\1/' | sed 's/#.*//' | sort -u \
+    | while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        ( cd "$(dirname "$f")" && [ -e "$p" ] ) || printf '%s\n' "$p"
+      done
+  )"
+  if [ -n "$bad_links" ]; then
     refuse "$f" "-" "link-unresolved" \
-      "local link(s) do not resolve: $(tr '\n' ' ' < /tmp/_vd_bad.$$)"
+      "local link(s) do not resolve: $(printf '%s\n' "$bad_links" | tr '\n' ' ')"
   fi
-  rm -f /tmp/_vd_bad.$$
 }
 
 main() {
