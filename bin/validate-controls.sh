@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Bind every control in CONTROLS.md to the enforcement that control names.
+# Bind every control in CONTROLS.md to the enforcement that control names, and
+# every refusal the gates emit back to a control, with no silent exclusions.
 #
 # usage: bin/validate-controls.sh [<controls document>]
 #
@@ -27,15 +28,20 @@
 #
 # WHAT THIS CHECKS
 #
-# Per control: every refusal code a control cites is emitted at an emission site
-# in a script that control's own `**Enforced by**` line names, and every path and
-# CI job on that line resolves. `bin/list-refusals.sh` decides what an emission
-# site is, so a comment cannot satisfy it.
+# Forward, per control: every refusal code a control cites is emitted at an
+# emission site in a script that control's own `**Enforced by**` line names, and
+# every path and CI job on that line resolves. `bin/list-refusals.sh` decides what
+# an emission site is, so a comment cannot satisfy it.
 #
-# WHAT THIS DOES NOT CHECK, YET
+# Backward, per gate: every refusal code a gate emits is cited by a control that
+# names that gate, or is listed in the exception table with a reason. A code
+# nothing claims has no control and usually no test, which is how
+# `validate-decision.sh`'s `no-chosen-field` shipped with neither, along with seven
+# of the scan gate's fifteen.
 #
-# The other direction: a gate emitting a refusal code no control claims. That is
-# the second half of the same defect and goes up separately.
+# Sideways: every gate script and both hooks are either named by a control or in
+# the exception table. The surface is enumerated from the tree, so a gate the
+# document forgets is refused rather than absent.
 #
 # WHAT THIS DOES NOT CHECK AT ALL
 #
@@ -68,6 +74,8 @@ refuse() { printf '%s: refuse[%s]: %s\n' "${1#$ROOT/}" "$2" "$3" >&2; refusals=$
 # audit found them, and a check that reads only the document cannot notice an
 # omission.
 gates="$(cd "$ROOT" && ls process/*/validate-*.sh bin/validate-*.sh 2>/dev/null)"
+hooks=".githooks/commit-msg .githooks/pre-push"
+surface="$gates $hooks"
 
 # --- parse the document -------------------------------------------------------
 # One pass, emitting a tab-separated stream the shell can loop over:
@@ -88,6 +96,8 @@ parsed="$(awk -v T="$TAB" '
     if ($0 ~ /^## CTRL-/) {
       id = $0; sub(/^## /, "", id); sub(/[ \t].*$/, "", id)
       sec = "ctrl"; printf "BLK%s%s\n", T, id
+    } else if ($0 ~ /^## Refusals and gates no control covers/) {
+      sec = "exc"; id = ""
     } else {
       sec = ""; id = ""
     }
@@ -120,6 +130,16 @@ parsed="$(awk -v T="$TAB" '
     next
   }
 
+  # The exception table. Three cells: the gate, what is excepted, and the reason.
+  sec == "exc" && /^\|[ \t]*`/ {
+    n = split($0, cell, "|")
+    if (n < 4) next
+    g = trim(cell[2]); gsub(/`/, "", g)
+    w = trim(cell[3]); gsub(/`/, "", w)
+    r = trim(cell[4])
+    printf "EXC%s%s%s%s%s%s\n", T, g, T, w, T, (r ~ /[A-Za-z]/ ? "1" : "0")
+    next
+  }
 ' "$DOC")"
 
 field() { printf '%s\n' "$parsed" | grep "^$1$TAB" | cut -f2- ; }
@@ -133,7 +153,7 @@ controls="$(field BLK)"
 # read, and a script named from somewhere outside process/ or bin/ still has to be
 # read too — otherwise its codes resolve to nothing and every control naming it is
 # refused for the wrong reason.
-read_me="$gates"
+read_me="$surface"
 while IFS= read -r tok; do
   [ -n "$tok" ] || continue
   case "$tok" in
@@ -242,17 +262,73 @@ done <<EOF
 $controls
 EOF
 
+# --- the exception table ------------------------------------------------------
+# The backward and sideways checks below have no silent exclusions. Anything a gate
+# refuses that no control claims has to be in this table with a reason, and a gate
+# no control names has to be too.
+#
+# Two shapes of row. `the gate itself` exempts a gate from needing a control and
+# exempts every code it emits; a backticked code exempts that one code. The breadth
+# of the first is deliberate and visible in the document rather than hidden here.
+exceptions="$(field EXC)"
+while IFS="$TAB" read -r g w r; do
+  [ -n "${g:-}" ] || continue
+  [ -e "$ROOT/$g" ] || refuse "$DOC" "enforcement-unresolved" \
+    "the exception table names \`$g\`, which is not in this repository"
+  [ "${r:-0}" = 1 ] || refuse "$DOC" "exception-no-reason" \
+    "the exception for \`$g\` ($w) carries no reason: an exception with none is the silent exclusion this table exists to replace"
+done <<EOF
+$exceptions
+EOF
+
+excepted_gate() { printf '%s\n' "$exceptions" | awk -F"$TAB" -v g="$1" '$1 == g && $2 == "the gate itself" { f = 1 } END { exit !f }'; }
+excepted_code() { printf '%s\n' "$exceptions" | awk -F"$TAB" -v g="$1" -v c="$2" '$1 == g && ($2 == c || $2 == "the gate itself") { f = 1 } END { exit !f }'; }
+
+# --- sideways: every gate and both hooks are named by a control or excepted ----
+# The surface comes from the tree, so a gate the document forgets is refused rather
+# than absent. Both hooks were missing from CONTROLS.md until an external audit
+# found them, and no check that reads only the document could have noticed.
+for g in $surface; do
+  if printf '%s\n' "$parsed" | awk -F"$TAB" -v g="$g" '$1 == "ENF" && $3 == g { f = 1 } END { exit !f }'; then
+    continue
+  fi
+  excepted_gate "$g" && continue
+  refuse "$DOC" "uncontrolled-gate" \
+    "\`$g\` refuses things and no control names it. Add a control, or list it in the exception table with a reason."
+done
+
+# --- backward: every code a gate emits is cited by a control naming that gate --
+# A refusal nothing claims has no control and usually no test. validate-decision.sh
+# emitted `no-chosen-field` with neither, and the scan gate emitted seven more.
+while IFS= read -r s; do
+  [ -n "$s" ] || continue
+  g="${s%%:*}"; c="${s##*:}"
+  [ "$c" = '?' ] && continue
+  if printf '%s\n' "$parsed" | awk -F"$TAB" -v g="$g" -v c="$c" '
+      $1 == "ENF" && $3 == g { enf[$2] = 1 }
+      $1 == "TAB" && $3 == c { tab[$2] = 1 }
+      END { for (k in enf) if (k in tab) { f = 1 } exit !f }'; then
+    continue
+  fi
+  excepted_code "$g" "$c" && continue
+  refuse "$DOC" "uncited-refusal" \
+    "$g emits refusal \`$c\` and no control that names $g cites it. Cite it, or list it in the exception table with a reason."
+done <<EOF
+$(printf '%s\n' "$sites" | awk -F: '{ print $1 ":" $3 }' | sort -u)
+EOF
+
 # --- summary ------------------------------------------------------------------
 # The denominator, printed. A gate that checked nothing would also exit 0, and this
 # whole repair is about a check that could not fail.
 nsites="$(printf '%s\n' "$sites" | grep -c .)"
 ncited="$(printf '%s\n' "$parsed" | grep -c "^TAB$TAB")"
 nctrl="$(printf '%s\n' "$controls" | grep -c .)"
+nexc="$(printf '%s\n' "$exceptions" | grep -c .)"
 
 if [ "$refusals" -ne 0 ]; then
   printf 'validate-controls: %d refusal(s) across %d controls\n' "$refusals" "$nctrl" >&2
   exit 1
 fi
 
-printf 'validate-controls: %d controls, %d cited refusals, %d emission sites read\n' \
-  "$nctrl" "$ncited" "$nsites"
+printf 'validate-controls: %d controls, %d cited refusals, %d emission sites read, %d exception(s)\n' \
+  "$nctrl" "$ncited" "$nsites" "$nexc"
