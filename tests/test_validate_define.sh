@@ -6,11 +6,24 @@
 # 54 of 64 findings and reported three wrong counts, and the ten strays included
 # a pattern nobody had named. This suite exists so the next one is caught in CI.
 #
-# Each case mutates a copy of the shipped cycle file in a full tree copy, so the
-# relative source link still resolves and the mutation is the only thing wrong.
+# Two kinds of fixture, for two different jobs.
+#
+# Cases about the SHIPPED RECORD mutate a copy of the shipped cycle file in a full
+# tree copy, so the relative source link still resolves and the mutation is the
+# only thing wrong. Every one of those mutations now goes through `mutate`, which
+# fails the suite when its pattern matches nothing: the patterns are matched out of
+# the artifact, so tampering with the artifact used to break the test's own mutation
+# and the suite then reported the wrong check. See tests/lib/mutate.sh.
+#
+# Cases about SHAPE use a fixture built from nothing by tests/lib/define-fixture.sh,
+# which knows its own answer. A record of a moment should not be asked to
+# demonstrate shape, and a suite pinned to one cannot tell its own breakage from a
+# defect.
 set -u
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$TEST_DIR/lib/assert.sh"
+. "$TEST_DIR/lib/mutate.sh"
+. "$TEST_DIR/lib/define-fixture.sh"
 
 ROOT="$(cd "$TEST_DIR/.." && pwd)"
 CYCLE_REL="process/03-define/cycles/2026-09-29.md"
@@ -31,10 +44,14 @@ fresh_tree() {
 gate() { bash "$ROOT/process/03-define/validate-define.sh" "$1/$CYCLE_REL" 2>&1; }
 
 # --- the shipped cycle passes -------------------------------------------------
+# Read this one first when the suite is red. Every case about the shipped record
+# mutates a copy of this file, so a failure here means the artifact is wrong and
+# the cases below are reporting a broken baseline rather than a defect.
 t="$(fresh_tree base)"
 out="$(gate "$t")"; rc=$?
-assert_status 0 "$rc" "the shipped cycle file is within the contract"
-assert_contains "$out" "within the contract" "it says so"
+assert_status 0 "$rc" \
+  "the shipped cycle file is within the contract — the baseline every case below mutates"
+assert_contains "$out" "within the contract" "and the gate says so, naming no refusal"
 
 # --- a run that read nothing does not report conformance -----------------------
 # Over an empty cycles directory this said "0 file(s) within the contract" and
@@ -58,7 +75,8 @@ assert_not_contains "$out" "within the contract" \
 
 # A finding deleted from the source — the case the arithmetic version passed.
 t="$(fresh_tree drop_row)"
-perl -0pi -e 's/^\| F03 \|.*\n//m' "$t/process/01-scan/findings/2026-09-29.md"
+mutate "$t/process/01-scan/findings/2026-09-29.md" 's/^\| F03 \|.*\n//m' \
+  "delete F03's row from the source"
 out="$(gate "$t")"; rc=$?
 assert_status 1 "$rc" "a finding deleted from the source exits 1"
 assert_contains "$out" "refuse[invented-accounting]" "an id accounted for but no longer in the source"
@@ -69,51 +87,68 @@ assert_contains "$out" "F03" "the refusal names which id"
 # loosened extractor passes this, which the mutation sweep found and nothing
 # else caught.
 t="$(fresh_tree drop_row_alibi)"
-perl -0pi -e 's/^\| F03 \|.*\n//m' "$t/process/01-scan/findings/2026-09-29.md"
+mutate "$t/process/01-scan/findings/2026-09-29.md" 's/^\| F03 \|.*\n//m' \
+  "delete F03's row from the source, leaving it mentioned in prose"
 printf '\nNote: F03 was reviewed separately.\n' >> "$t/process/01-scan/findings/2026-09-29.md"
 out="$(gate "$t")"; rc=$?
 assert_status 1 "$rc" "a deleted row is still caught when its id appears in prose"
 assert_contains "$out" "refuse[invented-accounting]" "ids come from table rows, not from any mention"
 
 t="$(fresh_tree drop_id)"
-perl -0pi -e 's/\bF03 //' "$t/$CYCLE_REL"
+mutate "$t/$CYCLE_REL" 's/\bF03 //' "drop F03 from the accounting block"
 out="$(gate "$t")"
 assert_contains "$out" "refuse[unaccounted]" "a finding left out of the accounting is refused"
 assert_contains "$out" "nothing may be dropped" "the message states the rule it enforces"
 
 t="$(fresh_tree invent)"
-perl -0pi -e 's/\bF64\b/F64 F99/' "$t/$CYCLE_REL"
+mutate "$t/$CYCLE_REL" 's/\bF64\b/F64 F99/' "account for an id the source does not carry"
 assert_contains "$(gate "$t")" "refuse[invented-accounting]" "an invented id is refused"
 
 t="$(fresh_tree dupe)"
-perl -0pi -e 's/\bF10 /F10 F10 /' "$t/$CYCLE_REL"
+mutate "$t/$CYCLE_REL" 's/\bF10 /F10 F10 /' "account for F10 twice"
 assert_contains "$(gate "$t")" "refuse[duplicate-accounting]" "an id accounted for twice is refused"
 
 # No block at all must refuse, not fall back to arithmetic.
 t="$(fresh_tree no_block)"
-perl -0pi -e 's/<!-- accounting:ids -->.*?<!-- \/accounting:ids -->//s' "$t/$CYCLE_REL"
+mutate "$t/$CYCLE_REL" 's/<!-- accounting:ids -->.*?<!-- \/accounting:ids -->//s' \
+  "remove the accounting block"
 assert_contains "$(gate "$t")" "refuse[no-accounting]" "a cycle with no accounting block is refused"
 
+# A theme count changed. The theme is found by position rather than by its text:
+# matching `**7 findings · mostly \`high\`` pinned this case to one theme's wording
+# and to its number, and when the artifact was tampered with the pattern stopped
+# matching and this assertion failed about the wrong thing.
 t="$(fresh_tree counts)"
-perl -0pi -e 's/\*\*7 findings · mostly `high`/**3 findings · mostly `high`/' "$t/$CYCLE_REL"
+mutate "$t/$CYCLE_REL" 's/^\*\*(\d+) findings/"**" . ($1 - 4) . " findings"/me' \
+  "take four off the first theme count"
 assert_contains "$(gate "$t")" "refuse[counts-disagree]" "theme counts that do not sum to the accounting are refused"
 
 t="$(fresh_tree outlier_drop)"
-perl -0pi -e 's/^- \*\*Models beat the human record.*?\n//ms' "$t/$CYCLE_REL"
+mutate "$t/$CYCLE_REL" 's/^- \*\*.*?\n//ms' "remove the first outlier"
 assert_contains "$(gate "$t")" "refuse[counts-disagree]" "losing an outlier is caught too"
 
 # The documented limit, asserted so nobody mistakes it for coverage: moving a
 # count between themes leaves the set unchanged and is NOT detected. Per-theme
 # ids would close it, and cycle 2026-09-29 predates them.
+#
+# The two theme counts are the first and the last, found by position. Naming them
+# by their numbers pinned the case to the artifact: the issue's deletion exploit
+# decremented theme 2, the first half of the substitution stopped matching, the
+# second half still applied, and this assertion went red saying a documented limit
+# had been closed.
 t="$(fresh_tree launder)"
-perl -0pi -e 's/\*\*12 findings/**11 findings/; s/\*\*16 findings/**17 findings/' "$t/$CYCLE_REL"
+mutate "$t/$CYCLE_REL" 's/^\*\*(\d+) findings/"**" . ($1 - 1) . " findings"/me' \
+  "take one off the first theme count"
+mutate "$t/$CYCLE_REL" 's/\A(.*)^\*\*(\d+) findings/"$1**" . ($2 + 1) . " findings"/mse' \
+  "put it on the last theme count"
 out="$(gate "$t")"; rc=$?
 assert_status 0 "$rc" "moving a count between themes is NOT detected — the documented limit"
 
 # Lowercasing a finding's prose must no longer change the accounting. The old
 # counter was `grep -cE '^| [A-Z]'`, which dropped the row from the denominator.
 t="$(fresh_tree lowercase)"
-perl -0pi -e 's/^\| F03 \| A study of/| F03 | a study of/m' "$t/process/01-scan/findings/2026-09-29.md"
+mutate "$t/process/01-scan/findings/2026-09-29.md" \
+  's/^(\| F03 \| )([A-Z])/$1 . lc($2)/me' "lowercase the first letter of F03's what cell"
 out="$(gate "$t")"; rc=$?
 assert_status 0 "$rc" "lowercasing a finding's first letter no longer removes it"
 
@@ -131,8 +166,9 @@ assert_status 0 "$rc" "lowercasing a finding's first letter no longer removes it
 # empty_outliers <tree> [body line] — replace the whole Outliers section with the
 # contract's own heading, and optionally one line of body.
 empty_outliers() {
-  perl -0pi -e "s/^## Outliers.*?(?=^---)/## Outliers — surfaced because they fit nothing\n\n${2:-}\n/ms" \
-    "$1/$CYCLE_REL"
+  mutate "$1/$CYCLE_REL" \
+    "s/^## Outliers.*?(?=^---)/## Outliers — surfaced because they fit nothing\n\n${2:-}\n/ms" \
+    "replace the outlier section with the contract's heading"
 }
 
 t="$(fresh_tree empty_outliers_heading)"
@@ -169,21 +205,22 @@ assert_not_contains "$out" "refuse[silent-empty-outliers]" \
 
 # --- method -------------------------------------------------------------------
 t="$(fresh_tree method)"
-perl -0pi -e 's/^method: .*\n//m' "$t/$CYCLE_REL"
+mutate "$t/$CYCLE_REL" 's/^method: .*\n//m' "remove the method field"
 out="$(gate "$t")"
 assert_contains "$out" "refuse[no-method]" "an undeclared method is refused"
 assert_contains "$out" "before trusting the grouping" "the message says why it matters"
 
 # --- outlier section ----------------------------------------------------------
 t="$(fresh_tree outliers)"
-perl -0pi -e 's/^## Outliers.*?(?=^## Where)//ms' "$t/$CYCLE_REL"
+mutate "$t/$CYCLE_REL" 's/^## Outliers.*?(?=^## Where)//ms' "remove the outlier section"
 out="$(gate "$t")"
 assert_contains "$out" "refuse[no-outlier-section]" "a missing Outliers section is refused"
 assert_contains "$out" "look identical" "the message says why an empty one must say so"
 
 # --- source -------------------------------------------------------------------
 t="$(fresh_tree source)"
-perl -0pi -e 's/^from: .*\n/from: nothing in particular\n/m' "$t/$CYCLE_REL"
+mutate "$t/$CYCLE_REL" 's/^from: .*\n/from: nothing in particular\n/m' \
+  "replace the from field with something that links nothing"
 out="$(gate "$t")"
 assert_contains "$out" "refuse[no-source]" "a cycle with no linked source is refused"
 
@@ -247,7 +284,8 @@ assert_contains "$out" "$ncyc file(s) within the contract" \
 # between the marker and a cycle that depends on the file.
 t="$(fresh_tree example_source)"
 SRC="$t/process/01-scan/findings/2026-09-29.md"
-perl -0pi -e 's/^nothing found: (.*)$/nothing found: $1\nexample: yes/m' "$SRC"
+mutate "$SRC" 's/^nothing found: (.*)$/nothing found: $1\nexample: yes/m' \
+  "mark the source as a worked example"
 assert_contains "$(cat "$SRC")" "example: yes" "the fixture marks the source as an example"
 out="$(/bin/bash "$ROOT/process/01-scan/validate-findings.sh" "$SRC" 2>&1)"; rc=$?
 assert_status 0 "$rc" "stage 1 accepts the marker, because an example is a legitimate file"
@@ -261,7 +299,8 @@ assert_contains "$out" "not a real scan" "and says what the marker means"
 # else in this suite notices — found by mutating it.
 t="$(fresh_tree example_no)"
 SRC="$t/process/01-scan/findings/2026-09-29.md"
-perl -0pi -e 's/^nothing found: (.*)$/nothing found: $1\nexample: no/m' "$SRC"
+mutate "$SRC" 's/^nothing found: (.*)$/nothing found: $1\nexample: no/m' \
+  "declare the source is not an example"
 assert_contains "$(cat "$SRC")" "example: no" "the fixture declares the source is not an example"
 out="$(gate "$t")"; rc=$?
 assert_status 0 "$rc" "a source that declares \`example: no\` is within the contract"
@@ -296,8 +335,9 @@ declared_count() {
 # existed before this one still reconciles.
 drop_finding() {
   local t="$1" id="$2"
-  perl -0pi -e "s/^\\| $id \\|.*\\n//m" "$t/process/01-scan/findings/2026-09-29.md"
-  perl -0pi -e "s/\\b$id //" "$t/$CYCLE_REL"
+  mutate "$t/process/01-scan/findings/2026-09-29.md" "s/^\\| $id \\|.*\\n//m" \
+    "delete $id's row from the source"
+  mutate "$t/$CYCLE_REL" "s/\\b$id //" "drop $id from the accounting block"
   awk 'BEGIN { done = 0 }
        done == 0 && /^\*\*[0-9]+ findings/ {
          match($0, /[0-9]+/)
@@ -331,14 +371,16 @@ assert_contains "$out" "not a filter" "and the rule it enforces"
 t="$(fresh_tree deletion_full)"
 before="$(declared_count "$t/$CYCLE_REL")"
 drop_finding "$t" F07
-perl -0pi -e "s/, $before findings/, @{[$before - 1]} findings/" "$t/$CYCLE_REL"
+mutate "$t/$CYCLE_REL" "s/, $before findings/, @{[$before - 1]} findings/" \
+  "correct the declared count to match"
 assert_eq "$((before - 1))" "$(declared_count "$t/$CYCLE_REL")" "the declared count was corrected too"
 out="$(gate "$t")"; rc=$?
 assert_status 0 "$rc" "editing the declared count as well is NOT detected — the stated limit"
 
 # A `from:` that links a source and states no count at all.
 t="$(fresh_tree nocount)"
-perl -0pi -e 's/^(from: \[[^\n]*\]\([^)]*\)).*$/$1/m' "$t/$CYCLE_REL"
+mutate "$t/$CYCLE_REL" 's/^(from: \[[^\n]*\]\([^)]*\)).*$/$1/m' \
+  "strip the item count off the from field"
 assert_eq "" "$(declared_count "$t/$CYCLE_REL")" "the fixture now declares no count"
 out="$(gate "$t")"; rc=$?
 assert_status 1 "$rc" "a from: field with no item count exits 1"
@@ -354,7 +396,7 @@ t="$(fresh_tree moved_row)"
 SRC="$t/process/01-scan/findings/2026-09-29.md"
 before="$(declared_count "$t/$CYCLE_REL")"
 moved="$(grep '^| F07 |' "$SRC")"
-perl -0pi -e 's/^\| F07 \|.*\n//m' "$SRC"
+mutate "$SRC" 's/^\| F07 \|.*\n//m' "take F07'\''s row out of the findings table"
 awk -v row="$moved" '
   $0 ~ /^## Findings[[:space:]]*$/ && done == 0 {
     print "| id | what |"; print "|---|---|"; print row; print ""
@@ -512,5 +554,69 @@ assert_not_contains "$out" "problem(s) checked" \
 # rather than into the count, and an assertion on the count alone sees nothing.
 assert_eq "1" "$(printf '%s\n' "$out" | grep -c .)" \
   "an explicit run prints one summary line and nothing about a phase it did not walk"
+# --- the anchors, on a fixture built from nothing ------------------------------
+# Three of this gate's expressions are anchored to the start of a line and had no
+# test. An anchor is invisible: remove it and the gate still reads plausibly, still
+# passes every case above, and starts counting mentions as structure. AGENTS.md's
+# rule is the one that applies — mutation-test the comparison, not just the guard,
+# because deleting a check proves it is reachable and loosening it proves it is
+# sufficient.
+#
+# Each case asserts WHAT THE ANCHOR PROTECTS, not the expression. The fixture is
+# built by tests/lib/define-fixture.sh and passes the gate by construction, so the
+# only difference between the baseline and the case is the mention that was added.
+#
+# The fourth anchored expression, the source's id harvest, moved into
+# process/01-scan/findings-ids.sh and is covered by tests/test_findings_ids.sh.
+
+anchor_gate() { bash "$ROOT/process/03-define/validate-define.sh" "$1" 2>&1; }
+
+# The baseline. Nothing below means anything if this does not pass.
+cyc="$(define_fixture "$TMP/anchor_base" "3 2" 1)"
+out="$(anchor_gate "$cyc")"; rc=$?
+assert_status 0 "$rc" "a cycle built from nothing is within the contract"
+
+# `grep -q '^## Outliers'` — the section's EXISTENCE. Unanchored, a sentence
+# mentioning the heading satisfies it, and a cycle with no outlier section at all
+# passes the check the contract calls load-bearing.
+cyc="$(define_fixture "$TMP/anchor_heading" "3 2" 1)"
+mutate "$cyc" 's/^## Outliers.*?(?=^---)/Nothing here mentions a `## Outliers` section as a heading.\n\n/ms' \
+  "replace the outlier section with a sentence that mentions its heading"
+assert_contains "$(cat "$cyc")" '## Outliers' "the fixture still contains the heading text"
+assert_eq "0" "$(grep -c '^## Outliers' "$cyc")" "but not at the start of any line"
+out="$(anchor_gate "$cyc")"
+assert_contains "$out" "refuse[no-outlier-section]" \
+  "a heading mentioned inside a sentence is not an outlier section"
+
+# `grep -cE '^- \*\*'` — the outlier COUNT, which feeds the reconciliation. The
+# fixture declares one outlier; writing it inside a sentence instead of as a list
+# item must leave the count at zero, so the counts no longer reconcile. Unanchored,
+# the mention is counted and the cycle passes while the outlier is not surfaced —
+# which is the whole point of the section.
+cyc="$(define_fixture "$TMP/anchor_bullet" "3 2" 1)"
+mutate "$cyc" 's/^- \*\*An outlier(.*?)\*\*$/One was recorded as prose: - **An outlier$1** — a mention, not an item./ms' \
+  "move the outlier from a list item into the middle of a sentence"
+assert_contains "$(cat "$cyc")" '- **An outlier' "the fixture still contains the list-item marker"
+assert_eq "0" "$(grep -c '^- \*\*' "$cyc")" "but not at the start of any line"
+out="$(anchor_gate "$cyc")"
+assert_contains "$out" "refuse[counts-disagree]" \
+  "an outlier written into a sentence is not counted as surfaced"
+
+# `grep -oE '^\*\*[0-9]+ findings'` — the THEME COUNTS that are summed. Unanchored,
+# any `**N findings` in prose is added to the sum, so a cycle can be made to
+# reconcile by writing a number in a sentence rather than by accounting for
+# anything. The fixture already reconciles, so adding the mention must change
+# nothing.
+cyc="$(define_fixture "$TMP/anchor_themecount" "3 2" 1)"
+mutate "$cyc" 's/^Why we think it is a theme: it is a built fixture\.$/Why we think it is a theme: a sibling carried **9 findings** and this one did not./m' \
+  "mention a theme count inside a sentence"
+assert_contains "$(cat "$cyc")" '**9 findings' "the fixture now mentions a count in prose"
+assert_eq "0" "$(grep -c '^\*\*9 findings' "$cyc")" "but not at the start of any line"
+out="$(anchor_gate "$cyc")"; rc=$?
+assert_status 0 "$rc" "a count mentioned inside a sentence is not added to the theme sum"
+assert_not_contains "$out" "refuse[counts-disagree]" "so the reconciliation is unchanged by it"
+
+# The denominator for the mutations above, printed rather than trusted.
+mutate_done 20
 
 assert_done
