@@ -40,14 +40,19 @@
 
 **Evidence note.** The allowlist was read out of [`DECIDERS.md`](DECIDERS.md) as the first cell of every row in the file, header included, so `decided_by: Name` was an authorized decider until 2026-10-03. It is now the `Name` column of whichever tables declare one, data rows only, skipping fenced examples — so a second table, an example row and the heading itself all donate nothing. A file that declares no such column authorizes nobody, which is the same choice as a missing file.
 
-**When the proof of a person starts.** This control establishes **who is authorized** to decide. Proof that a person rather than an agent recorded the decision starts with the **next** decision, by commit signature. A signature is evidence that a specific private key was present when the commit was made; an author field is a string anyone can set, which is why the author field cannot carry this. Nothing in the published history is signed — measured on `main` at `12ca5cd` on 2026-10-04:
+**When the proof of a person starts.** This control establishes **who is authorized** to decide. Proof that a person rather than an agent recorded the decision starts with the **next** decision, by commit signature. A signature is evidence that a specific private key was present when the commit was made; an author field is a string anyone can set, which is why the author field cannot carry this. Neither decision that already exists has one:
 
 ```
-$ git log 12ca5cd --format='%G?' | sort -u
-N
+$ git log --no-walk --format='%h %G?' 59b7cd2 f808ff5
+59b7cd2 N
+f808ff5 N
 ```
 
-`N` is git's code for no signature, and it is the only value every commit reachable from that one returns. The ref is a commit rather than a branch name so the measurement stays reproducible; `tests/test_doc_claims.sh` runs the command and refuses a transcript git disagrees with.
+`N` is git's code for no signature. Both are local commits with no signature header at all, so they read `N` on any machine, and nothing can add one afterwards. `tests/test_doc_claims.sh` runs this and refuses a transcript git disagrees with.
+
+**The history does hold signatures, and they are not a person's.** 74 of the 206 commits reachable from `12ca5cd` carry a PGP signature, every one of them committed by `GitHub <noreply@github.com>` — the platform signing a merge it performed through the web interface. That is evidence GitHub did the merge. It is not evidence about who wrote the change or who recorded a decision, which is why this control rests on the decision commit rather than on the merge.
+
+It also shows why a signature count is not the measurement to transcribe. `%G?` over the whole history reads differently depending on whether the reader has `gpg` installed and GitHub's key available: on a machine without `gpg`, git reports `N` for all 206, which is how a claim that **nothing in the repository is signed** came to be written down on 2026-10-04 and was wrong. A signature *header* is a fact about the object; a signature *status* is a fact about the reader's keyring, and only the first is worth transcribing.
 
 Signing for decision commits is **not configured**, and configuring it belongs to the decider, so this is an obligation that **starts at the next decision rather than one already met**. A control with a start date is an ordinary thing for an assessor to read; a history that cannot be verified is not.
 
@@ -388,7 +393,7 @@ $ git log 12ca5cd --format='%an|%cn' | sort | uniq -c | sort -rn
 
 Those 85 carry no signal at all: author and committer are both `imagineux`, the commit was made locally, and it was made by either the owner or an agent. Committer does not separate them and neither does timing or message style. A rewrite could only assign them an identity by fiat, producing a history that looks separated while the separation is invented — and nobody, including whoever ran it, could check it afterwards. That is the overclaim this document exists to avoid, in the file that answers who is authorized. It would also force a push past the `non_fast_forward` rule on `main` and break every commit citation the tracked documents carry, including the `fa7538a` pointer `bin/validate-standards.sh` now resolves.
 
-**What replaces it is a start date, not an enforcement.** CTRL-1 now records that proof of a person begins with the next decision, by commit signature, and that the two existing decisions predate the obligation. It carries the command and the measurement that show no commit in the published history is signed. Signing for decision commits is not configured and configuring it is the decider's, so the honest position is that the proof obligation starts, not that it is met.
+**What replaces it is a start date, not an enforcement.** CTRL-1 now records that proof of a person begins with the next decision, by commit signature, and that the two existing decisions predate the obligation. It carries the command and the measurement showing neither of them is signed, and the reason the 74 signatures the history does hold are no help: they are GitHub's, on merges it performed itself. Signing for decision commits is not configured and configuring it is the decider's, so the honest position is that the proof obligation starts, not that it is met.
 
 `bin/validate-authorship.sh` checks the author field and **refuses today**: a commit setting `chosen:` must be authored by the identity declared in `DECIDERS.md`, and that identity must not be shared. Neither holds. It is deliberately **not wired into CI**, because a gate that cannot pass blocks every branch. What would turn it on is the decider committing under the declared address and making the `chosen:` commit personally — `DECIDERS.md` states both. Neither is waiting on a history change: the issue that tracked rewriting `main` is closed as won't-fix for the reason above, and nothing is deferred to it.
 
