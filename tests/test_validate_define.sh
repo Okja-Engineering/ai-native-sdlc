@@ -275,6 +275,18 @@ out="$(pgate "$t")"; rc=$?
 assert_status 1 "$rc" "and a fenced example on its own does not satisfy the field"
 assert_contains "$out" "refuse[no-rests-on]" "the refusal is no-rests-on"
 
+# No Discover topics directory at all. Reachable only when the link resolves and
+# the directory does not, because an unresolvable link returns before this. Found
+# by tests/mutate-sweep.sh: deleting this refusal left every suite green, so the
+# branch that says "nothing can establish the edge" was itself unestablished.
+t="$(fresh_tree notopicsdir)"
+perl -0pi -e 's|^rests on: .*|rests on: [`c`](../cycles/2026-09-29.md)|m' "$t/$PROBLEM_REL"
+rm -rf "$t/process/02-discover/topics"
+out="$(pgate "$t")"; rc=$?
+assert_status 1 "$rc" "a tree with no Discover topics directory exits 1"
+assert_contains "$out" "refuse[rests-on-not-a-topic]" "the refusal is rests-on-not-a-topic"
+assert_contains "$out" "no Discover topics directory" "the message says the directory is missing"
+
 # And problems are in the denominator of a bare run, not only of an explicit one.
 # A check nobody invokes is not a control, and CI invokes this with no arguments.
 t="$(fresh_tree bare_run)"
@@ -284,5 +296,30 @@ out="$(DEFINE_CYCLES_DIR="$t/process/03-define/cycles" \
        bash "$ROOT/process/03-define/validate-define.sh" 2>&1)"; rc=$?
 assert_status 1 "$rc" "a run with no arguments reads problems as well as cycles"
 assert_contains "$out" "refuse[no-rests-on]" "and refuses the problem it found"
+
+# --- and the problem denominator is printed, like the cycle one ----------------
+# The same reasoning the empty-input sweep applied to cycles, pointed at problems:
+# a count nobody prints is a count nobody can check. Both of these were found by
+# tests/mutate-sweep.sh, which made each comparison always true and saw nothing go
+# red. Derived from the directory rather than written out, so adding a problem does
+# not make the assertion stale.
+out="$(cd "$ROOT" && bash process/03-define/validate-define.sh 2>&1)"; rc=$?
+assert_status 0 "$rc" "the bare run over the real tree passes"
+nprob="$(ls "$ROOT"/process/03-define/problems/*.md 2>/dev/null | grep -c .)"
+assert_contains "$out" "$nprob problem(s) checked" \
+  "it says how many problems it checked (found $nprob)"
+
+# An explicit run reports what was named and nothing else. The problem line belongs
+# to the directory walk, so naming one file must not make the gate talk about a
+# phase it did not read.
+out="$(cd "$ROOT" && bash process/03-define/validate-define.sh "$CYCLE_REL" 2>&1)"; rc=$?
+assert_status 0 "$rc" "naming one cycle file passes"
+assert_not_contains "$out" "problem(s) checked" \
+  "and does not claim to have checked problems it did not walk"
+# Both halves of that block, because the empty half is the one a loosened guard
+# reaches: with `$# -eq 0` always true, an explicit run falls into "no problem files"
+# rather than into the count, and an assertion on the count alone sees nothing.
+assert_eq "1" "$(printf '%s\n' "$out" | grep -c .)" \
+  "an explicit run prints one summary line and nothing about a phase it did not walk"
 
 assert_done
