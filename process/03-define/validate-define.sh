@@ -94,8 +94,25 @@ field() {
   ' "$1" 2>/dev/null
 }
 
+# outlier_body <file> — the Outliers section's BODY, heading excluded.
+#
+# This was `sed -n '/^## Outliers/,/^---/p'`, which includes the heading, so any
+# of `none`, `empty` or `nothing` in the TITLE satisfied the "it must say it is
+# empty" check. define-contract.md's own name for the section is "Outliers —
+# surfaced because they fit nothing", so a cycle using the contract's wording and
+# listing no outliers at all passed the one refusal that makes the section
+# load-bearing. The range also ran to end of file when a cycle carried no `---`
+# after the section, taking every section below it with it.
+outlier_body() {
+  awk '
+    !inside && substr($0, 1, 11) == "## Outliers" { inside = 1; next }
+    inside && (substr($0, 1, 3) == "## " || $0 ~ /^---[[:space:]]*$/) { exit }
+    inside { print }
+  ' "$1"
+}
+
 check_cycle() {
-  local f="$1" src src_path resolved outliers declared src_ids src_n declared_n
+  local f="$1" src src_path resolved outliers outlier_text declared src_ids src_n declared_n
   local uniq_declared missing extra dupes themes_sum accounted_n
 
   # --- method is declared -------------------------------------------------
@@ -105,17 +122,17 @@ check_cycle() {
   fi
 
   # --- the outlier section exists ----------------------------------------
+  # Read once. The count was computed from the same expression three times over,
+  # which is three places for the section boundary to be got wrong differently.
+  outlier_text="$(outlier_body "$f")"
+  outliers=$(printf '%s\n' "$outlier_text" | grep -cE '^- \*\*')
   if ! grep -q '^## Outliers' "$f"; then
     refuse "$f" "-" "no-outlier-section" \
       "no Outliers section: an empty outlier list and an omitted one look identical, so an empty one must say so"
-  else
-    outliers=$(sed -n '/^## Outliers/,/^---/p' "$f" | grep -cE '^- \*\*')
-    if [ "$outliers" -eq 0 ] && ! sed -n '/^## Outliers/,/^---/p' "$f" | grep -qiE 'none|empty|nothing'; then
-      refuse "$f" "-" "silent-empty-outliers" \
-        "the Outliers section lists nothing and does not say it is empty"
-    fi
+  elif [ "$outliers" -eq 0 ] && ! printf '%s\n' "$outlier_text" | grep -qiE 'none|empty|nothing'; then
+    refuse "$f" "-" "silent-empty-outliers" \
+      "the Outliers section lists nothing and does not say it is empty — and saying so means saying it in the section, not in its heading"
   fi
-  outliers=$(sed -n '/^## Outliers/,/^---/p' "$f" 2>/dev/null | grep -cE '^- \*\*')
 
   # --- every source item accounted for ------------------------------------
   src="$(field "$f" from)"
