@@ -167,4 +167,272 @@ assert_contains "$(cat "$HOOKS/pre-push")" "rev-list --no-merges" \
 assert_contains "$(cat "$ROOT/.github/workflows/ci.yml")" "rev-list --no-merges" \
   "the job excludes merges from the message check"
 
+# --- commit-msg: the four subject rules that had no test ----------------------
+# The section above covers the conventional-subject check and the merge exemption.
+# Four more rules live in the same hook and nothing exercised them: the 72-character
+# limit, the trailing period, the imperative form, and the tool-attribution pattern.
+# The `Co-Authored-By` half of the attribution ban was covered above; the other
+# half — `generated with`, the robot emoji, the two addresses — was not, and it is
+# the half a tool actually writes.
+#
+# Driven by handing the hook a message file, which is its whole contract. The merge
+# case above needs real git state and is driven through `git commit`; these do not,
+# and a direct call keeps a dozen cases cheap.
+hook_msg() { # <message> -> output in $out, status in $rc
+  printf '%s\n' "$1" > "$TMP/msg"
+  out="$(cd "$R" && /bin/bash "$HOOKS/commit-msg" "$TMP/msg" 2>&1)"
+  rc=$?
+}
+
+# The hook skips every subject rule while a merge is in progress, so a lingering
+# MERGE_HEAD would make all of the assertions below pass without running anything.
+# The merge case above ends with `git merge --abort`; this is the assertion that the
+# abort worked, and it is here because the failure mode is silent.
+assert_eq "" "$(cd "$R" && ls .git/MERGE_HEAD 2>/dev/null)" \
+  "the fixture repository is not mid-merge, or every subject rule below is skipped"
+
+# The limit is "> 72", so 72 has to pass and 73 has to fail. A test of one side only
+# passes against `-ge 72` as well, which is a different rule.
+s72="fix: $(printf 'a%.0s' $(seq 67))"
+s73="fix: $(printf 'a%.0s' $(seq 68))"
+assert_eq "72" "${#s72}" "the accepted fixture is exactly 72 characters"
+assert_eq "73" "${#s73}" "the refused fixture is exactly 73 characters"
+
+hook_msg "$s72"
+assert_status 0 "$rc" "a 72-character subject is accepted"
+hook_msg "$s73"
+assert_status 1 "$rc" "a 73-character subject is refused"
+assert_contains "$out" "limit is 72" "and the refusal names the limit"
+
+hook_msg 'fix: repair the thing.'
+assert_status 1 "$rc" "a subject ending with a period is refused"
+assert_contains "$out" "ends with a period" "and the refusal says so"
+
+# The imperative check is an enumeration, so the suite walks all of it rather than
+# the one form it was written for. AGENTS.md: include inputs the implementation was
+# not written for, and if a reasonable rewrite would still pass, the suite is
+# pinning behaviour.
+for v in adding adds added fixes fixed updates updated removes removed changes changed; do
+  hook_msg "fix: $v the thing"
+  assert_status 1 "$rc" "a subject opening with '$v' is refused"
+done
+for v in add fix update remove change repair carry; do
+  hook_msg "fix: $v the thing"
+  assert_status 0 "$rc" "a subject opening with '$v' is accepted"
+done
+
+# --- commit-msg: the attribution ban, both halves -----------------------------
+# Only the Co-Authored-By form had a test. The others are what a tool writes by
+# default, which is the reason the ban exists.
+hook_msg "$(printf 'fix: repair the thing\n\nCo-Authored-By: Somebody <nobody@example.invalid>\n')"
+assert_status 1 "$rc" "a Co-Authored-By trailer is refused"
+assert_contains "$out" "Co-Authored-By trailer is not allowed" "and the refusal names the trailer"
+
+hook_msg "$(printf 'fix: repair the thing\n\nGenerated with a tool\n')"
+assert_status 1 "$rc" "a generated-with line is refused"
+assert_contains "$out" "tool or model attribution" "and the refusal names the rule"
+
+hook_msg "$(printf 'fix: repair the thing\n\n%s a tool\n' "$(printf '\360\237\244\226')")"
+assert_status 1 "$rc" "the robot emoji is refused"
+
+hook_msg "$(printf 'fix: repair the thing\n\nnoreply@anthropic.com\n')"
+assert_status 1 "$rc" "a model vendor address is refused"
+
+hook_msg "$(printf 'fix: repair the thing\n\nclaude.com/claude-code\n')"
+assert_status 1 "$rc" "a tool URL is refused"
+
+# And an ordinary body is not caught by any of them, or the ban would refuse prose.
+hook_msg "$(printf 'fix: repair the thing\n\nThe cause was a substring search. Found by hand.\n')"
+assert_status 0 "$rc" "an ordinary body is accepted"
+
+# --- pre-push: the secret scan and the never-publish guard --------------------
+# Neither had a test. Both live in pre-push and neither has a server-side
+# counterpart, so a hook that stopped refusing would be the only thing between a
+# mistake and a public repository — CTRL-9 says exactly that.
+#
+# A second fixture repository, so the sequence above keeps its own state. The
+# never-publish list has to be INSIDE the repository being pushed: pre-push reads
+# `$(git rev-parse --show-toplevel)/.githooks/never-publish`, not the list belonging
+# to whatever core.hooksPath points at. Without one in the fixture the guard reads
+# as absent and passes everything, which is the reason this is written with the list
+# present rather than relying on the real one.
+R2="$TMP/local2"
+git init -q --bare "$TMP/remote2"
+mkdir -p "$R2"
+(
+  cd "$R2" || exit 2
+  git init -q .
+  git config core.hooksPath "$HOOKS"
+  git config user.name 'A Person'
+  git config user.email 'person@example.invalid'
+  git remote add origin "$TMP/remote2"
+  mkdir -p .githooks
+  printf '%s\n' '# a fixture list' '.scuba/*' > .githooks/never-publish
+  printf 'one\n' > a.txt
+  git add -A && git commit -q -m 'feat: add a and a never-publish list'
+  git branch -M main
+  git push -q origin main
+) >/dev/null 2>&1
+push2() { ( cd "$R2" && git push "$@" 2>&1 ); }
+
+assert_eq "1" "$(cd "$R2" && git ls-files .githooks/never-publish | grep -c .)" \
+  "the fixture repository carries its own never-publish list"
+
+# A never-publish path already on the remote, put there with --no-verify. This is
+# SETUP and not an assertion about the guard: the deletion case below needs a path
+# that is already public, and the only honest way to get one past the guard is to
+# bypass it on purpose. Over a range where the path is added and removed, `git diff`
+# reports no change at all, so a fixture that does both inside one range tests
+# nothing — which is how the first version of the deletion assertion below passed
+# against a hook with the ACMR filter removed.
+(
+  cd "$R2" || exit 2
+  mkdir -p .scuba && printf 'control plane\n' > .scuba/state.md
+  git add -A && git commit -q -m 'chore: add orchestration state'
+  git push -q --no-verify origin main
+) >/dev/null 2>&1
+assert_eq "1" "$(cd "$R2" && git ls-tree -r --name-only origin/main | grep -c '^\.scuba/state.md$')" \
+  "the setup put a never-publish path on the remote, so the deletion case has one"
+
+# The guard fires, with the list present.
+(
+  cd "$R2" || exit 2
+  printf 'more state\n' > .scuba/other.md
+  git add -A && git commit -q -m 'chore: add more orchestration state'
+) >/dev/null 2>&1
+out="$(push2 origin main)"; rc=$?
+assert_status 1 "$rc" "a push touching a never-publish path is refused"
+assert_contains "$out" "NEVER-PUBLISH" "and the refusal names the guard"
+assert_contains "$out" ".scuba/other.md" "and names the file"
+assert_contains "$out" "matches '.scuba/*'" "and the pattern it matched"
+( cd "$R2" && git reset -q --hard HEAD~1 ) >/dev/null 2>&1
+
+# Removing the path is not refused. The guard filters on ACMR and not on deletion on
+# purpose: a push whose only involvement with a never-publish path is taking it out
+# is someone fixing the mistake this exists to prevent. The path has to be on the
+# remote already for the range to report a deletion at all.
+(
+  cd "$R2" || exit 2
+  git rm -q .scuba/state.md
+  git commit -q -m 'chore: remove orchestration state'
+) >/dev/null 2>&1
+out="$(push2 origin main)"; rc=$?
+assert_status 0 "$rc" "a push that only removes a never-publish path is allowed"
+assert_not_contains "$out" "NEVER-PUBLISH" "and the guard does not fire on the deletion"
+
+# The disclosure is printed either way, because its job is to make the blast radius
+# visible before the push rather than to refuse.
+assert_contains "$out" "would newly publish" "the disclosure is printed on a clean push"
+assert_contains "$out" "commit(s)" "and counts the commits"
+assert_contains "$out" "secret scan:" "and says which secret scan ran"
+
+# --- pre-push: every built-in secret pattern ---------------------------------
+# Six classes, one assertion each, so dropping any single alternative from the
+# pattern turns this red rather than five of six staying green. The scan has no
+# server-side counterpart at all.
+#
+# The fixtures are ASSEMBLED at run time. Written literally they would match the
+# pattern in this file's own added lines, and pushing this suite would be refused by
+# the guard it tests.
+F10='A1B2C3D4E5'
+F16='A1B2C3D4E5F6G7H8'
+F20='A1B2C3D4E5F6G7H8I9J0'
+secret_line() {
+  case "$1" in
+    aws)       printf 'AKIA%s\n' "$F16" ;;
+    aws-temp)  printf 'ASIA%s\n' "$F16" ;;
+    github)    printf 'ghp_%s\n' "$F16" ;;
+    anthropic) printf 'sk-ant-%s\n' "$F16" ;;
+    pem)       printf -- '-----BEGIN %s PRIVATE KEY-----\n' 'RSA' ;;
+    slack)     printf 'xoxb-%s\n' "$F10" ;;
+    assigned)  printf 'api_key=%s\n' "$F20" ;;
+  esac
+}
+leakno=0
+for class in aws aws-temp github anthropic pem slack assigned; do
+  leakno=$((leakno + 1))
+  (
+    cd "$R2" || exit 2
+    secret_line "$class" > "leak$leakno.txt"
+    git add -A && git commit -q -m "chore: add a $class fixture"
+  ) >/dev/null 2>&1
+  out="$(push2 origin main)"; rc=$?
+  assert_status 1 "$rc" "a push carrying a $class credential is refused"
+  assert_contains "$out" "SECRETS:" "and the refusal names the secret scan ($class)"
+  # Back to whatever the remote actually has, not to HEAD~1. If one of these pushes
+  # ever goes through — which is what happens when a clause has been dropped from
+  # the pattern — HEAD~1 leaves the branch behind the remote, every later push is
+  # rejected as a non-fast-forward, and five more assertions fail for a reason that
+  # has nothing to do with them.
+  ( cd "$R2" && git fetch -q origin && git reset -q --hard origin/main ) >/dev/null 2>&1
+done
+
+# And an ordinary file is not called a secret, or the scan would refuse every push.
+(
+  cd "$R2" || exit 2
+  printf 'an ordinary line of prose about keys and passwords\n' > plain.txt
+  git add -A && git commit -q -m 'docs: add a plain file'
+) >/dev/null 2>&1
+out="$(push2 origin main)"; rc=$?
+assert_status 0 "$rc" "an ordinary file is not called a secret"
+
+# --- what is NOT asserted here -----------------------------------------------
+# The never-publish guard FAILS OPEN when the list is missing or unreadable:
+# check_publish wraps everything in `[ -r "$never_publish" ]` and returns 0
+# otherwise, so a push from a tree with no list is unguarded. That is a defect and
+# it belongs to issue #57, which owns the two fail-open guards.
+#
+# The assertion that would pin it — "with no never-publish list, a push touching a
+# never-publish path is still refused" — is RED against the hook as it stands, so it
+# cannot be added here without also making the fix. It is left to #57 rather than
+# half-done in two places. Everything above runs with the list PRESENT, and stays
+# true either way.
+
+
+# --- the conventional prefix has to START the subject ---------------------------
+# Found by tests/mutate-sweep.sh, by dropping the `^` from the conventional-subject
+# expression in both the hook and the pre-push re-check. Unanchored, any subject that
+# contains `fix: ` anywhere passes — `WIP fix: repair the thing` is the shape that
+# actually happens, and every case above either matches at the start or matches
+# nowhere, so none of them could see the difference.
+for s in \
+  'WIP fix: repair the thing' \
+  'draft feat: add the thing' \
+  'revert of docs: say what it does' \
+  '[squash] chore: tidy up'
+do
+  hook_msg "$s"
+  assert_status 1 "$rc" "a conventional prefix not at the start is refused: $s"
+done
+
+# The same rule, server-side, over a real pushed range. The hook and the job drifted
+# apart on the merge exemption once already, so the anchor is checked in both.
+(
+  cd "$R" || exit 2
+  printf 'anchored\n' > g.txt && git add -A
+  git commit -q --no-verify -m 'WIP fix: repair the thing'
+) >/dev/null 2>&1
+out="$(push_out origin main)"; rc=$?
+assert_status 1 "$rc" "pre-push refuses a conventional prefix not at the start"
+assert_contains "$out" "not a conventional commit" "and names the rule"
+( cd "$R" && git fetch -q origin && git reset -q --hard origin/main ) >/dev/null 2>&1
+
+# --- a subject carrying a hash is still the subject -----------------------------
+# The hook strips the template's comment lines with `grep -v '^#'`. Unanchored that
+# drops every line containing a hash, so a subject naming an issue number disappears
+# and the line below it is read as the subject instead. This repository writes issue
+# numbers in commit bodies, so it is a shape that will arrive.
+hook_msg "$(printf 'fix: repair the thing behind #30\n\nSome body text.\n')"
+assert_status 0 "$rc" "a subject containing a hash is accepted"
+hook_msg "$(printf 'repair the thing behind #30\n\nfix: a line that would pass\n')"
+assert_status 1 "$rc" "and a bad subject containing a hash is still read as the subject"
+assert_contains "$out" "repair the thing behind #30" "the refusal quotes the real subject"
+
+# The body is stripped the same way, and the attribution ban reads the body. A trailer
+# on a line that also carries a hash has to survive the stripping, or the ban is
+# defeated by adding an issue number to the trailer.
+hook_msg "$(printf 'fix: repair the thing\n\nCo-Authored-By: Somebody <nobody@example.invalid> #30\n')"
+assert_status 1 "$rc" "an attribution trailer on a line that also carries a hash is refused"
+assert_contains "$out" "Co-Authored-By trailer is not allowed" "and the refusal names the trailer"
+
 assert_done
