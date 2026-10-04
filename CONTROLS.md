@@ -112,7 +112,11 @@
 
 **What it prevents.** A reader trusting a grouping without knowing whether a person, a model or a classifier made it.
 
-**Enforced by** `process/03-define/validate-define.sh`, refusal `no-method`.
+**Enforced by** `process/03-define/validate-define.sh`.
+
+| Refusal | Condition |
+|---|---|
+| `no-method` | the cycle record declares no `method:` field |
 
 **Evidence.** The `method:` field on every cycle record.
 
@@ -124,7 +128,27 @@
 
 **What it prevents.** A cycle record that cannot be compared with the next one, and a finding with no source. The scan runs repeatedly, so drift in shape is the risk worth mechanising against.
 
-**Enforced by** `process/01-scan/validate-findings.sh`, with fifteen refusals including `no-source`, `nothing-found`, `empty-cycle`, `since`, `consequence`, `kind`, `contradiction` and `filename`.
+**Enforced by** `process/01-scan/validate-findings.sh`.
+
+All fifteen are listed. This said "fifteen refusals including" and named eight, and the seven it left out — `field`, `sections`, `looked-at`, `assessment`, `columns`, `id` and `dated` — were outside the check that was supposed to bind this document to the gate. A prose list is not reachable by the check either way: the eight it did name were read from a sentence, and the check only harvested table rows.
+
+| Refusal | Condition |
+|---|---|
+| `filename` | the file name is not a cycle date, `<YYYY-MM-DD>.md` |
+| `since` | no `since` field, or a value that is neither a date nor the words first run |
+| `nothing-found` | no "nothing found" field, or a value other than yes or no |
+| `field` | a declared field appears more than once, carries a value outside the declared set, or a required cell is empty |
+| `sections` | a heading that is not one of the sections the contract declares |
+| `looked-at` | no "Looked at" section, an empty one, or a declared source with no line in it |
+| `assessment` | stage 1 prose judging what a finding means, which belongs to Discover |
+| `columns` | the findings table's column count, column names, or a row's cell count disagree with the contract |
+| `id` | the id cell is not `F` followed by a number, so Define cannot account for the row |
+| `no-source` | a finding with no source, or a source that is not a resolvable-looking locator |
+| `dated` | no dated cell, or a value that is not a calendar date in `YYYY-MM-DD` |
+| `kind` | kind is outside the declared list |
+| `consequence` | the consequence guess is outside the declared list |
+| `empty-cycle` | the cycle carries neither a finding nor an explicit "nothing found: yes" |
+| `contradiction` | "nothing found: yes" and the file carries findings |
 
 **Evidence.** Every finding carries what it is, a resolving locator, a date, what it may affect, and a consequence grade. `nothing-found` is a recorded result rather than an empty file, so "the scan found nothing" is distinguishable from "the scan did not run".
 
@@ -208,6 +232,10 @@
 **What it prevents.** A convention from applying only to whoever remembered to enable it. The hooks in `.githooks/` are bypassable — `--no-verify` defeats them and they run only for someone who has set `core.hooksPath` — so the ones that can have a server-side counterpart.
 
 **An external audit found this document omitted all of these.** An assessor told to start here got five of the repository's refusals and missed five more, including a hard refusal protecting the local-to-remote boundary.
+
+**Enforced by** `.githooks/commit-msg`, `.githooks/pre-push` and `bin/validate-claims.sh`, and the `commit-messages`, `claims` and `tests` jobs in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+This control enforces by exit status rather than by refusal codes, so it has no refusal table. That put it outside the document check twice over: codes were harvested only from table rows, and the gate pattern recognised only `validate-*.sh`, so neither hook could be checked even if they had been harvested. `bin/validate-controls.sh` now resolves all six — each path has to exist, and each job name has to be declared in the workflow.
 
 | Control | Local | Server-side | What it refuses |
 |---|---|---|---|
