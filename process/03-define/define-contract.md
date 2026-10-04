@@ -119,7 +119,7 @@ So an item that fits no theme is surfaced **because** it fits no theme, not desp
 
 `<!-- declared-empty: every finding this cycle fitted a theme -->`
 
-Same shape as `rests on: none` plus its reason above, and as `<!-- not-a-claim: … -->` in `STANDARDS.md`: the gate checks that the declaration is present and carries a reason, not that the reason is true. **A sentence is not a declaration.** Until 2026-10-04 the gate searched this section's prose for one of three short words, and the section's own explanation of why outliers matter carries one of them twice — so for cycle `2026-09-29` the refusal could never fire, and deleting all three outliers left the section satisfying its own emptiness check. A declared form cannot be arrived at by accident; a word in a sentence can.
+Same shape as `rests on: none` plus its reason above, and as `<!-- not-a-claim: … -->` in `STANDARDS.md`: the gate checks that the declaration is present and carries a reason, not that the reason is true. **Inside a fenced block it declares nothing**, for the same reason a fenced `rests on: none` does not satisfy that field. **A sentence is not a declaration.** Until 2026-10-04 the gate searched this section's prose for one of three short words, and the section's own explanation of why outliers matter carries one of them twice — so for cycle `2026-09-29` the refusal could never fire, and deleting all three outliers left the section satisfying its own emptiness check. A declared form cannot be arrived at by accident; a word in a sentence can.
 
 The same declaration is what the Discover contract requires of an empty *what could not be established* section. One form, two sections, declared in both contracts because the two gates share no library.
 

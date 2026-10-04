@@ -115,6 +115,12 @@ field() {
 # standing in for a reading — after the two-number coverage proxy and the
 # four-phrase dead-pointer match.
 #
+# A FENCED BLOCK IS NOT A DECLARATION, for the same reason `field` below skips
+# fences: a document showing what the form looks like must not thereby satisfy it.
+# A fenced `rests on: none` donated itself as the real field's value once, and an
+# example row in a fenced block in DECIDERS.md would have authorized everyone it
+# named. Found by attacking this check after writing it.
+#
 # This predicate is also written, identically, in
 # process/02-discover/validate-discovery.sh, which owns the other section that may
 # be empty. The gates share no library and adding one would put a load-bearing
@@ -123,7 +129,11 @@ field() {
 # and in CONTROLS.md, and what holds the two copies together is that both suites
 # pin the same behaviour rather than the expression.
 declares_empty() {
-  printf '%s\n' "$1" | grep -qE '<!--[[:space:]]*declared-empty:[^>]*[A-Za-z][^>]*-->'
+  printf '%s\n' "$1" | awk '
+    /^[ \t]*(```|~~~)/ { fence = !fence; next }
+    fence { next }
+    /<!--[ \t]*declared-empty:[^>]*[A-Za-z][^>]*-->/ { found = 1 }
+    END { exit found ? 0 : 1 }'
 }
 
 # outlier_body <file> — the Outliers section's BODY, heading excluded.

@@ -86,6 +86,14 @@ has() { grep -qiE "$2" "$1"; }
 # this gate reported the artifact within the contract: the artifact deleted every
 # disclosure it owed, asserted the opposite, and passed on one incidental word.
 #
+# A FENCED BLOCK IS NOT A DECLARATION. A document showing what the form looks
+# like must not thereby satisfy it. This is the third time this repository has
+# paid for that class — a fenced `rests on: none` donated itself as the real
+# field's value, and an example row in a fenced block in DECIDERS.md would have
+# authorized everyone it named — so the fence skip is the house rule, lifted from
+# `field` in process/03-define/validate-define.sh. Found by attacking this check
+# after writing it.
+#
 # This predicate is also written, identically, in
 # process/03-define/validate-define.sh, which owns the other section that may be
 # empty. The gates share no library and adding one would put a load-bearing
@@ -94,7 +102,11 @@ has() { grep -qiE "$2" "$1"; }
 # contracts and in CONTROLS.md, and what holds the two copies together is that
 # both suites pin the same behaviour rather than the expression.
 declares_empty() {
-  printf '%s\n' "$1" | grep -qE '<!--[[:space:]]*declared-empty:[^>]*[A-Za-z][^>]*-->'
+  printf '%s\n' "$1" | awk '
+    /^[ \t]*(```|~~~)/ { fence = !fence; next }
+    fence { next }
+    /<!--[ \t]*declared-empty:[^>]*[A-Za-z][^>]*-->/ { found = 1 }
+    END { exit found ? 0 : 1 }'
 }
 
 # tokens <text> -> the words of a text, one per line.
@@ -315,8 +327,16 @@ check_topic() {
     # one line of prose carrying a grade marker counted as an open item, which is
     # the second way a hollowed section passed: write the assertion, append the
     # marker, and the emptiness check is skipped rather than satisfied.
+    #
+    # The marker is FLUSH LEFT. An earlier version of this allowed leading
+    # whitespace, which counted an indented line as a nested item — and four
+    # spaces is a code block in Markdown, so a reader sees no item where the gate
+    # counted one. The tolerance bought nothing measurable: both shipped topics
+    # write their items flush left, and a genuinely nested item always sits under
+    # a parent that counts. Removed rather than kept in case, and the case is in
+    # the suite.
     seen=$(printf '%s\n' "$opensec" \
-      | grep -cE '^[[:space:]]*([-*+][[:space:]]|[0-9]+[.)][[:space:]]|\*\*).*\[O\]')
+      | grep -cE '^([-*+][[:space:]]|[0-9]+[.)][[:space:]]|\*\*).*\[O\]')
     if [ "$seen" -eq 0 ] && ! declares_empty "$opensec"; then
       refuse "$f" "-" "silent-empty-open" \
         "the open section lists no [O] item and does not declare itself empty: an artifact with nothing open is making a strong claim, and it has to make it as a declaration in the section — <!-- declared-empty: reason --> — not as a sentence. This was a search of the section's prose for a short word until 2026-10-04, and an artifact that deleted all seven of its items and asserted the opposite passed on the word \"nothing\""
