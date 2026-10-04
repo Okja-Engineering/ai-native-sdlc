@@ -5,6 +5,7 @@ options: [`../../04-develop/options/producing-themes.md`](../../04-develop/optio
 chosen: F
 decided_by: Matthew Van Dusen
 dated: 2026-10-01
+expires: 2026-11-30
 amends: none — F chose to measure before building, so nothing about how we work changed yet. The successor decision due 2026-11-30 is where an amendment would land.
 
 **Decided.** F — do nothing yet, and measure first, with a tripwire attached.
