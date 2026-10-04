@@ -100,6 +100,33 @@ out="$(run "$TMP/in-prose.md")"; st=$?
 assert_status 1 "$st" "a code moved out of the table into prose is refused"
 assert_contains "$out" "refuse[code-in-prose]" "and the refusal says to put it back in the table"
 
+# --- a prose code is compared as a whole code, not as a substring --------------
+# Found by tests/mutate-sweep.sh, by loosening the `grep -qxF` that asks whether a
+# prose code is already in the control's table. As a substring test, a prose mention
+# of `fixture-ref` is satisfied by the table citing `fixture-refusal`, and the prose
+# mention goes unchecked. Third time this shape has been found here: `uncited-claim`
+# against the bare string `S-`, the decider allowlist against a table cell, and now
+# this.
+out="$(run "$FIX/prefix-code.md")"; st=$?
+assert_status 1 "$st" "a prose code that is a prefix of a cited one is still refused"
+assert_contains "$out" "refuse[code-in-prose]" "and the refusal is code-in-prose"
+assert_contains "$out" 'refusal `fixture-ref`' "and it names the shorter code"
+
+# --- a refusal code the lister cannot read is a refusal, not a skip -----------
+# Found by tests/mutate-sweep.sh: deleting this refusal left every suite green. A site
+# whose code cannot be read is invisible to this check AND to a mutation sweep by line
+# number at the same time, which is the pair of blind spots that let the scan gate's
+# `id` refusal ship with no test.
+out="$(run "$FIX/unreadable-site.md")"; st=$?
+assert_status 1 "$st" "a refuse call whose code cannot be read is refused"
+assert_contains "$out" "refuse[site-unreadable]" "and the refusal is site-unreadable"
+assert_contains "$out" "unreadable-site.sh" "and it names the gate"
+
+# The same fixture gate does have one readable call, so this is about the unreadable
+# one and not about the gate being unreadable altogether.
+assert_contains "$(/bin/bash "$ROOT/bin/list-refusals.sh" "$FIX/unreadable-site.sh")" \
+  "fixture-refusal" "the fixture gate's other call is read normally"
+
 # --- a control with no enforcement at all -------------------------------------
 # CTRL-9 had no Enforced by line, which is how its five hook and CI controls were
 # outside the check.

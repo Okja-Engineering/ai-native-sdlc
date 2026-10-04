@@ -317,4 +317,47 @@ assert_contains "$(cat "$ROOT/DECIDERS.md")" \
   "$(sed -n 's/^decided_by:[[:space:]]*//p' "$ROOT/process/05-deliver/decisions/agent-pr-approval.md" | head -1)" \
   "the real decider list names the person the real record names"
 
+
+# --- a missing option set is named once, not twice -----------------------------
+# Found by tests/mutate-sweep.sh, by loosening `-eq 1` to `-ge 0` on the guard that
+# skips resolution when there is nothing to resolve. The gate then tried to resolve
+# an empty path and added `options-unresolved` on top of `no-options-link`: two
+# refusals naming two different problems where the record has one. The existing
+# assertion on `no-options-link` passes either way, which is why nothing caught it.
+#
+# This gate's own sibling already records what that costs a reader. The scan gate's
+# header describes an index shifted by one producing "four confident refusals that
+# each named the wrong problem".
+{
+  printf '%s\n\n' '# Decision — thing'
+  printf '%s\n' 'problem: [p](../../03-define/problems/thing.md)'
+  printf 'chosen: %s\n' 'A'
+  printf 'decided_by: %s\n' 'Ada Lovelace'
+  printf 'dated: %s\n' '2026-10-01'
+  printf 'amends: %s\n' '[s](../../../STANDARD.md#a-standard)'
+} > "$TMP/process/05-deliver/decisions/thing.md"
+assert_eq "0" "$(grep -c '^options:' "$TMP/process/05-deliver/decisions/thing.md")" \
+  "the fixture declares no option set"
+out="$(bash "$GATE" "$TMP/process/05-deliver/decisions/thing.md" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a decided record declaring no option set exits 1"
+assert_contains "$out" "refuse[no-options-link]" "and the refusal is no-options-link"
+assert_not_contains "$out" "refuse[options-unresolved]" \
+  "and the gate does not also refuse an option set it was never given"
+
+# --- the gate with no arguments reads the decisions directory ------------------
+# Found by tests/mutate-sweep.sh, by loosening `-gt 0` to `-ge 0` on the argument
+# count. The gate then took the "files were named" branch with nothing named, looped
+# over nothing, and reported "0 file(s) within the contract" and exit 0. CI runs this
+# gate with no arguments, so that is the gate this repository says guards the one
+# thing that cannot be reconstructed afterwards, reporting clean having read nothing.
+#
+# DECIDERS_FILE is unset for this call. The rest of the suite supplies its own decider
+# list on purpose, and here the point is the real records against the real list.
+out="$(cd "$ROOT" && unset DECIDERS_FILE && bash process/05-deliver/validate-decision.sh 2>&1)"
+rc=$?
+assert_status 0 "$rc" "the gate with no arguments passes over the real decision records"
+assert_not_contains "$out" "0 file(s)" "and does not report having checked nothing"
+nrec="$(ls "$ROOT"/process/05-deliver/decisions/*.md 2>/dev/null | grep -c .)"
+assert_contains "$out" "$nrec file(s)" "it checked every decision record (found $nrec)"
+
 assert_done

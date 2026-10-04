@@ -155,4 +155,58 @@ assert_contains "$out" "declared identity Grace Hopper <grace@example.invalid> a
 assert_not_contains "$(cat "$ROOT/.github/workflows/ci.yml")" "validate-authorship" \
   "the gate is not wired into CI while it cannot pass"
 
+
+# --- the identity match is a whole line, not a substring ----------------------
+# Found by tests/mutate-sweep.sh, by loosening `grep -qxF` to `grep -qF`. The
+# fixtures above compare identities that either match exactly or differ completely,
+# so the loosening changed nothing any of them could see.
+#
+# An author identity is `Name <address>`, so one is a substring of another only when
+# it is a SUFFIX of it — which is what a declared name carrying a title or a middle
+# name produces. The first version of this fixture used a shorter ADDRESS, which is
+# not a substring at all because of the closing angle bracket, and it passed against
+# the loosened gate. This is the same defect as `uncited-claim` against the bare
+# string `S-`: satisfying "resolves" while resolving to the wrong thing.
+R3="$TMP/suffix"
+mkdir -p "$R3/process/05-deliver/decisions" "$R3/bin"
+cp "$GATE" "$R3/bin/"
+cat > "$R3/DECIDERS.md" <<'DEC'
+# Authorized deciders
+
+| Name | Since | git identity |
+|---|---|---|
+| Ada Lovelace | 2026-01-01 | `Dr Ada Lovelace <ada@example.invalid>` |
+DEC
+( cd "$R3" && git init -q . \
+  && git -c user.name='Dr Ada Lovelace' -c user.email='ada@example.invalid' \
+       commit -q --allow-empty -m 'chore: set up' ) 2>/dev/null
+printf 'chosen: D\n' > "$R3/process/05-deliver/decisions/thing.md"
+( cd "$R3" && git add -A && git -c user.name='Ada Lovelace' -c user.email='ada@example.invalid' \
+    commit -q -m 'feat: decide without the title' ) 2>/dev/null
+out="$(cd "$R3" && bash bin/validate-authorship.sh 2>&1)"; rc=$?
+assert_status 1 "$rc" "an author identity that is a suffix of a declared one is refused"
+assert_contains "$out" "refuse[author-not-a-decider]" "and the refusal names the cause"
+
+# --- the reported count is a whole-line match too ------------------------------
+# A reported number rather than a refusal, and the number is what DECIDERS.md was
+# corrected against: it claimed a declared identity "already appears in this history"
+# while it appeared zero times. A substring match inflates it with every author whose
+# identity merely contains a declared one, which is the same shape the other way up.
+R4="$TMP/count"
+mkdir -p "$R4/process/05-deliver/decisions" "$R4/bin"
+cp "$GATE" "$R4/bin/"
+cat > "$R4/DECIDERS.md" <<'DEC'
+# Authorized deciders
+
+| Name | Since | git identity |
+|---|---|---|
+| Ada Lovelace | 2026-01-01 | `Ada Lovelace <ada@example.invalid>` |
+DEC
+( cd "$R4" && git init -q . \
+  && git -c user.name='Dr Ada Lovelace' -c user.email='ada@example.invalid' \
+       commit -q --allow-empty -m 'chore: a commit under a longer name' ) 2>/dev/null
+out="$(cd "$R4" && bash bin/validate-authorship.sh 2>&1)"
+assert_contains "$out" "authors 0 commit(s)" \
+  "a declared identity is not credited with a commit whose identity merely contains it"
+
 assert_done
