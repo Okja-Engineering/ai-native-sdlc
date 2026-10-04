@@ -132,7 +132,7 @@ Signing for decision commits is **not configured**, and configuring it belongs t
 | `declared-count` | the count `from:` declares is not the number of findings the source records |
 | `source-unreadable` | the ids of the declared source could not be read |
 | `no-outlier-section` | no outlier section at all |
-| `silent-empty-outliers` | the section lists nothing and does not say it is empty |
+| `silent-empty-outliers` | the section lists nothing and does not declare itself empty |
 | `no-source` | the record links no source artifact |
 | `source-unresolved` | the declared source does not resolve |
 | `source-is-example` | the declared source is marked `example: yes`, so it is not a real scan |
@@ -140,6 +140,8 @@ Signing for decision commits is **not configured**, and configuring it belongs t
 **Evidence.** The counts reconcile against the source artifact, which is linked and resolvable. This control caught a real defect before it was mechanised: a draft that grouped 54 of 64 findings and reported three wrong counts, where the ten strays included a pattern nobody had named.
 
 **Evidence note.** The accounting is a **set comparison by id**, not arithmetic. It was a total until 2026-10-03, when an external audit broke it two ways — lowercasing a finding's first letter removed it from the denominator, and two theme counts could move in opposite directions with the total reconciling.
+
+**Evidence note, the outlier section.** `define-contract.md` calls Outliers the load-bearing section, and the refusal that makes it load-bearing was a search of the section's prose for one of three short words until 2026-10-04. The section's own explanation of why outliers matter uses one of those words twice, so for cycle `2026-09-29` that refusal could never fire: deleting all three outliers left the section satisfying its own emptiness check. An empty section now declares itself empty in band and with a reason, `<!-- declared-empty: reason -->`, the same form CTRL-7 requires of an empty open section. The limit of it is *What is not controlled*, item 15.
 
 **Evidence note, the denominator.** The set comparison establishes that the ids accounted for are the ids the source **currently** carries, and says nothing about what the source was supposed to carry. Until 2026-10-04 a finding could be deleted from the findings table, its id dropped from the accounting block and one theme count decremented, and both gates reported the files within the contract — while the record's `from:` line declared 64 findings over a 63-row table and nothing read it. The declared count is now compared to the source's rows, so the three numbers — declared, recorded, accounted — have to agree.
 
@@ -209,7 +211,7 @@ All fifteen are listed. This said "fifteen refusals including" and named eight, 
 | Refusal | Condition |
 |---|---|
 | `no-open-section` | no "what could not be established" section |
-| `silent-empty-open` | the section lists nothing and does not say so |
+| `silent-empty-open` | the section lists no `[O]` item and does not declare itself empty |
 | `no-verified-by-hand` | coverage has no verified-by-hand part |
 | `empty-verified-by-hand` | the verified-by-hand part names nothing the artifact carries anywhere else |
 | `empty-coverage-part` | the reached or not-reached part names nothing the artifact carries anywhere else |
@@ -229,6 +231,10 @@ All fifteen are listed. This said "fifteen refusals including" and named eight, 
 **Evidence.** Coverage in three parts — reached, not reached, and **verified by hand** — which is what separates *an agent reported this* from *someone checked it*. Both shipped topics pass despite differing in markup, so the gate checks the contract rather than one artifact's formatting.
 
 **Evidence note.** Each part's check was two numbers until 2026-10-03 — a minimum separator count and a minimum character count — and the comment above them asserted that a fabricated part "tops out around 43 characters and 2 separators". It does not. A sentence denying that anything was checked passed with two commas added to it, and the same sentence without the commas was refused. The gate now requires each part to name something the artifact carries somewhere else, which is the thing the two numbers were a proxy for.
+
+**Evidence note, the open section.** This is the control behind the question *where did the process say it could not verify something*, and until 2026-10-04 it was a search of the section's prose for one of three short words. A review deleted all seven items from the open section of `topics/agent-pr-approval.md`, replaced them with *"the discovery was exhaustive and nothing of consequence remains outstanding"*, and the gate reported the artifact within the contract — an artifact deleting every disclosure it owed, asserting the opposite, and passing on one incidental word. Two more routes were found while repairing it and neither needed a word at all: the section's own trailing `---` separator was inside the body the check read and begins with a list marker, so it counted as an item; and an `[O]` anywhere in the body counted as an item.
+
+What the check reads now is a **declaration**, `<!-- declared-empty: reason -->`, inside the section — the shape `not-a-claim` and `dead-pointer` already use, checked for presence and for a reason. An open item is a list item carrying its `[O]` grade, which is what `discovery-contract.md` asks for and what both shipped topics write. The same declaration is what CTRL-4 now requires of an empty outlier section; one form, two sections, and the limit of it is *What is not controlled*, item 15.
 
 **What it does not cover.** Three things. The first is the limit of the repaired check, and is in *What is not controlled*, item 11. The other two of the checks the contract hoped for are **not mechanisable**, and the gate's own header says so rather than leaving the gap implicit:
 
@@ -451,3 +457,13 @@ What was found, and what each one does now:
 - **There is no mechanical check for the shape.** The sweep was a person reading every gate and both hooks and running each one with its input taken away. Nothing refuses a new gate written with the same shape, and the only thing that would is a convention nobody can enforce from inside a shell script.
 - **One mutant is known to be uncaught.** Replacing the discovery gate's variable with a `mktemp` whose write is not checked re-opens the fail-open, and no suite catches it, because it only fails when the temp area itself is broken. Recorded in `tests/test_validate_discovery.sh` at the site, with the reason the obvious test for it does not work.
 **14. A problem's `from:`.** CTRL-10 reads a problem's `rests on:` and not its `from:`, which the Define contract also declares as required. So a problem can name a cycle that does not exist, or name one without linking it, and the gate reports it within the contract. This is the same shape as two defects this repository has already found — `problem:` on a decision record, and `rests on:` itself — and it is left open rather than closed in the same change for a stated reason: no artifact has shown it failing, and the two it would check are both correct today. It is written down here so the next reader does not have to rediscover it.
+
+**15. Whether a section declared empty really is empty.** CTRL-4 and CTRL-7 both require a section with nothing in it to declare that in band and with a reason. That establishes two things and no more: the author made the claim deliberately, and recorded why. **A declaration that a section is empty is not evidence that nothing was found.** An author who found something and did not want to write it down can declare the section empty and the gate will accept it, exactly as an author can declare a real claim `not-a-claim` or a live pointer dead.
+
+What the declared form does change is narrower and worth stating exactly. The emptiness claim can no longer be made **by accident**: before this, prose that happened to contain a short word satisfied the check, which is how an artifact that deleted all seven of its disclosures and asserted the opposite passed. A declaration has to be written, it names the author's reason, and `git log` shows who added it. So the control moved from *a word appeared* to *somebody asserted this on the record* — and the assertion itself is still a reader's job to disbelieve.
+
+Two narrower limits of the same check:
+
+- **What counts as an item is a markup rule.** An open item is a list item carrying its `[O]` grade. A real open item written as unmarked prose is not counted, so an artifact can be refused for a section that does carry content — an actionable refusal rather than a silent pass, but a refusal of honest work all the same. In the other direction, a fabricated item in the right markup — a bullet asserting that nothing was left open, graded `[O]` — is counted as an item and the section is not read any further. That one is a fabricated graded claim rather than an incidental word, which is a higher bar and not a closed door.
+- **Nothing stops a third section being written with a fourth word search.** The two gates hold the declaration separately, because they share no library and adding one would put a load-bearing script outside the enumeration *Sideways* builds from the tree. The form is declared in both contracts and here, and both suites pin the same behaviour; none of that is a mechanism that would refuse a new gate written the old way.
+

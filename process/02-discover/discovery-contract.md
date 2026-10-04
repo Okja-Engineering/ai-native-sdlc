@@ -58,6 +58,16 @@ A mandatory section, listing `[O]` items explicitly. Not a footnote.
 
 This is the section a reader checks to find out whether the question was actually answered. In the worked artifact it carried the most consequential item of all — that the comparison the question implies *does not exist publicly and would have to be run.* An artifact with no `[O]` section is claiming completeness it has not earned.
 
+**An item is a list item carrying its `[O]` grade.** The marker may be a bullet, a number or a bold label — the two shipped topics differ on that and both are within the contract — but an item is an item. A line of prose carrying an `[O]` somewhere in it is not one.
+
+**An empty section is permitted, and it declares itself empty.** A phase that genuinely left nothing open is a real state. Saying so is a declaration in the section, naming the reason:
+
+`<!-- declared-empty: every question in scope was answered, and the searches that found nothing are recorded under Coverage -->`
+
+Same shape as `<!-- not-a-claim: … -->` and `<!-- dead-pointer: … -->` in `STANDARDS.md` and `SOURCES.md`, and the same two things are checked: the declaration is present, and it carries a reason. **A sentence is not a declaration**, and that distinction is the whole of why this is written down. Until 2026-10-04 the gate searched the section's prose for one of three short words, so an artifact could delete all seven of its items, write *"the discovery was exhaustive and nothing of consequence remains outstanding"*, and pass on the word "nothing". The declared form cannot be arrived at by accident, which is the only property that makes the section load-bearing.
+
+**What the declaration does not establish.** That nothing was found. It records that the author says the section is empty and why; whether that is true is a reader's job, and `CONTROLS.md` carries it under *what is not controlled*.
+
 ### Where this stops
 
 What a later phase will need that this phase could not supply, recorded so it is not rediscovered.
@@ -89,7 +99,7 @@ Built as `validate-discovery.sh` once discovery had run twice on differently sha
 | The check this contract named | Outcome |
 |---|---|
 | every claim carries a grade from the enum, and a source | **Not mechanisable.** See below |
-| the `[O]` section exists and is not empty without saying why | Built — `no-open-section`, `silent-empty-open` |
+| the `[O]` section exists and is not empty without declaring why | Built — `no-open-section`, `silent-empty-open` |
 | no recommendation language appears anywhere | **Deliberately not built.** See below |
 | the required sections are present, including *verified by hand* | Built — `no-question`, `no-coverage`, `no-not-reached`, `no-verified-by-hand`, `no-where-this-stops` |
 
