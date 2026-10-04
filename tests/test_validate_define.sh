@@ -185,6 +185,108 @@ assert_not_contains "$out" "0 file(s) within the contract" \
 ncyc="$(ls "$ROOT"/process/03-define/cycles/*.md 2>/dev/null | grep -c .)"
 assert_contains "$out" "$ncyc file(s) within the contract" \
   "it checked every cycle file in the directory (found $ncyc)"
+# --- the declared count is the denominator ------------------------------------
+# The set comparison establishes that the accounting matches the source. It says
+# nothing about what the source was supposed to contain, so a finding could be
+# deleted from the source, dropped from the accounting block and decremented out
+# of one theme count, and every check above still reconciled. `from:` declares the
+# count and nothing read it.
+#
+# No number is written literally in any of these cases. They read the declared
+# count out of the file, change the file, and compare against what they computed —
+# a literal would pin this suite to today's artifact, which is the coupling that
+# made a tampered artifact break the suite's own mutations.
+
+# declared_count <cycle file> — the count the `from:` field states.
+declared_count() {
+  sed -n 's/^from:.*,[[:space:]]*\([0-9][0-9]*\)[[:space:]]*findings.*/\1/p' "$1" | head -1
+}
+
+# drop_finding <tree> <id> — delete the row from the source, drop the id from the
+# accounting block, and take one off the first theme count, so every check that
+# existed before this one still reconciles.
+drop_finding() {
+  local t="$1" id="$2"
+  perl -0pi -e "s/^\\| $id \\|.*\\n//m" "$t/process/01-scan/findings/2026-09-29.md"
+  perl -0pi -e "s/\\b$id //" "$t/$CYCLE_REL"
+  awk 'BEGIN { done = 0 }
+       done == 0 && /^\*\*[0-9]+ findings/ {
+         match($0, /[0-9]+/)
+         printf "%s%d%s\n", substr($0, 1, RSTART - 1), substr($0, RSTART, RLENGTH) - 1, \
+           substr($0, RSTART + RLENGTH)
+         done = 1; next
+       }
+       { print }' "$t/$CYCLE_REL" > "$t/cycle.tmp" && mv "$t/cycle.tmp" "$t/$CYCLE_REL"
+}
+
+t="$(fresh_tree deletion)"
+before="$(declared_count "$t/$CYCLE_REL")"
+drop_finding "$t" F07
+# The mutation has to have landed, or the assertions below would be about an
+# unmodified file. This is asserted rather than assumed: a mutation that silently
+# does nothing is how a suite reports a defect in the wrong place.
+assert_eq "$((before - 1))" \
+  "$(/bin/bash "$ROOT/process/01-scan/findings-ids.sh" "$t/process/01-scan/findings/2026-09-29.md" | grep -c .)" \
+  "the fixture now records one finding fewer than the cycle declares"
+out="$(gate "$t")"; rc=$?
+assert_status 1 "$rc" "a deleted finding reconciled through the accounting still exits 1"
+assert_contains "$out" "refuse[declared-count]" "the declared count is compared to the source"
+assert_contains "$out" "declares $before findings" "the refusal names the count the record declares"
+assert_contains "$out" "the source records $((before - 1))" "and the count the source actually carries"
+assert_contains "$out" "not a filter" "and the rule it enforces"
+
+# The stated limit, so nobody reads this as more than it is: correcting the
+# declared count as well makes the record internally consistent again and the gate
+# passes. The denominator is anchored to what the scan recorded, not to the world.
+# CONTROLS.md CTRL-4 says so in the same words.
+t="$(fresh_tree deletion_full)"
+before="$(declared_count "$t/$CYCLE_REL")"
+drop_finding "$t" F07
+perl -0pi -e "s/, $before findings/, @{[$before - 1]} findings/" "$t/$CYCLE_REL"
+assert_eq "$((before - 1))" "$(declared_count "$t/$CYCLE_REL")" "the declared count was corrected too"
+out="$(gate "$t")"; rc=$?
+assert_status 0 "$rc" "editing the declared count as well is NOT detected — the stated limit"
+
+# A `from:` that links a source and states no count at all.
+t="$(fresh_tree nocount)"
+perl -0pi -e 's/^(from: \[[^\n]*\]\([^)]*\)).*$/$1/m' "$t/$CYCLE_REL"
+assert_eq "" "$(declared_count "$t/$CYCLE_REL")" "the fixture now declares no count"
+out="$(gate "$t")"; rc=$?
+assert_status 1 "$rc" "a from: field with no item count exits 1"
+assert_contains "$out" "refuse[no-declared-count]" "and names the missing count"
+
+# --- a finding moved out of the findings table --------------------------------
+# A way to drop a finding that was not one of the reported exploits: take the row
+# out of `## Findings` and leave it in a table inside `## Looked at`, which the
+# findings contract permits content in. Stage 1 accepts the file — the row is not
+# in the findings table, so nothing there looks at it — and the id is still
+# present in the file, so an extractor reading the whole file sees no change.
+t="$(fresh_tree moved_row)"
+SRC="$t/process/01-scan/findings/2026-09-29.md"
+before="$(declared_count "$t/$CYCLE_REL")"
+moved="$(grep '^| F07 |' "$SRC")"
+perl -0pi -e 's/^\| F07 \|.*\n//m' "$SRC"
+awk -v row="$moved" '
+  $0 ~ /^## Findings[[:space:]]*$/ && done == 0 {
+    print "| id | what |"; print "|---|---|"; print row; print ""
+    done = 1
+  }
+  { print }' "$SRC" > "$SRC.tmp" && mv "$SRC.tmp" "$SRC"
+assert_contains "$(cat "$SRC")" "| F07 |" "the row is still in the file"
+out="$(/bin/bash "$ROOT/process/01-scan/validate-findings.sh" "$SRC" 2>&1)"; rc=$?
+assert_status 0 "$rc" "stage 1 accepts the file, so the Define gate is the only thing standing here"
+out="$(gate "$t")"; rc=$?
+assert_status 1 "$rc" "a finding moved out of the findings table exits 1"
+assert_contains "$out" "refuse[declared-count]" "and the declared count catches it"
+
+# --- the gate will not run without the harvester ------------------------------
+# Exit 2 is "could not run". Reporting the tree clean with no denominator is the
+# shape bin/validate-claims.sh was caught in, and it is worse than a refusal.
+t="$(fresh_tree noharvest)"
+rm -f "$t/process/01-scan/findings-ids.sh"
+out="$(FINDINGS_IDS="$t/process/01-scan/findings-ids.sh" bash "$ROOT/process/03-define/validate-define.sh" "$t/$CYCLE_REL" 2>&1)"; rc=$?
+assert_status 2 "$rc" "a missing id harvester exits 2 rather than reporting the tree clean"
+assert_contains "$out" "will not run without it" "and says it will not run"
 
 # --- a problem is checked too -------------------------------------------------
 # No gate read a problem or an option at all. `rests on:` is the only thing
