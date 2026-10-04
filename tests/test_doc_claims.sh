@@ -210,16 +210,25 @@ assert_eq "no" "$fires" "a phase named away from the claim is a mention, not the
 # recorded. Same three rules as `dead-pointer` and `not-a-claim`.
 OVERCLAIM='all of it in git|everything is in git|entirely in git'
 
-# declared <line text> -> 0 when the line declares the overclaim it carries
+# declared <keyword> <phrase pattern> <line text> -> 0 when the line declares the
+# claim it carries
 #
 # One implementation, used for the real documents and for the fixtures below, so a
 # fixture proves the decision this makes rather than a second copy of it.
+#
+# The pattern and the declaration keyword are arguments rather than baked in. The
+# overclaim here and the stale authorship claim further down are one problem — a
+# line carrying a sentence that stopped being true, quoted by the line that
+# corrects it — and the three rules for retiring one are the same three rules for
+# retiring the other. Two copies of them would be two things to get wrong. The
+# keyword still differs, so a reader of a declaration can tell what kind of claim
+# it retires.
 declared() {
-  local text="$1" phrase decl rest
-  phrase="$(printf '%s' "$text" | grep -oiE "$OVERCLAIM" | head -1 | tr 'A-Z' 'a-z')"
-  [ -n "$phrase" ] || return 0                       # no overclaim on the line
+  local kw="$1" pat="$2" text="$3" phrase decl rest
+  phrase="$(printf '%s' "$text" | grep -oiE "$pat" | head -1 | tr 'A-Z' 'a-z')"
+  [ -n "$phrase" ] || return 0                       # no such claim on the line
   decl="$(printf '%s' "$text" \
-    | sed -n 's/.*<!--[[:space:]]*corrected-overclaim:\([^>]*\)-->.*/\1/p' \
+    | sed -n "s/.*<!--[[:space:]]*${kw}:\([^>]*\)-->.*/\1/p" \
     | tr 'A-Z' 'a-z')"
   case "$decl" in
     *"$phrase"*) ;;
@@ -236,7 +245,7 @@ overclaim=""
 while IFS= read -r hit; do
   [ -n "$hit" ] || continue
   loc="${hit%%:*}:$(printf '%s' "${hit#*:}" | cut -d: -f1)"
-  declared "${hit#*:}" || overclaim="$overclaim $loc"
+  declared corrected-overclaim "$OVERCLAIM" "${hit#*:}" || overclaim="$overclaim $loc"
 done <<EOF
 $(git grep -niIE "$OVERCLAIM" -- '*.md' ':(exclude)tests/*' 2>/dev/null || true)
 EOF
@@ -245,29 +254,29 @@ assert_eq "" "$overclaim" "no document claims the whole chain is in git"
 # --- and the exemption has to be able to refuse -------------------------------
 # Five constructed lines. The second is the exploit the whole-line version let
 # through, so it is the one that matters.
-declared 'The whole chain is all of it in git.' \
+declared corrected-overclaim "$OVERCLAIM" 'The whole chain is all of it in git.' \
   && r=exempt || r=flagged
 assert_eq "flagged" "$r" "a bare overclaim is flagged"
 
-declared 'The chain is claimed to be all of it in git.' \
+declared corrected-overclaim "$OVERCLAIM" 'The chain is claimed to be all of it in git.' \
   && r=exempt || r=flagged
 assert_eq "flagged" "$r" "the word claimed elsewhere on the line does not exempt it"
 
-declared 'AGENTS.md said *"All of it in git."* <!-- corrected-overclaim: all of it in git — the line is the correction -->' \
+declared corrected-overclaim "$OVERCLAIM" 'AGENTS.md said *"All of it in git."* <!-- corrected-overclaim: all of it in git — the line is the correction -->' \
   && r=exempt || r=flagged
 assert_eq "exempt" "$r" "a declaration naming the phrase and carrying a reason exempts it"
 
-declared 'AGENTS.md said *"All of it in git."* <!-- corrected-overclaim: all of it in git -->' \
+declared corrected-overclaim "$OVERCLAIM" 'AGENTS.md said *"All of it in git."* <!-- corrected-overclaim: all of it in git -->' \
   && r=exempt || r=flagged
 assert_eq "flagged" "$r" "a declaration carrying no reason exempts nothing"
 
-declared 'AGENTS.md said *"All of it in git."* <!-- corrected-overclaim: everything is in git — wrong phrase -->' \
+declared corrected-overclaim "$OVERCLAIM" 'AGENTS.md said *"All of it in git."* <!-- corrected-overclaim: everything is in git — wrong phrase -->' \
   && r=exempt || r=flagged
 assert_eq "flagged" "$r" "a declaration naming a different phrase exempts nothing"
 
 # A line with no overclaim on it is not flagged, or the loop above would report
 # every line of every document.
-declared 'The process chain is readable end to end from a clone.' \
+declared corrected-overclaim "$OVERCLAIM" 'The process chain is readable end to end from a clone.' \
   && r=exempt || r=flagged
 assert_eq "exempt" "$r" "a line carrying no overclaim is not flagged"
 
@@ -317,8 +326,8 @@ assert_eq "yes" "$found" "the detection fires on a script path that does not exi
 # nothing noticed for as long as nobody re-ran it by hand.
 #
 # The invariant: a transcribed git measurement is immediately preceded by the
-# command that produces it. Not that the number is right — that is below, under
-# what this does not establish — but that a reader has a way to find out.
+# command that produces it. Whether the number is right is the next section, which
+# runs that command. This one is only that a reader has a way to find out.
 #
 # A tally line is a count, then a name, then a bracketed address: the output shape
 # of `git log --format='%an <%ae>' | sort | uniq -c`. A markdown table row is not
@@ -379,6 +388,456 @@ assert_eq "$TMP/tally-far.md:$((WINDOW + 2)) " "$(unsourced_tallies "$TMP/tally-
 printf '| Name | git identity |\n| Ada | `Ada <ada@example.invalid>` |\n' > "$TMP/table.md"
 assert_eq "" "$(grep -E "$TALLY" "$TMP/table.md" || true)" \
   "a markdown table row naming an address is not read as a tally"
+
+# --- and it agrees with the history at the ref its command names ---------------
+# The section above establishes that a reader has a way to find out whether a
+# transcribed tally is right. It does not establish that it IS right, and the
+# difference cost exactly what it sounds like: `DECIDERS.md` carried `63 / 32` and
+# 95 commits under a correct command, and a clone at the same time printed
+# `89 / 74 / 43` and 206. The command was sitting right above the numbers. Nobody
+# ran it.
+#
+# The invariant: a transcribed tally equals what git prints at the ref its own
+# command names. No count is pinned here — the expected value is read out of the
+# history on every run — so this cannot go stale, and it cannot be satisfied by
+# editing one literal into agreement with another.
+#
+# This is also what forces a transcription to name a commit rather than a branch.
+# `main` moves, so a tally labelled `main` stops agreeing the next time anybody
+# commits and this goes red; a tally labelled with the commit it was measured at
+# agrees forever. The document ends up reproducible because the reproducible form
+# is the only one that passes.
+#
+# A ref that does not resolve in this checkout is reported, not skipped. A
+# measurement nobody here can reproduce is the defect rather than an excuse to
+# look away, and `bin/validate-standards.sh` already takes that line — it exits 2
+# in a depth-1 clone instead of reporting the documents clean against history it
+# cannot see. Both CI legs check out full history for the same reason.
+
+# the ref a `git log` command names, or empty when it names only options
+tally_ref() {
+  printf '%s' "$1" \
+    | sed -E -e 's/.*git log[[:space:]]+//' -e 's/[[:space:]].*//' -e 's/^-.*//'
+}
+
+# a transcribed tally line reduced to what git would print for it. The trailing
+# annotation `<- agent-driven commits` is a reader's note, not part of the
+# measurement, so it is dropped before comparing.
+tally_entry() {
+  printf '%s' "$1" \
+    | sed -E -e 's/^[[:space:]]*#?[[:space:]]*//' \
+             -e 's/^([0-9]+)[[:space:]]+([^<]*<[^>]*>).*/\1 \2/'
+}
+
+# One implementation, used for the real documents and for the fixtures below.
+stale_tallies() { # <files...> -> `file:line` for each tally that disagrees
+  local hit f n from cmd ref want got
+  for hit in $(grep -nE "$TALLY" "$@" /dev/null 2>/dev/null | cut -d: -f1,2 | sort -u); do
+    f="${hit%%:*}"; n="${hit##*:}"
+    from=$((n - WINDOW)); [ "$from" -lt 1 ] && from=1
+    cmd="$(sed -n "${from},${n}p" "$f" | grep -E "$COMMAND" | tail -1)"
+    # A tally with no command above it is the section above's finding, not this
+    # one's. Reporting it twice would say one defect is two.
+    [ -n "$cmd" ] || continue
+    ref="$(tally_ref "$cmd")"
+    if [ -z "$ref" ] || ! git rev-parse --verify --quiet "$ref^{commit}" >/dev/null 2>&1; then
+      printf '%s(ref:%s) ' "$hit" "${ref:-none}"
+      continue
+    fi
+    # A failed `git log` must not read as an empty tally, for the same reason
+    # `bin/validate-authorship.sh` refuses to run when it cannot read the history.
+    if ! want="$(git log "$ref" --format='%an <%ae>' 2>/dev/null)"; then
+      printf '%s(git-log-failed-at:%s) ' "$hit" "$ref"
+      continue
+    fi
+    want="$(printf '%s\n' "$want" | sort | uniq -c | sed -E 's/^[[:space:]]*//')"
+    got="$(tally_entry "$(sed -n "${n}p" "$f")")"
+    printf '%s\n' "$want" | grep -qxF "$got" || printf '%s(doc:%s) ' "$hit" "$got"
+  done
+}
+
+# shellcheck disable=SC2046
+stale="$(stale_tallies $(git grep -lIE "$TALLY" -- '*.md' '*.sh' ':(exclude)tests/*' 2>/dev/null))"
+assert_eq "" "${stale% }" \
+  "a transcribed git author tally agrees with the history at the ref it names"
+
+# The fixtures are built out of this repository's own history rather than from
+# numbers typed here, so they cannot drift into agreement the way the documents
+# drifted out of it.
+real_top="$(git log HEAD --format='%an <%ae>' | sort | uniq -c | sort -rn \
+            | sed -E 's/^[[:space:]]*//' | head -1)"
+
+tally_fixture() { # <file> <ref> <tally line>
+  { printf '```\n$ git log %s --format=%%an <%%ae> | sort | uniq -c\n' "$2"
+    printf '  %s\n```\n' "$3"
+  } > "$1"
+}
+
+tally_fixture "$TMP/tally-true.md" HEAD "$real_top"
+assert_eq "" "$(stale_tallies "$TMP/tally-true.md")" \
+  "a tally that agrees with the history at the ref it names passes"
+
+tally_fixture "$TMP/tally-count.md" HEAD "$(printf '%s' "$real_top" | awk '{ $1 = $1 + 1; print }')"
+case "$(stale_tallies "$TMP/tally-count.md")" in
+  "$TMP/tally-count.md:3"*) fires=yes ;; *) fires=no ;;
+esac
+assert_eq "yes" "$fires" "the detection fires on a tally whose count disagrees with the history"
+
+# A right count against the wrong identity is the same defect, so the comparison
+# is over the whole line rather than the number alone.
+tally_fixture "$TMP/tally-whom.md" HEAD \
+  "$(printf '%s' "$real_top" | sed -E 's/<[^>]*>/<nobody@example.invalid>/')"
+case "$(stale_tallies "$TMP/tally-whom.md")" in
+  "$TMP/tally-whom.md:3"*) fires=yes ;; *) fires=no ;;
+esac
+assert_eq "yes" "$fires" "the detection fires on a tally attributed to the wrong identity"
+
+# A ref nobody can resolve is reported rather than skipped, or an unreproducible
+# measurement would be the one shape that escapes.
+tally_fixture "$TMP/tally-deadref.md" no-such-ref-here '7 somebody <shared@example.invalid>'
+case "$(stale_tallies "$TMP/tally-deadref.md")" in
+  *"(ref:no-such-ref-here)"*) fires=yes ;; *) fires=no ;;
+esac
+assert_eq "yes" "$fires" "a tally sourced to a ref that does not resolve is reported"
+
+# And a command that names no ref at all cannot be reproduced either: `git log`
+# with only options measures whatever the reader happens to have checked out.
+printf '```\n$ git log --format=%%an <%%ae> | sort | uniq -c\n  7 somebody <shared@example.invalid>\n```\n' \
+  > "$TMP/tally-noref.md"
+case "$(stale_tallies "$TMP/tally-noref.md")" in
+  *"(ref:none)"*) fires=yes ;; *) fires=no ;;
+esac
+assert_eq "yes" "$fires" "a tally whose command names no ref is reported"
+
+# --- a transcribed signature check agrees with git ----------------------------
+# CTRL-1's start date rests on nothing in the history being signed: proof that a
+# person recorded a decision begins with the next decision, by commit signature,
+# and the two decisions that already exist are recorded as predating that. The
+# claim underneath it is a present-tense statement about `git log`, so it is held
+# to the same rule as the author tally above — the document transcribes the command
+# and its output, and this runs the command.
+#
+# `N` is not pinned. The expected value is whatever git reports, so the day a
+# commit is signed this goes red and the sentences resting on the claim have to be
+# revisited. That is the point of the check rather than a side effect of it: the
+# start date stops being a start date once something is signed.
+#
+# A mention of the command in prose is not a transcription. The reasoning is the
+# same as the linked-path exemption at the top of this file — you cannot both quote
+# a command inline and be transcribing its output on the next line — so only an
+# occurrence opening a fenced block is read as one.
+#
+# WHAT IS COMPARED, AND WHY IT IS PER COMMIT
+#
+# The transcript's rows are read and each one is checked against git: a row is a
+# revision and the status the document says it has. Not the whole command's output,
+# because `%G?` over a range is not reproducible — it is a fact about the reader's
+# keyring, not about the objects. 74 of the commits here carry GitHub's PGP
+# signature on merges it performed, and `%G?` for those reads `E` where the key is
+# missing and `N` on a machine with no `gpg` at all. That is how a claim that
+# nothing in this repository is signed came to be written down: it was measured
+# where `gpg` was not installed, and the first version of this check went green
+# locally and red on both CI legs for exactly that reason.
+#
+# A row naming an unsigned commit is reproducible everywhere, because a commit with
+# no signature header reads `N` with or without `gpg`. So the document transcribes
+# the commits the control is about, and this checks those.
+SIG_COMMAND="--format='%h %G?'"
+
+# Does this object carry a signature header? A fact about the object, readable with
+# no keyring and no `gpg` binary, unlike the status. Only the commit headers are
+# read, so a message line starting with the word cannot be mistaken for one.
+carries_signature() { # <rev> -> 0 when it does
+  git cat-file -p "$1" 2>/dev/null \
+    | awk '/^$/ { exit } /^gpgsig/ { found = 1 } END { exit !found }'
+}
+
+sig_transcripts() { # <files...> -> `file:line(...)` for each row git disagrees with
+  local hit f n prev row rev said want rows
+  for hit in $(grep -nF -- "$SIG_COMMAND" "$@" /dev/null 2>/dev/null | cut -d: -f1,2 | sort -u); do
+    f="${hit%%:*}"; n="${hit##*:}"
+    [ "$n" -gt 1 ] || continue
+    prev="$(sed -n "$((n - 1))p" "$f")"
+    case "$prev" in '```'*) ;; *) continue ;; esac
+    rows=0
+    while IFS= read -r row; do
+      [ -n "$row" ] || continue
+      rev="${row%% *}"; said="${row##* }"
+      rows=$((rows + 1))
+      if ! git cat-file -e "$rev^{commit}" 2>/dev/null; then
+        printf '%s(unreadable:%s) ' "$hit" "$rev"
+        continue
+      fi
+      # A row naming a commit that DOES carry a signature is refused outright,
+      # whatever status it claims. That status is a fact about the reader's keyring,
+      # so the row would be true on one machine and false on the next — which is the
+      # defect this check was built after walking into. Transcribe the commits the
+      # control is about; they have no signature and read `N` everywhere.
+      if carries_signature "$rev"; then
+        printf '%s(%s carries a signature, so its status depends on the reader) ' "$hit" "$rev"
+        continue
+      fi
+      # A FAILED `git log` MUST NOT READ AS A STATUS. `bin/validate-authorship.sh`
+      # carries the same rule after a mistyped ref turned that gate off and reported
+      # the thing it exists to refuse.
+      if ! want="$(git log -1 --format='%G?' "$rev" 2>/dev/null)"; then
+        printf '%s(unreadable:%s) ' "$hit" "$rev"
+        continue
+      fi
+      # Both sides in the message. A failure naming only the transcript makes the
+      # reader rerun the command by hand to find out what it disagreed with.
+      [ "$said" = "$want" ] || printf '%s(%s doc:%s|git:%s) ' "$hit" "$rev" "$said" "$want"
+    done <<EOF
+$(sed -n "$((n + 1)),\$p" "$f" | awk '/^```/ { exit } { print }')
+EOF
+    # A fenced block with no rows in it is a claim with nothing under it.
+    [ "$rows" -gt 0 ] || printf '%s(no-rows) ' "$hit"
+  done
+}
+
+# shellcheck disable=SC2046
+sigfiles="$(git grep -lF -- "$SIG_COMMAND" -- '*.md' ':(exclude)tests/*' 2>/dev/null)"
+sigbad="$(sig_transcripts $sigfiles)"
+assert_eq "" "${sigbad% }" "a transcribed signature check agrees with what git reports"
+
+# And a document actually transcribes it, or the sweep above walked nothing. The
+# claim CTRL-1's start date rests on has to be somewhere a reader can check.
+nsig=0
+for f in $sigfiles; do
+  nsig=$((nsig + $(grep -cF -- "$SIG_COMMAND" "$f" || true)))
+done
+[ "$nsig" -ge 1 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "a document carries the signature check CTRL-1 rests on (found $nsig)"
+
+# The detection has to fire. The expected transcript is built from what git reports
+# for this checkout, never from `N` typed here, so it cannot drift into agreement.
+# The fixtures name a commit found in this history rather than `HEAD`. `HEAD` on a
+# pull-request checkout is the merge commit the forge made, which the forge signs —
+# so fixtures built on it were refused as signed on both CI legs while passing
+# locally. A fixture pinned to a property of the current checkout is the same defect
+# as a document pinned to the reader's keyring, one layer down.
+sig_unsigned=""
+for c in $(git rev-list -n 300 HEAD); do
+  if ! carries_signature "$c"; then sig_unsigned="$c"; break; fi
+done
+[ -n "$sig_unsigned" ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "the history holds an unsigned commit to build fixtures on"
+sig_status="$(git log -1 --format='%G?' "$sig_unsigned" 2>/dev/null)"
+assert_eq "N" "$sig_status" "an unsigned commit reports N, on any machine"
+
+sig_fixture() { # <file> <row...>
+  local out="$1"; shift
+  { printf '```\n$ git log --no-walk %s %s\n' "$SIG_COMMAND" "$sig_unsigned"
+    printf '%s\n' "$@"
+    printf '```\n'
+  } > "$out"
+}
+
+sig_fixture "$TMP/sig-true.md" "$sig_unsigned $sig_status"
+assert_eq "" "$(sig_transcripts "$TMP/sig-true.md")" \
+  "a transcript that agrees with git on every row passes"
+
+sig_fixture "$TMP/sig-wrong.md" "$sig_unsigned G"
+case "$(sig_transcripts "$TMP/sig-wrong.md")" in
+  "$TMP/sig-wrong.md:2($sig_unsigned doc:G|git:$sig_status)"*) fires=yes ;; *) fires=no ;;
+esac
+assert_eq "yes" "$fires" "the detection fires on a row git does not agree with"
+
+# One true row must not cover a false one, or a transcript could be padded into
+# passing.
+sig_fixture "$TMP/sig-mixed.md" "$sig_unsigned $sig_status" "$sig_unsigned G"
+case "$(sig_transcripts "$TMP/sig-mixed.md")" in
+  *"($sig_unsigned doc:G|git:$sig_status)"*) fires=yes ;; *) fires=no ;;
+esac
+assert_eq "yes" "$fires" "a true row does not cover a false one in the same transcript"
+
+sig_fixture "$TMP/sig-deadrev.md" "no-such-rev-here N"
+case "$(sig_transcripts "$TMP/sig-deadrev.md")" in
+  *"(unreadable:no-such-rev-here)"*) fires=yes ;; *) fires=no ;;
+esac
+assert_eq "yes" "$fires" "a row naming a revision git cannot read is reported, not skipped"
+
+# And a row naming a commit that carries a signature is refused however it reads.
+# Found from the history rather than named here: the web merges carry GitHub's PGP
+# key, and a status for one of them is true on a machine with that key and false on
+# a machine without it.
+sig_signed=""
+for c in $(git rev-list -n 300 HEAD); do
+  if carries_signature "$c"; then sig_signed="$c"; break; fi
+done
+[ -n "$sig_signed" ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "the history holds a signed commit to test the refusal against"
+sig_fixture "$TMP/sig-signed.md" "$sig_signed N"
+case "$(sig_transcripts "$TMP/sig-signed.md")" in
+  *"carries a signature"*) fires=yes ;; *) fires=no ;;
+esac
+assert_eq "yes" "$fires" "a row naming a signed commit is refused whatever status it claims"
+
+# An empty fence is a claim with nothing under it.
+printf '```\n$ git log --no-walk %s HEAD\n```\n' "$SIG_COMMAND" > "$TMP/sig-empty.md"
+case "$(sig_transcripts "$TMP/sig-empty.md")" in
+  *"(no-rows)"*) fires=yes ;; *) fires=no ;;
+esac
+assert_eq "yes" "$fires" "a transcript with no rows is reported"
+
+# A mention in prose is not a transcript, or every sentence naming the command
+# would be demanding that the next line be its output.
+printf 'Run `git log --no-walk %s 59b7cd2` to check it yourself.\nThe start date is in CTRL-1.\n' \
+  "$SIG_COMMAND" > "$TMP/sig-mention.md"
+assert_eq "" "$(sig_transcripts "$TMP/sig-mention.md")" \
+  "a command mentioned in prose is not read as a transcript"
+
+# --- a present-tense claim about `git log` agrees with what the gate prints -----
+# Three documents said, in the present tense, that every commit on `main` was
+# authored under one address, and named `bin/validate-authorship.sh` in the same
+# breath as the way to check. A distinct agent identity was configured on
+# 2026-10-03 and all three sentences stayed. The gate had been printing the
+# contradiction on every run since, and the documents telling a reader to run it
+# were the documents it contradicted.
+#
+# The invariant: a document may assert the live author-identity state of the
+# history only while the gate agrees. The expected answer is read out of the
+# gate's own output rather than re-derived from `git log` here, because a second
+# derivation is a second thing to go stale — and because the claim being checked
+# is literally what the gate prints.
+#
+# No count is pinned. Both predicates are recomputed on every run, so on the day
+# the history does come back to one address that sentence becomes legal again
+# without this check being touched.
+#
+# A correction has to quote the sentence it corrects, so it needs the same in-band
+# declaration the overclaim above uses, with the same three rules: name the phrase,
+# carry a reason, and be a declaration rather than a word somewhere on the line.
+#
+#   <!-- corrected-claim: under one address — reason -->
+#
+# The honest limit: this reads a frame, not a sentence. `under one address` and the
+# near-forms of it are covered because they are tied to the frame; a document that
+# says the same thing some other way escapes, and widening the list further would
+# be chasing phrasings — which `AGENTS.md` already says is not how to fix a
+# denylist. It is narrow the same way the absence phrases at the top of this file
+# are narrow. What does not escape is the transcribed tally, which is checked
+# against git exactly, so the numbers a reader would act on are covered by the
+# section above whatever the prose does.
+#
+# Attacked before shipping: a fresh one-address sentence appended to `README.md` is
+# caught, a fresh tally with a correct command and wrong numbers appended to
+# `intent.md` is caught, and `the whole history sits on a single email` was not
+# until the frame was widened to the one below.
+GATE='bin/validate-authorship.sh'
+# The gate refuses today — that refusal is its finding, not a failure to run — so a
+# non-zero exit here is expected and the output is what is wanted.
+gate_out="$(/bin/bash "$GATE" 2>/dev/null || true)"
+
+# `    89 imagineux <imagineux@gmail.com>` -> the address
+gate_addresses="$(printf '%s\n' "$gate_out" \
+  | sed -n -E 's/^[[:space:]]+[0-9]+[[:space:]]+[^<]*<([^>]*)>.*/\1/p' \
+  | sort -u | grep -c . || true)"
+# `  declared identity Name <addr> authors N commit(s) on main`
+gate_declared="$(printf '%s\n' "$gate_out" | grep -c 'declared identity' || true)"
+gate_declared_idle=yes
+printf '%s\n' "$gate_out" | grep -qE 'declared identity .* authors [1-9]' && gate_declared_idle=no
+
+# The gate's output is the denominator for everything below, so an empty one is a
+# failure rather than a quiet pass over nothing.
+[ "$gate_addresses" -ge 1 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "the gate prints the author addresses in the history (found $gate_addresses)"
+[ "$gate_declared" -ge 1 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "the gate prints what each declared identity authors (found $gate_declared)"
+
+# The history sits on one address. A frame — a preposition, a singular quantity, a
+# noun — rather than the three sentences verbatim, so a paraphrase of the claim
+# does not walk past it. `One address per party` in DECIDERS.md is a plan for the
+# future rather than a claim about the history, and the preposition is what keeps
+# it out.
+#
+# `[ *_]+` rather than a space between the words, because markdown emphasis sits
+# inside a sentence. `authors **no commits** at all` in this repository's own
+# DECIDERS.md is the live case: a plain-space pattern reads it as `authors **no`
+# and walks past the claim.
+ONE_ADDRESS='(under|on)[ *_]+(one|a[ *_]+single)[ *_]+(address|e-?mail)'
+# No declared decider identity has authored anything.
+IDLE_IDENTITY='authors[ *_]+(nothing|no[ *_]+commits)'
+
+claim_hits() { # <pattern> [files...] -> file:line:text
+  local pat="$1"; shift
+  if [ "$#" -gt 0 ]; then
+    grep -niIE "$pat" "$@" /dev/null 2>/dev/null || true
+  else
+    # `git grep`, so untracked scratch files cannot fail the suite — and so this
+    # has to be verified after staging rather than after the last edit.
+    git grep -niIE "$pat" -- '*.md' ':(exclude)tests/*' 2>/dev/null || true
+  fi
+}
+
+# false_claims <keyword> <pattern> <the claim is false: yes|no> [files...]
+#   -> `file:line` for every undeclared line carrying a claim that is false
+false_claims() {
+  local kw="$1" pat="$2" is_false="$3" out="" hit loc
+  shift 3
+  [ "$is_false" = yes ] || return 0
+  while IFS= read -r hit; do
+    [ -n "$hit" ] || continue
+    loc="${hit%%:*}:$(printf '%s' "${hit#*:}" | cut -d: -f1)"
+    declared "$kw" "$pat" "${hit#*:}" || out="$out $loc"
+  done <<EOF
+$(claim_hits "$pat" "$@")
+EOF
+  printf '%s' "${out# }"
+}
+
+[ "$gate_addresses" -gt 1 ] && one_address_false=yes || one_address_false=no
+assert_eq "" "$(false_claims corrected-claim "$ONE_ADDRESS" "$one_address_false")" \
+  "no document says the history is under one address while the gate prints more"
+
+[ "$gate_declared_idle" = no ] && idle_false=yes || idle_false=no
+assert_eq "" "$(false_claims corrected-claim "$IDLE_IDENTITY" "$idle_false")" \
+  "no document says a declared identity authors nothing while the gate prints commits for it"
+
+# --- and the detection has to be able to fire ---------------------------------
+# Driven through the same sweep over a fixture file, not through a second copy of
+# the predicate, so these prove the decision the sweep makes.
+printf 'Every commit on `main` is authored under one address.\n' > "$TMP/claim-bare.md"
+assert_eq "$TMP/claim-bare.md:1" \
+  "$(false_claims corrected-claim "$ONE_ADDRESS" yes "$TMP/claim-bare.md")" \
+  "the detection fires on an undeclared one-address claim"
+
+printf 'This said *"authored under one address"* until 2026-10-04. <!-- corrected-claim: under one address — the line is the correction, so it quotes what it corrects -->\n' \
+  > "$TMP/claim-declared.md"
+assert_eq "" "$(false_claims corrected-claim "$ONE_ADDRESS" yes "$TMP/claim-declared.md")" \
+  "a declaration naming the phrase and carrying a reason exempts it"
+
+printf 'This said *"authored under one address"* until 2026-10-04. <!-- corrected-claim: under one address -->\n' \
+  > "$TMP/claim-noreason.md"
+assert_eq "$TMP/claim-noreason.md:1" \
+  "$(false_claims corrected-claim "$ONE_ADDRESS" yes "$TMP/claim-noreason.md")" \
+  "a declaration carrying no reason exempts nothing"
+
+printf 'This said *"authored under one address"* once. <!-- corrected-claim: all of it in git — wrong phrase -->\n' \
+  > "$TMP/claim-wrongphrase.md"
+assert_eq "$TMP/claim-wrongphrase.md:1" \
+  "$(false_claims corrected-claim "$ONE_ADDRESS" yes "$TMP/claim-wrongphrase.md")" \
+  "a declaration naming a different phrase exempts nothing"
+
+# A whole-line word exemption is the exploit the overclaim check shipped with, and
+# it must not come back through a second copy of the rule.
+printf 'The corrected claim said every commit is authored under one address.\n' \
+  > "$TMP/claim-word.md"
+assert_eq "$TMP/claim-word.md:1" \
+  "$(false_claims corrected-claim "$ONE_ADDRESS" yes "$TMP/claim-word.md")" \
+  "the words corrected and claim elsewhere on the line do not exempt it"
+
+# And while the gate agrees with the sentence, the sentence is not flagged — or
+# this would be refusing a document for describing the state it is in.
+assert_eq "" "$(false_claims corrected-claim "$ONE_ADDRESS" no "$TMP/claim-bare.md")" \
+  "the claim is not flagged while the gate agrees with it"
+
+# The idle-identity half is true today, so a fixture is the only thing that can
+# show it is able to fail at all.
+printf 'The identity `DECIDERS.md` declares authors nothing at all.\n' > "$TMP/claim-idle.md"
+assert_eq "$TMP/claim-idle.md:1" \
+  "$(false_claims corrected-claim "$IDLE_IDENTITY" yes "$TMP/claim-idle.md")" \
+  "the detection fires on an undeclared idle-identity claim"
 
 # --- a document a gate cites as authority does not declare itself unaccepted ---
 # A gate that refuses names the document whose rule it is enforcing, so a reader
