@@ -8,6 +8,9 @@
 #   --operator   run one operator instead of all six
 #   --target     restrict to one gate or hook
 #
+# A scope that enumerates nothing refuses. See THE SCOPE HAS TO HOLD SOMETHING
+# below for why that is the whole point of the script.
+#
 # Not named test_*.sh, so tests/run-all.sh does not pick it up. A full sweep takes
 # tens of minutes; this is a tool you run deliberately, not a suite.
 #
@@ -23,6 +26,32 @@
 # So the denominator is enumerated from the files, printed, and the report names
 # every site nothing caught. `--list` is there so the denominator can be read and
 # argued with before anyone trusts a sweep built on it.
+#
+# THE SCOPE HAS TO HOLD SOMETHING
+#
+# This reported success over nothing:
+#
+#   $ tests/mutate-sweep.sh --operator D --target .githooks/commit-msg
+#   mutate-sweep: 0 mutations enumerated, 0 caught, 0 NOT caught, 0 inconclusive
+#   $ echo $?
+#   0
+#
+# Operator D replaces a `refuse` call and the hooks refuse by exit status, so that
+# scope holds nothing — and the instrument built to find checks that cannot fail
+# did not apply the rule to itself. `tests/lib/assert.sh` already refuses a suite
+# with no assertions and `tests/run-all.sh` already refuses a run with no suites.
+#
+# What makes it worth more than the obvious case is what it composes with. The
+# emission-site count is held by a floor rather than a denominator — `-ge 80`
+# against 110 sites, 22 of them duplicate `(gate, code)` pairs — so the lister can
+# lose a fifth of its sites while this reports `88 mutations, 0 NOT caught` and
+# exits 0, with nothing saying the denominator moved. Pinning a denominator per
+# gate is a separate change; this is the half that stops the loss being silent.
+#
+# An empty scope now refuses BEFORE the pristine copy is checked, which is not
+# only about speed. `tests/test_mutate_sweep.sh` drives this script, and this
+# script runs the whole suite on its copy — so refusing after that check made the
+# instrument's own suite recurse without terminating.
 #
 # THE TWO KINDS OF MUTATION, AND WHY BOTH
 #
@@ -55,10 +84,15 @@
 #
 # WHERE THIS STOOD ON 2026-10-04, AND WHAT IS STILL OPEN
 #
-# 215 mutations. Thirty-two were not caught, and the run that found them is what this
+# Thirty-two mutations were not caught, and the run that found them is what this
 # script is for. The tests that close them are a change per gate, each one stacked on
 # this script, because the result has to exist before the coverage it justifies —
 # re-run `tests/mutate-sweep.sh` here and it reports them.
+#
+# This said "215 mutations" where `--list` printed 236. The denominator moves every
+# time a gate gains or loses a guard, so the number is not written down here at all:
+# `tests/mutate-sweep.sh --list` prints the current one and the breakdown by
+# operator and file, which is the form that cannot go stale.
 #
 # Every D, T, X, E and P site is closed by those changes. Operator A — dropping a
 # regular expression's anchors — is the one nothing in this repository had ever applied,
@@ -120,7 +154,10 @@
 # Re-run `tests/mutate-sweep.sh --operator A` to get the current list.
 #
 # exit 0  every mutation was caught
-# exit 1  at least one was not caught, or at least one was inconclusive
+# exit 1  at least one was not caught, at least one was inconclusive, or the
+#         requested scope enumerated no mutations at all
+# exit 2  the scope could not be read — a target that is not a file, an unknown
+#         argument, or a pristine copy that does not pass before anything is mutated
 set -u
 
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -335,19 +372,60 @@ mutate_E() { # the enumerated alternatives become anything
 ops="D A T X E P"
 [ -n "$only_op" ] && ops="$only_op"
 
-if [ "$only_list" = yes ]; then
+LAB="$(mktemp -d)"
+trap 'rm -rf "$LAB"' EXIT
+DENOM="$LAB/denominator"
+
+# Enumerated once, into one list, read by `--list` and by the sweep below. It used
+# to be enumerated twice — into a temp file for `--list`, and again inside the
+# sweep's own loop — which is why the sweep had no denominator in front of it to
+# look at before reporting a result over it. One list is also what makes the count
+# in the report and the count `--list` prints the same measurement rather than two
+# that happen to agree.
+enumerate() {
+  local op t L
   for op in $ops; do
     for t in $targets; do
       for L in $("sites_$op" "$t"); do printf '%s %s:%s\n' "$op" "$t" "$L"; done
     done
-  done > "${TMPDIR:-/tmp}/mutate-sweep-denominator.$$"
-  n="$(grep -c . "${TMPDIR:-/tmp}/mutate-sweep-denominator.$$" | tr -d ' ')"
-  printf '# denominator: %s mutations\n' "$n"
-  awk '{ split($2, a, ":"); print $1, a[1] }' "${TMPDIR:-/tmp}/mutate-sweep-denominator.$$" \
+  done
+}
+
+sites_enumerated() { grep -c . "$DENOM" 2>/dev/null | tr -d ' '; }
+
+# The scope as it was asked for, so a refusal names what was empty rather than
+# printing a zero and leaving the reader to work out which zero it was.
+scope() {
+  local o t
+  if [ -n "$only_op" ]; then o="operator $only_op"; else o="operators $ops"; fi
+  if [ -n "$only_target" ]; then t="$only_target"; else t="every gate and both hooks"; fi
+  printf '%s over %s' "$o" "$t"
+}
+
+# A scope that enumerates nothing is a refusal, not a pass. See THE SCOPE HAS TO
+# HOLD SOMETHING at the top of this file.
+refuse_empty_scope() {
+  [ "$(sites_enumerated)" -gt 0 ] && return 0
+  printf 'mutate-sweep: 0 mutations enumerated for %s — nothing was measured, so this is not a pass.\n' \
+    "$(scope)" >&2
+  printf 'mutate-sweep: run `tests/mutate-sweep.sh --list` to see which operators reach which files.\n' >&2
+  exit 1
+}
+
+print_denominator() {
+  printf '# denominator: %s mutations\n' "$(sites_enumerated)"
+  awk '{ split($2, a, ":"); print $1, a[1] }' "$DENOM" \
     | sort | uniq -c | awk '{ printf "  %-3s %-45s %s\n", $2, $3, $1 }'
   printf '\n'
-  cat "${TMPDIR:-/tmp}/mutate-sweep-denominator.$$"
-  rm -f "${TMPDIR:-/tmp}/mutate-sweep-denominator.$$"
+  cat "$DENOM"
+}
+
+if [ "$only_list" = yes ]; then
+  enumerate > "$DENOM"
+  print_denominator
+  # Printed first and then refused: a reader asking what this scope covers should
+  # see the empty breakdown, and no script should be able to read it as a result.
+  refuse_empty_scope
   exit 0
 fi
 
@@ -356,8 +434,6 @@ fi
 # evidence pointers the documents cite into history and a fresh repository does not
 # have them. This clone has its own .git directory, so the copy is independent and
 # nothing here can reach the real refs.
-LAB="$(mktemp -d)"
-trap 'rm -rf "$LAB"' EXIT
 cp -R "$ROOT" "$LAB/repo" || exit 2
 REPO="$LAB/repo"
 SITE_SRC="$LAB/pristine"
@@ -366,6 +442,13 @@ for t in $targets; do
   mkdir -p "$LAB/pristine/$(dirname "$t")"
   cp "$ROOT/$t" "$LAB/pristine/$t"
 done
+
+# Enumerated from the pristine copy rather than the live tree, so the line numbers
+# about to be mutated cannot move underneath the sweep — and refused here, before
+# the green check below, because that check runs the whole suite and the suite
+# drives this script.
+enumerate > "$DENOM"
+refuse_empty_scope
 
 # The copy has to be green before anything is mutated, or every "caught" result
 # below could be the copy being broken rather than the mutation being seen.
@@ -440,62 +523,62 @@ inconclusive=0
 uncaught_list=""
 inconclusive_list=""
 
-for op in $ops; do
-  for t in $targets; do
-    for L in $("sites_$op" "$t"); do
-      enumerated=$((enumerated + 1))
-      "mutate_$op" "$L" < "$LAB/pristine/$t" > "$REPO/$t.mutated"
-      if cmp -s "$REPO/$t.mutated" "$LAB/pristine/$t"; then
-        rm -f "$REPO/$t.mutated"
-        cp "$LAB/pristine/$t" "$REPO/$t"
-        inconclusive=$((inconclusive + 1))
-        inconclusive_list="$inconclusive_list $op:$t:$L(no-change)"
-        continue
-      fi
-      before="$(sed -n "${L}p" "$LAB/pristine/$t")"
-      after="$(sed -n "${L}p" "$REPO/$t.mutated")"
-      if ! "verify_$op" "$before" "$after"; then
-        rm -f "$REPO/$t.mutated"
-        cp "$LAB/pristine/$t" "$REPO/$t"
-        chmod +x "$REPO/$t"
-        inconclusive=$((inconclusive + 1))
-        inconclusive_list="$inconclusive_list $op:$t:$L(operator-did-not-bite)"
-        continue
-      fi
+# Driven from the one enumerated list rather than by re-enumerating here, so the
+# count this reports and the count `--list` prints cannot drift apart. Read on file
+# descriptor 3, because the suites run inside this loop inherit stdin and one of
+# them reading it would eat the rest of the denominator.
+exec 3< "$DENOM"
+while IFS=' ' read -r op site <&3; do
+  [ -n "$op" ] || continue
+  t="${site%:*}"; L="${site##*:}"
+  enumerated=$((enumerated + 1))
+  "mutate_$op" "$L" < "$LAB/pristine/$t" > "$REPO/$t.mutated"
+  if cmp -s "$REPO/$t.mutated" "$LAB/pristine/$t"; then
+    rm -f "$REPO/$t.mutated"
+    cp "$LAB/pristine/$t" "$REPO/$t"
+    inconclusive=$((inconclusive + 1))
+    inconclusive_list="$inconclusive_list $op:$t:$L(no-change)"
+    continue
+  fi
+  before="$(sed -n "${L}p" "$LAB/pristine/$t")"
+  after="$(sed -n "${L}p" "$REPO/$t.mutated")"
+  if ! "verify_$op" "$before" "$after"; then
+    rm -f "$REPO/$t.mutated"
+    cp "$LAB/pristine/$t" "$REPO/$t"
+    chmod +x "$REPO/$t"
+    inconclusive=$((inconclusive + 1))
+    inconclusive_list="$inconclusive_list $op:$t:$L(operator-did-not-bite)"
+    continue
+  fi
 
-      mv "$REPO/$t.mutated" "$REPO/$t"
-      chmod +x "$REPO/$t"
+  mv "$REPO/$t.mutated" "$REPO/$t"
+  chmod +x "$REPO/$t"
 
-      if ! /bin/bash -n "$REPO/$t" 2>/dev/null; then
-        cp "$LAB/pristine/$t" "$REPO/$t"
-        inconclusive=$((inconclusive + 1))
-        inconclusive_list="$inconclusive_list $op:$t:$L(syntax)"
-        continue
-      fi
+  if ! /bin/bash -n "$REPO/$t" 2>/dev/null; then
+    cp "$LAB/pristine/$t" "$REPO/$t"
+    inconclusive=$((inconclusive + 1))
+    inconclusive_list="$inconclusive_list $op:$t:$L(syntax)"
+    continue
+  fi
 
-      if red="$(first_red "$t")"; then
-        caught=$((caught + 1))
-        printf 'caught       %s %s:%s   by %s\n' "$op" "$t" "$L" "$red"
-      else
-        uncaught=$((uncaught + 1))
-        uncaught_list="$uncaught_list
+  if red="$(first_red "$t")"; then
+    caught=$((caught + 1))
+    printf 'caught       %s %s:%s   by %s\n' "$op" "$t" "$L" "$red"
+  else
+    uncaught=$((uncaught + 1))
+    uncaught_list="$uncaught_list
   $op $t:$L  $(sed -n "${L}p" "$LAB/pristine/$t" | sed 's/^[ \t]*//' | cut -c1-96)"
-        printf 'NOT CAUGHT   %s %s:%s\n' "$op" "$t" "$L"
-      fi
-      cp "$LAB/pristine/$t" "$REPO/$t"
-      chmod +x "$REPO/$t"
-    done
-  done
+    printf 'NOT CAUGHT   %s %s:%s\n' "$op" "$t" "$L"
+  fi
+  cp "$LAB/pristine/$t" "$REPO/$t"
+  chmod +x "$REPO/$t"
 done
+exec 3<&-
 
-if [ "$only_list" = yes ]; then
-  printf '%s\n' "$denominator" | grep -c . | tr -d ' ' | { read -r n; printf '# denominator: %s mutations\n' "$n"; }
-  printf '%s\n' "$denominator" | grep . | awk '{ split($2, a, ":"); print $1, a[1] }' | sort | uniq -c \
-    | awk '{ printf "  %-3s %-45s %s\n", $2, $3, $1 }'
-  printf '\n'
-  printf '%s\n' "$denominator" | grep .
-  exit 0
-fi
+# A second `--list` block stood here, unreachable behind the one that exits above
+# and reading a `$denominator` variable nothing ever set. Under `set -u` it would
+# have aborted if it were ever reached. Deleted rather than repaired: there is one
+# enumeration and one place that prints it now.
 
 printf '\n'
 printf 'mutate-sweep: %d mutations enumerated, %d caught, %d NOT caught, %d inconclusive\n' \
