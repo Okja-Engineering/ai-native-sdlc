@@ -41,33 +41,36 @@ Adding a decider is now an explicit, reviewable change to a tracked file — whi
 
 An allowlist establishes that `decided_by` names an authorized person. It does not establish that the person, rather than an agent, wrote the field.
 
-**Git cannot currently tell them apart, because every commit on `main` is authored under one address.** Two author identities exist and both use `imagineux@gmail.com`.
+**Git still cannot tell them apart.** Both commits that set `chosen:` are authored by the identity an agent uses, and the identity declared above authors nothing at all. `bin/validate-authorship.sh` refuses on the first and prints the second every time it runs.
 
-Measured against `main` in a fresh clone on 2026-10-03:
+**The separation has started, and it started from the wrong end.** A distinct agent address was configured on 2026-10-03, so agent-driven commits made after that date are separable from everyone else's. *What turns it on* below asks for the other move — the decider committing under the declared identity — and that has not happened. The half that was done is not the half this control needs, because the act being gated is the decider's. This said *"every commit on `main` is authored under one address"* until 2026-10-04; it stopped being true on 2026-10-03 and nothing noticed, which is what the check named at the end of this section now exists to stop. <!-- corrected-claim: under one address — the correction has to quote the sentence it corrects -->
+
+Measured in a fresh clone, against `main` at `12ca5cd`, on 2026-10-04:
 
 ```
 $ git clone https://github.com/Okja-Engineering/ai-native-sdlc.git && cd ai-native-sdlc
-$ git log main --format='%an <%ae>' | sort | uniq -c | sort -rn
-  63 imagineux <imagineux@gmail.com>          <- agent-driven commits, including both decisions
-  32 Matthew Van Dusen <imagineux@gmail.com>  <- 31 web merges, plus 6142a91 Initial commit
-$ git rev-list main --count
-95
+$ git log 12ca5cd --format='%an <%ae>' | sort | uniq -c | sort -rn
+    89 imagineux <imagineux@gmail.com>               <- agent-driven, including both decisions
+    74 Matthew Van Dusen <imagineux@gmail.com>       <- 73 web merges, plus 6142a91 Initial commit
+    43 ai-native-sdlc agent <agent@noreply.invalid>  <- configured 2026-10-03
+$ git rev-list 12ca5cd --count
+206
 ```
 
-**And the declared identity is absent entirely:**
+**And the declared identity authors nothing:**
 
 ```
-$ git log --all --format='%an <%ae>%n%cn <%ce>' | grep -c 'matt.vandusen@okja.io'
+$ git log 12ca5cd --format='%an <%ae>%n%cn <%ce>' | grep -c 'matt.vandusen@okja.io'
 0
 ```
 
-Zero as an author and zero as a committer, across every ref a clone fetches. Its only occurrence in the repository is this file.
+Zero as an author and zero as a committer. Its only occurrence in the repository is this file.
 
-**Why the measurement is labelled with a ref and a date.** The first version of this block read `71 / 29 / 7` across three variants totalling 107 commits, and so did `AGENTS.md`, `CONTROLS.md` and `bin/validate-authorship.sh`. All four were taken from a working tree carrying branches that were never pushed, so no reader of the public repository could reproduce any of them. `main` rather than `--all`, because `--all` also counts whatever branches happen to be open when it runs — a clone today sees 100 commits across all refs and 95 on `main`, and only the second number is stable enough to write down.
+**Why the measurement is labelled with a commit rather than a branch.** The first version of this block read `71 / 29 / 7` across three variants totalling 107 commits, and so did `AGENTS.md`, `CONTROLS.md` and `bin/validate-authorship.sh`. All four were taken from a working tree carrying branches that were never pushed, so no reader of the public repository could reproduce any of them. Labelling them `main` and a date fixed less than it looked: `main` moves, so the numbers went stale again the next time anyone committed, and a reader running the command got a different answer with no way to tell which of the two was wrong. A commit hash is the same measurement for everybody forever. `--all` is worse than either, because it also counts whatever branches happen to be open when it runs.
 
-`bin/validate-authorship.sh` prints the same tally from the live history every time it runs, so this block can be checked against the repository rather than trusted. It also prints how many commits each declared identity authors, which is the line that would have caught the claim below.
+`bin/validate-authorship.sh` prints the same tally from the live history every time it runs, so this block can be checked against the repository rather than trusted. It also prints how many commits each declared identity authors, which is the line that would have caught the claim below. `tests/test_doc_claims.sh` now runs that command: a transcribed tally has to equal what git prints at the ref it names, and a present-tense sentence about author identities has to agree with what the gate prints.
 
-`STANDARDS.md` §3 convicts a vendor of this exact shape: *"Two accounts belonging to one vendor's one product is a separation of identity, not of duties."* Here it is one account with two display names, in the document that says so.
+`STANDARDS.md` §3 convicts a vendor of this exact shape: *"Two accounts belonging to one vendor's one product is a separation of identity, not of duties."* The two display names sharing `imagineux@gmail.com` are that shape, in the document that says so, and splitting the agent off to its own address did not touch them.
 
 **`bin/validate-authorship.sh` checks it and refuses today.** A commit that sets `chosen:` to anything but `pending` must be authored by the identity declared above, and that identity must not be shared. Neither holds:
 
@@ -86,7 +89,7 @@ refuse[identity-shared]       f808ff5 is authored under <imagineux@gmail.com>, w
 
 Two things, and both are the decider's:
 
-1. **Configure a distinct identity for agent-driven commits**, so `git log` separates them without anyone's testimony. This said *"the address above already appears in this history"* until 2026-10-03 and it never did — `matt.vandusen@okja.io` authors nothing, as the measurement above shows. So the step is to start using it, not to reuse something already present: configure the decider's git identity on the machine the decider commits from, and leave agent-driven commits on `imagineux@gmail.com`. One address per party, and the separation is then readable from `git log` alone.
+1. **Configure the decider's declared identity on the machine the decider commits from.** This step used to be written the other way round — configure a distinct address for the agent and leave the decider where he was — and that half was done on 2026-10-03, which is why `ai-native-sdlc agent <agent@noreply.invalid>` appears in the tally above. It separates agent commits from everything else and it does nothing for this control, because the identity being checked is the decider's and `matt.vandusen@okja.io` still authors nothing. The remaining step is to start using the declared address, not to reuse something already present. One address per party, and the separation is then readable from `git log` alone.
 2. **Make the decision commit yourself.** The act being gated is setting `chosen:`. An agent may draft the record and leave it `pending` — which the contract already treats as a valid state — and the commit that fills it is the human's. That is a workflow change, not a code change, and it is what makes the control real rather than described.
 
 **Both are deferred to a git history cleanup on `main`**, tracked as issue #51. That is a force-push to a public branch which rewrites every SHA, so it has to take the commit citations in `spec.md`, `SOURCES.md` and `STANDARDS.md` with it — `fa7538a` among them. Not an operation to run piecemeal, and not an agent's to run at all.
