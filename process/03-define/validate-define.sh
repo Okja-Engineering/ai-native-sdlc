@@ -13,16 +13,24 @@
 #
 # For a CYCLE, define-contract.md names five checks and defers them until a
 # second cycle shows which parts are shape and which are this cycle's accidents.
-# Three of them do not depend on shape at all and are built here:
+# Four of them do not depend on shape at all and are built here:
 #
 #   1. every item in the source artifact is accounted for, compared as a SET of
 #      declared ids rather than as a total. This caught a real defect by hand
 #      before it was mechanised — the first draft of cycle 2026-09-29 themed 54
 #      of 64 and reported three wrong counts — and an external audit later broke
 #      the arithmetic version two ways. See the accounting block below.
-#   2. the outlier section exists, and says so explicitly when empty — an
+#   2. the count `from:` declares is the number of findings the source records.
+#      The set comparison establishes that the ids accounted for are the ids the
+#      source carries; it says nothing about what the source was SUPPOSED to
+#      carry. A finding could be deleted from the source, dropped from the
+#      accounting block and decremented out of one theme count, and both gates
+#      passed — while `from: ..., 64 findings` stood above a 63-row table and
+#      nothing read it. A number a human types and no gate reads is not an
+#      anchor. See the declared count below.
+#   3. the outlier section exists, and says so explicitly when empty — an
 #      empty list and an omitted list look identical otherwise.
-#   3. `method` is declared — a reader must know whether themes came from a
+#   4. `method` is declared — a reader must know whether themes came from a
 #      person, a model or a classifier before trusting the grouping.
 #
 # Deferred, because they do depend on shape: "every theme carries a name, a
@@ -47,6 +55,17 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CYCLES="${DEFINE_CYCLES_DIR:-$SCRIPT_DIR/cycles}"
 PROBLEMS="${DEFINE_PROBLEMS_DIR:-$SCRIPT_DIR/problems}"
+
+# The one place a finding's id is harvested from a findings file. This gate used
+# to carry its own expression for it, which read the whole file rather than the
+# `## Findings` section — so a table anywhere else in the source counted as
+# findings. Stage 1 owns the shape of a findings file, so stage 1 owns the
+# harvester.
+IDS="${FINDINGS_IDS:-$SCRIPT_DIR/../01-scan/findings-ids.sh}"
+if [ ! -f "$IDS" ]; then
+  printf 'validate-define: no findings id harvester at %s — the accounting is compared against the ids the source records, so this gate will not run without it\n' "$IDS" >&2
+  exit 2
+fi
 
 refusals=0
 
@@ -76,7 +95,8 @@ field() {
 }
 
 check_cycle() {
-  local f="$1" src src_path resolved outliers declared src_ids uniq_declared missing extra dupes themes_sum accounted_n
+  local f="$1" src src_path resolved outliers declared src_ids src_n declared_n
+  local uniq_declared missing extra dupes themes_sum accounted_n
 
   # --- method is declared -------------------------------------------------
   if [ -z "$(field "$f" method)" ]; then
@@ -110,6 +130,39 @@ check_cycle() {
     return
   fi
 
+  src_ids="$(bash "$IDS" "$resolved")"
+  if [ "$?" -ne 0 ]; then
+    refuse "$f" "-" "source-unreadable" \
+      "the ids of the declared source could not be read: $src_path"
+    return
+  fi
+  src_n="$(printf '%s\n' "$src_ids" | grep -c .)"
+  src_ids="$(printf '%s\n' "$src_ids" | sort)"
+
+  # --- the declared count is the denominator ------------------------------
+  #
+  # `from:` states the source artifact and its item count. The count is what the
+  # rest of the record is written against — the artifact's own prose says "every
+  # one of the 64 rows" — and until this check existed nothing read it. Deleting
+  # a finding from the source, dropping its id from the accounting block and
+  # decrementing one theme count left both gates reporting the file within the
+  # contract, with the declared count standing over a table one row shorter.
+  #
+  # Checked against the source's rows rather than against the accounting block,
+  # because the set comparison below already ties the block to the source. The
+  # two together give the three-way agreement, and each disagreement keeps its
+  # own refusal instead of being folded into one message that names three
+  # numbers and no cause.
+  declared_n="$(printf '%s' "$src" \
+    | sed -n 's/.*,[[:space:]]*\([0-9][0-9]*\)[[:space:]]*findings.*/\1/p')"
+  if [ -z "$declared_n" ]; then
+    refuse "$f" "-" "no-declared-count" \
+      "from: links a source but declares no item count: the count is the denominator every theme count is written against, and one nothing states cannot be checked"
+  elif [ "$declared_n" -ne "$src_n" ]; then
+    refuse "$f" "-" "declared-count" \
+      "from: declares $declared_n findings, and the source records $src_n — a theme is a summary, not a filter, and the declared count is what says how much there was to summarise"
+  fi
+
   # --- the accounting, as a SET comparison --------------------------------
   #
   # This used to add two totals and compare them. An external audit showed that
@@ -121,7 +174,6 @@ check_cycle() {
   # declared id set against the source's gives each its own refusal.
   declared="$(sed -n '/accounting:ids -->/,/\/accounting:ids -->/p' "$f" \
     | grep -oE 'F[0-9]+' | sort)"
-  src_ids="$(grep -oE '^\| F[0-9]+ \|' "$resolved" | grep -oE 'F[0-9]+' | sort)"
 
   if [ -z "$declared" ]; then
     refuse "$f" "-" "no-accounting" \
