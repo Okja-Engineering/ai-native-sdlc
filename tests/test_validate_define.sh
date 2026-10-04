@@ -142,4 +142,48 @@ rm -f "$t/process/01-scan/findings/2026-09-29.md"
 out="$(gate "$t")"
 assert_contains "$out" "refuse[source-unresolved]" "a source that does not resolve is refused"
 
+
+# --- an outlier section that lists outliers is accepted ------------------------
+# Found by tests/mutate-sweep.sh, by loosening `-eq 0` to `-ge 0` on the outlier
+# count. The silent-empty check has two halves — nothing listed, and nothing saying
+# it is empty — and only the refusal was covered. Nothing established that a section
+# LISTING outliers is accepted, so with the count loosened a populated section is
+# refused and no suite noticed.
+#
+# The shipped cycle cannot distinguish the two halves, because its outlier prose
+# happens to contain the word "nothing" and that satisfies the second half on its
+# own. This fixture takes those words out, so the count is the only thing left to
+# decide it.
+t="$(fresh_tree outliers_listed)"
+awk '
+  /^## Outliers/ { inside = 1 }
+  inside && /^---/ { inside = 0 }
+  inside {
+    gsub(/[Nn]othing/, "little"); gsub(/[Nn]one/, "neither"); gsub(/[Ee]mpty/, "bare")
+  }
+  { print }
+' "$t/$CYCLE_REL" > "$t/edited" && mv "$t/edited" "$t/$CYCLE_REL"
+assert_eq "0" "$(sed -n '/^## Outliers/,/^---/p' "$t/$CYCLE_REL" | grep -ciE 'none|empty|nothing')" \
+  "the fixture's outlier section says none of none, empty or nothing"
+nout="$(sed -n '/^## Outliers/,/^---/p' "$t/$CYCLE_REL" | grep -cE '^- \*\*')"
+[ "$nout" -ge 1 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "and it still lists outliers (found $nout)"
+out="$(gate "$t")"; rc=$?
+assert_status 0 "$rc" "an outlier section that lists outliers is accepted"
+assert_not_contains "$out" "refuse[silent-empty-outliers]" "and is not called silently empty"
+
+# --- the gate with no arguments reads the cycles directory ---------------------
+# Found by loosening `-gt 0` to `-ge 0` on the argument count. The gate then took the
+# "files were named" branch with nothing named, looped over nothing, and reported
+# "0 file(s) within the contract" and exit 0. CI runs this gate with no arguments, so
+# that is a gate reporting a clean tree having evaluated nothing — the shape this
+# repository keeps finding.
+out="$(cd "$ROOT" && bash process/03-define/validate-define.sh 2>&1)"; rc=$?
+assert_status 0 "$rc" "the gate with no arguments passes over the real cycle files"
+assert_not_contains "$out" "0 file(s) within the contract" \
+  "and does not report having checked nothing"
+ncyc="$(ls "$ROOT"/process/03-define/cycles/*.md 2>/dev/null | grep -c .)"
+assert_contains "$out" "$ncyc file(s) within the contract" \
+  "it checked every cycle file in the directory (found $ncyc)"
+
 assert_done
