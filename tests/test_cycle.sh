@@ -90,6 +90,40 @@ assert_contains "$out" "referenced by no problem" "an unreferenced topic is repo
 assert_contains "$out" "unreferenced-topic" "and names which topic has no parent"
 rm -f "$SB/process/02-discover/topics/unreferenced-topic.md"
 
+# --- the count it reports is the count the source records ---------------------
+# count_rows() carried its own expression for what a finding is. It was anchored,
+# so it survived the lowercasing exploit, and it read the WHOLE FILE — so a
+# markdown table anywhere in a findings file was reported as findings.
+# findings-contract.md permits content in `## Looked at`, so this is a
+# contract-valid file that the report over-counted.
+#
+# No count is written literally. The report is compared against the harvester,
+# which is the one thing that decides what a finding is.
+decoy="$SB/process/01-scan/findings/2026-11-02.md"
+{
+  printf '# Scan cycle — 2026-11-02\n\nsince: 2026-09-29\nnothing found: no\n\n'
+  printf '## Looked at\n\n'
+  printf -- '- web: release notes, 2026-09-29 to 2026-11-02.\n'
+  printf -- '- X: the syndication endpoint, 2026-09-29 to 2026-11-02.\n'
+  printf -- '- YouTube: channel feeds, 2026-09-29 to 2026-11-02.\n\n'
+  printf 'What could not be reached, as a table:\n\n'
+  printf '| id | what |\n|---|---|\n| F91 | a decoy row |\n| F92 | another decoy row |\n\n'
+  printf '## Findings\n\n'
+  printf '| id | what | source | dated | kind | might affect (guess) | consequence guess |\n'
+  printf '|---|---|---|---|---|---|---|\n'
+  printf '| F01 | A thing happened | https://example.com/a | 2026-10-30 | practice-change | build (guess) | low |\n'
+  printf '| F02 | Another thing happened | https://example.com/b | 2026-11-01 | practice-change | build (guess) | low |\n'
+} > "$decoy"
+
+out="$(/bin/bash "$ROOT/process/01-scan/validate-findings.sh" "$decoy" 2>&1)"; rc=$?
+assert_status 0 "$rc" "the decoy fixture is within the stage 1 contract"
+
+want="$(/bin/bash "$ROOT/process/01-scan/findings-ids.sh" "$decoy" | grep -c .)"
+out="$(run 2026-11-02)"
+reported="$(printf '%s\n' "$out" | sed -n 's/.*01 scan *\([0-9][0-9]*\) findings.*/\1/p' | head -1)"
+assert_eq "$want" "$reported" "the report counts the findings the source records"
+rm -f "$decoy"
+
 # --- one cycle by name --------------------------------------------------------
 out="$(run 2026-09-29)"; rc=$?
 assert_status 0 "$rc" "naming a cycle exits 0"

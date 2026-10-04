@@ -141,6 +141,57 @@ assert_status 0 "$rc" "no problem yet exits 0"
 assert_contains "$out" "The next step is yours" "it hands the pick back to a person"
 assert_contains "$out" "would be inventing the pick" "it says why it will not scaffold one"
 
+# --- the count it writes is the count the source records ----------------------
+# next.sh:83 was `rows=$(grep -cE '^| [A-Z]' "$findings")` — the exact expression
+# define-contract.md names as the one an external audit defeated, still writing
+# the `from: ..., N findings` line of every new cycle. Two things are wrong with
+# it: the case of a finding's first letter decides whether it counts, and it reads
+# the whole file, so any markdown table counts. findings-contract.md permits
+# content in `## Looked at`, and the fixture below is a contract-valid file with
+# two findings and one decoy table there. It reported five.
+#
+# The count is not written literally here. It is compared against the harvester,
+# which is the thing that decides what a finding is, and against the raw row count
+# it must NOT be — so a regression to counting rows fails rather than passing on a
+# fixture that happens to agree.
+t="$(fresh decoy)"
+rm -f "$t"/process/01-scan/findings/*.md "$t"/process/03-define/cycles/*.md
+DECOY="$t/process/01-scan/findings/2026-10-04.md"
+{
+  printf '# Scan cycle — 2026-10-04\n\nsince: 2026-09-29\nnothing found: no\n\n'
+  printf '## Looked at\n\n'
+  printf -- '- web: release notes and preprints, 2026-09-29 to 2026-10-04.\n'
+  printf -- '- X: the syndication endpoint only, 2026-09-29 to 2026-10-04.\n'
+  printf -- '- YouTube: channel feeds, 2026-09-29 to 2026-10-04.\n\n'
+  printf 'The ground each agent could not reach, as a table:\n\n'
+  printf '| id | what |\n|---|---|\n| F91 | a decoy row |\n| F92 | another decoy row |\n\n'
+  printf '## Findings\n\n'
+  printf '| id | what | source | dated | kind | might affect (guess) | consequence guess |\n'
+  printf '|---|---|---|---|---|---|---|\n'
+  printf '| F01 | A thing happened | https://example.com/a | 2026-09-30 | practice-change | build (guess) | low |\n'
+  printf '| F02 | another thing happened | https://example.com/b | 2026-10-01 | practice-change | build (guess) | low |\n'
+} > "$DECOY"
+
+out="$(/bin/bash "$ROOT/process/01-scan/validate-findings.sh" "$DECOY" 2>&1)"; rc=$?
+assert_status 0 "$rc" "the decoy fixture is within the stage 1 contract, so nothing there refuses it"
+
+run "$t" 2026-10-04 >/dev/null
+made="$t/process/03-define/cycles/2026-10-04.md"
+wrote="$(sed -n 's/^from:.*,[[:space:]]*\([0-9][0-9]*\)[[:space:]]*findings.*/\1/p' "$made" | head -1)"
+want="$(/bin/bash "$ROOT/process/01-scan/findings-ids.sh" "$DECOY" | grep -c .)"
+raw="$(grep -cE '^\| ' "$DECOY")"
+assert_eq "$want" "$wrote" "the count it writes is the number of findings the source records"
+[ "$wrote" = "$raw" ] && same=yes || same=no
+assert_eq "no" "$same" "and it is not the number of table rows in the file (which is $raw)"
+
+# The scaffold and the gate have to agree about the count, or the first thing a
+# person does with a new cycle is argue with a refusal the scaffold caused.
+out="$(/bin/bash "$ROOT/process/03-define/validate-define.sh" "$made" 2>&1)"
+assert_not_contains "$out" "refuse[declared-count]" \
+  "the gate does not refuse the count the scaffold wrote"
+assert_not_contains "$out" "refuse[no-declared-count]" \
+  "and the scaffold did write one"
+
 # --- a cycle starts with a scan ----------------------------------------------
 t="$(fresh noscan)"
 out="$(run "$t" 2099-01-01)"; rc=$?
