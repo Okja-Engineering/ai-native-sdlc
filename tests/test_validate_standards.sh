@@ -356,4 +356,27 @@ t="$(fresh key_undeclared)"
 grep -v 'not-a-claim' "$t/STANDARDS.md" > "$t/S.tmp" && mv "$t/S.tmp" "$t/STANDARDS.md"
 assert_contains "$(gate "$t")" "refuse[uncited-claim]" "with the declarations removed, the key rows are read as claims"
 
+
+# --- the uncited count is a whole-line match ----------------------------------
+# Found by tests/mutate-sweep.sh, by loosening `grep -qx` to `grep -q` on the test
+# that decides whether a register entry is cited. An id that is a PREFIX of a cited
+# id then counts as cited, and the number this gate reports is the one DECIDERS.md
+# and SOURCES.md have both been corrected against. It is reported rather than
+# refused, which is exactly why nothing was reading it.
+#
+# Asserted as a difference rather than as an absolute number, so adding a real source
+# does not fail this.
+t="$(fresh prefix_id)"
+uncited_count() { gate "$1" | sed -n 's/.*, \([0-9]*\) not currently cited.*/\1/p'; }
+base="$(uncited_count "$t")"
+[ -n "$base" ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "the gate reports an uncited count to compare against (got ${base:-none})"
+awk '{ print; if ($0 ~ /^\| `S-NIST-AC5`/) print "| `S-NIST-AC` | a fixture entry whose id is a prefix of a cited one — [example.invalid](https://example.invalid/fixture) | 2026 | Standard | n/a | n/a | A fixture row, cited by nothing |" }' \
+  "$t/SOURCES.md" > "$t/reg" && mv "$t/reg" "$t/SOURCES.md"
+assert_eq "1" "$(grep -c '^| `S-NIST-AC` |' "$t/SOURCES.md")" \
+  "the fixture added one register entry whose id is a prefix of a cited one"
+after="$(uncited_count "$t")"
+assert_eq "$((base + 1))" "$after" \
+  "an entry whose id is a prefix of a cited id is counted as uncited, not as cited"
+
 assert_done
