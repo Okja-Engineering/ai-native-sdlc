@@ -275,4 +275,208 @@ for value in release-or-capability practice-change milestone-or-event counter-ev
   fi
 done
 
+
+# --- a field the contract declares once, declared twice -----------------------
+# Found by tests/mutate-sweep.sh. The duplicate-field refusal fires for three
+# fields and only one of them was covered: deleting the `nothing found` or the
+# `example` duplicate check left every suite green. A findings file declaring a
+# field twice has two answers to the same question, and the next cycle's comparison
+# reads whichever one the gate happened to pick.
+#
+# The field list is read out of the GATE rather than written here, so a fourth
+# declared field is covered by existing rather than by someone remembering to add a
+# case. That is the difference between pinning the invariant and pinning the two
+# literals the sweep happened to find.
+declared_fields="$(grep -oE "field_count ('[a-z ]+'|[a-z]+)" "$GATE" \
+                   | sed 's/field_count //' | tr -d "'" | sort -u)"
+nfields="$(printf '%s\n' "$declared_fields" | grep -c .)"
+[ "$nfields" -ge 3 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "the declared field list was read from the gate (found $nfields)"
+
+# duplicate_field <field name> -> a prepared file declaring that field twice
+duplicate_field() {
+  case_no=$((case_no + 1))
+  dir="$TMP/case$case_no"
+  mkdir -p "$dir"
+  awk -v f="$1:" '{ print; if (index($0, f) == 1) print }' "$WITH_FINDINGS" > "$dir/2026-10-01.md"
+  printf '%s\n' "$dir/2026-10-01.md"
+}
+
+printf '%s\n' "$declared_fields" | while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  printf '%s\n' "$f"
+done > "$TMP/fields"
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  dup="$(duplicate_field "$f")"
+  # The duplication has to have happened, or the assertions below pass against an
+  # unmodified fixture. This is the check that the awk matched the field at all.
+  n="$(grep -c "^$f:" "$dup")"
+  assert_eq "2" "$n" "the fixture declares \"$f\" twice"
+  gate "$dup"
+  assert_status 1 "$STATUS" "a file declaring \"$f\" twice is refused"
+  assert_contains "$OUT" "refuse[field]" "a duplicated \"$f\" is refused under field"
+  assert_contains "$OUT" "appears 2 times" "and the refusal says how many times (\"$f\")"
+done < "$TMP/fields"
+
+# --- the Looked at section present and empty ----------------------------------
+# Found by tests/mutate-sweep.sh. The missing-section refusal was covered and the
+# present-but-empty one was not, so deleting it left every suite green. The two are
+# not the same case: a heading with nothing under it is what a half-finished cycle
+# looks like, and it is the one a reader is most likely to skim past.
+#
+# Written with awk and not with a sed address. The first version used
+# `/^- \(web\|X\|YouTube\):/d`, where `\|` is a GNU extension BSD sed does not
+# honour: it deleted nothing, the fixture was unchanged, and the gate correctly
+# reported it within the contract. The assertion below about the fixture is what
+# caught that, which is why it is there.
+empty_section() { # <heading> -> a prepared file with that section's body removed
+  case_no=$((case_no + 1))
+  dir="$TMP/case$case_no"
+  mkdir -p "$dir"
+  awk -v h="## $1" '
+    $0 == h { print; inside = 1; next }
+    /^## / { inside = 0 }
+    inside && $0 !~ /^[ \t]*$/ { next }
+    { print }' "$WITH_FINDINGS" > "$dir/2026-10-01.md"
+  printf '%s\n' "$dir/2026-10-01.md"
+}
+emptied="$(empty_section 'Looked at')"
+assert_eq "0" "$(sed -n '/^## Looked at$/,/^## /p' "$emptied" | grep -c '^- ')" \
+  "the fixture leaves the Looked at heading with nothing under it"
+gate "$emptied"
+assert_status 1 "$STATUS" "a Looked at section with a heading and nothing under it is refused"
+assert_contains "$OUT" "refuse[looked-at]" "and it is refused under looked-at"
+assert_contains "$OUT" "section is empty" "and the refusal says the section is empty"
+
+# --- a findings row with the wrong number of cells -----------------------------
+# Found by tests/mutate-sweep.sh. The header's column count and the header's column
+# names were both covered; a ROW with the wrong cell count was not. It is the first
+# thing the row check does and everything after it reads cells by position, so a row
+# that gets past it with too few cells makes every later refusal name the wrong cell.
+#
+# Both directions, because a check written as `-lt` passes a row with too many.
+short="$(prepare "$WITH_FINDINGS" 2026-10-01.md 's/^| F01 | A platform shipped[^|]*|/| F01 |/')"
+gate "$short"
+assert_status 1 "$STATUS" "a findings row with too few cells is refused"
+assert_contains "$OUT" "refuse[columns]" "and it is refused under columns"
+assert_contains "$OUT" "cells; the contract declares" "and the refusal compares the counts"
+
+long="$(prepare "$WITH_FINDINGS" 2026-10-01.md 's/^| F01 |/| F01 | spare |/')"
+gate "$long"
+assert_status 1 "$STATUS" "a findings row with too many cells is refused"
+assert_contains "$OUT" "refuse[columns]" "a row with too many cells is refused under columns"
+
+# --- the optional field is optional -------------------------------------------
+# Found by tests/mutate-sweep.sh, by loosening `-ge 1` to `-ge 0`. Every fixture
+# here declares `example`, so nothing established that a file without it is accepted
+# — and with the comparison loosened the gate refuses one, reporting an empty value
+# for a field the contract does not require. The absent case is the one no fixture
+# happened to cover.
+gate "$(prepare "$WITH_FINDINGS" 2026-10-01.md '/^example: /d')"
+assert_status 0 "$STATUS" "a cycle file that declares no example field is accepted"
+assert_not_contains "$OUT" "refuse[field]" "and the absent field is not reported as an empty one"
+
+# --- the first-run message is about a first run -------------------------------
+# Also found by loosening a comparison. `-eq 0` to `-ge 0` made the gate print
+# "this would be a first run" over a directory holding cycle files, which is the
+# summary line a reader uses to decide whether anything was checked at all. The
+# empty-directory half was covered; this is the other half of the same sentence.
+OUT="$(FINDINGS_DIR="$ROOT/process/01-scan/findings" bash "$GATE" 2>&1)"
+STATUS=$?
+assert_status 0 "$STATUS" "the real findings directory passes"
+assert_not_contains "$OUT" "would be a first run" \
+  "a directory holding cycle files is not reported as a first run"
+
+# And the count it reports is the number of files, with the wording to match. The
+# plural helper is a comparison too, and nothing read its output.
+assert_contains "$OUT" "2 files within the contract" \
+  "the summary counts the files it checked and agrees with itself about the plural"
+one="$TMP/one-cycle"
+mkdir -p "$one" && cp "$WITH_FINDINGS" "$one/"
+OUT="$(FINDINGS_DIR="$one" bash "$GATE" 2>&1)"
+assert_contains "$OUT" "1 file within the contract" \
+  "and says file, not files, for one of them"
+
+# --- an enum value is the whole value, not a prefix of a declared one ----------
+# Found by tests/mutate-sweep.sh, by loosening `in_list`'s `grep -Fxq` to `grep -Fq`.
+# Every enum case above uses a value that is nothing like a declared one, so the
+# loosening changed nothing any of them could see — and with it, `kind: release`
+# passes against a declared `release-or-capability`.
+#
+# This is the shape AGENTS.md calls for under "include inputs the implementation was
+# not written for": a truncation of a declared value, not a word from nowhere. It is
+# also the third time this repository has shipped the same defect — `uncited-claim`
+# against the bare string `S-`, and the decider allowlist against a name that was a
+# cell of the table rather than a person.
+for part in release practice counter sentiment; do
+  gate "$(prepare "$WITH_FINDINGS" 2026-10-01.md "s/release-or-capability/$part/")"
+  assert_status 1 "$STATUS" "a kind of \"$part\" is refused, though a declared kind starts with it"
+  assert_contains "$OUT" "refuse[kind]" "and \"$part\" is refused under kind"
+done
+
+for part in med hi uncl; do
+  gate "$(prepare "$WITH_FINDINGS" 2026-10-01.md "s/| medium |/| $part |/")"
+  assert_status 1 "$STATUS" "a consequence guess of \"$part\" is refused"
+  assert_contains "$OUT" "refuse[consequence]" "and \"$part\" is refused under consequence"
+done
+
+# And the declared values themselves still pass, or the loop above would be
+# satisfied by a gate that refuses everything.
+for ok_kind in release-or-capability practice-change counter-evidence; do
+  gate "$(prepare "$WITH_FINDINGS" 2026-10-01.md "s/release-or-capability/$ok_kind/")"
+  assert_status 0 "$STATUS" "the declared kind \"$ok_kind\" is accepted"
+done
+
+# --- a column name resolves by its exact name, and why that has no case here ----
+# tests/mutate-sweep.sh loosens `col_index`'s `grep -nxF` to `grep -nF` and nothing
+# catches it. That is recorded rather than tested, and the reason is specific.
+#
+# `col_index` is only ever called with the literal column names the gate itself
+# carries, resolved against the list the contract declares. For the loosening to
+# change which cell is read, the contract would have to declare two columns where one
+# name is a substring of the other AND the findings file's header would have to match
+# that contract exactly, because the header-names check runs first and refuses a
+# mismatch. Constructing that means editing the contract, the header and every row
+# together, at which point the fixture is testing the fixture.
+#
+# What is covered instead is the adjacent invariant, above: a renamed column is
+# refused, naming both what it found and what was declared. If the column list ever
+# gains a name that is a prefix of another, this reason stops holding and the case has
+# to be built.
+assert_contains "$(cat "$GATE")" 'grep -nxF' \
+  "col_index still matches a column name as a whole line"
+
+
+# --- a source has to BE a locator, not mention one -----------------------------
+# Found by tests/mutate-sweep.sh, by dropping the `^` from each of the four shapes
+# `source_ok` accepts. Unanchored, a source that mentions a locator in passing is
+# accepted, and "no source, no finding" becomes "no source, no finding, unless the
+# sentence happens to contain a URL".
+#
+# The existing cases here use a source with no locator in it at all — `a thread I
+# remember seeing` — which is refused either way, so none of them could see it. CTRL-6
+# claims this control, which makes the gap one a reader of CONTROLS.md would not expect.
+for mention in \
+  'see https://example.invalid/notes/one' \
+  'as noted in doi:10.0000/fixture-one' \
+  'discussed in arXiv:2609.00001' \
+  'roughly as in cite: Example Org, a fixture citation, 2026'
+do
+  gate "$(prepare "$WITH_FINDINGS" 2026-10-01.md "s|https://example.invalid/notes/one|$mention|")"
+  assert_status 1 "$STATUS" "a source that only mentions a locator is refused: $mention"
+  assert_contains "$OUT" "refuse[no-source]" "and it is refused under no-source"
+done
+
+# The bare locators still pass, or the loop above is satisfied by a gate that refuses
+# every source.
+for ok_src in \
+  'https://example.invalid/notes/one' \
+  'doi:10.0000/fixture-one' \
+  'arXiv:2609.00001'
+do
+  gate "$(prepare "$WITH_FINDINGS" 2026-10-01.md "s|https://example.invalid/notes/one|$ok_src|")"
+  assert_status 0 "$STATUS" "the bare locator is still accepted: $ok_src"
+done
+
 assert_done
