@@ -178,17 +178,98 @@ assert_eq "no" "$fires" "a phase named away from the claim is a mention, not the
 # This is a narrow guard on the specific overclaim rather than a general
 # truth-check, because the unqualified form is the one that misleads an assessor
 # reading CONTROLS.md and expecting a clone to hold everything.
-# Lines QUOTING the old claim in order to correct it are exempt — the correction
-# necessarily contains the phrase, and the first version of this check fired on
-# it. Same shape as the Annotated exemption above.
 # `-i`, not just `-I`. The first version used `-nIE`, where `I` means skip
 # binary files and NOT ignore case — so the pattern `all of it in git` missed
 # `All of it in git`, the exact sentence this check exists to catch. The mutation
 # test passed vacuously until that was found.
-overclaim="$(git grep -niIE 'all of it in git|everything is in git|entirely in git' \
-  -- '*.md' ':(exclude)tests/*' 2>/dev/null \
-  | grep -viE 'claimed|until 2026|this said|used to' || true)"
+#
+# THE EXEMPTION IS PER PHRASE, NOT PER LINE.
+#
+# A line quoting the old claim in order to correct it has to be exempt, because the
+# correction necessarily contains the phrase. That was four phrases matched anywhere
+# on the line — `claimed|until 2026|this said|used to` — which discarded the whole
+# line. Appending
+#
+#   The chain is claimed to be all of it in git.
+#
+# to README.md passed, because the line contains the word "claimed". Reproduced
+# against the shipped suite: 21 assertions, 0 failed, and run-all green over 13
+# suites.
+#
+# This repository had already fixed exactly this shape one file over.
+# bin/validate-standards.sh exempted every pointer on a line carrying any of four
+# phrases, so SOURCES.md line 5 — naming the dead branch and the live commit in one
+# sentence — exempted both, and replacing the live commit with a dead one was
+# accepted. It is now an in-band declaration naming the pointer and carrying a
+# reason, and so is this:
+#
+#   <!-- corrected-overclaim: all of it in git — reason -->
+#
+# A declaration that does not name the phrase on its line does not exempt it, and
+# one carrying nothing beyond the phrase does not either, because then no reason is
+# recorded. Same three rules as `dead-pointer` and `not-a-claim`.
+OVERCLAIM='all of it in git|everything is in git|entirely in git'
+
+# declared <line text> -> 0 when the line declares the overclaim it carries
+#
+# One implementation, used for the real documents and for the fixtures below, so a
+# fixture proves the decision this makes rather than a second copy of it.
+declared() {
+  local text="$1" phrase decl rest
+  phrase="$(printf '%s' "$text" | grep -oiE "$OVERCLAIM" | head -1 | tr 'A-Z' 'a-z')"
+  [ -n "$phrase" ] || return 0                       # no overclaim on the line
+  decl="$(printf '%s' "$text" \
+    | sed -n 's/.*<!--[[:space:]]*corrected-overclaim:\([^>]*\)-->.*/\1/p' \
+    | tr 'A-Z' 'a-z')"
+  case "$decl" in
+    *"$phrase"*) ;;
+    *) return 1 ;;                                   # names a different phrase, or none
+  esac
+  rest="${decl/$phrase/}"                            # what is left is the reason
+  case "$rest" in
+    *[a-z0-9]*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+overclaim=""
+while IFS= read -r hit; do
+  [ -n "$hit" ] || continue
+  loc="${hit%%:*}:$(printf '%s' "${hit#*:}" | cut -d: -f1)"
+  declared "${hit#*:}" || overclaim="$overclaim $loc"
+done <<EOF
+$(git grep -niIE "$OVERCLAIM" -- '*.md' ':(exclude)tests/*' 2>/dev/null || true)
+EOF
 assert_eq "" "$overclaim" "no document claims the whole chain is in git"
+
+# --- and the exemption has to be able to refuse -------------------------------
+# Five constructed lines. The second is the exploit the whole-line version let
+# through, so it is the one that matters.
+declared 'The whole chain is all of it in git.' \
+  && r=exempt || r=flagged
+assert_eq "flagged" "$r" "a bare overclaim is flagged"
+
+declared 'The chain is claimed to be all of it in git.' \
+  && r=exempt || r=flagged
+assert_eq "flagged" "$r" "the word claimed elsewhere on the line does not exempt it"
+
+declared 'AGENTS.md said *"All of it in git."* <!-- corrected-overclaim: all of it in git — the line is the correction -->' \
+  && r=exempt || r=flagged
+assert_eq "exempt" "$r" "a declaration naming the phrase and carrying a reason exempts it"
+
+declared 'AGENTS.md said *"All of it in git."* <!-- corrected-overclaim: all of it in git -->' \
+  && r=exempt || r=flagged
+assert_eq "flagged" "$r" "a declaration carrying no reason exempts nothing"
+
+declared 'AGENTS.md said *"All of it in git."* <!-- corrected-overclaim: everything is in git — wrong phrase -->' \
+  && r=exempt || r=flagged
+assert_eq "flagged" "$r" "a declaration naming a different phrase exempts nothing"
+
+# A line with no overclaim on it is not flagged, or the loop above would report
+# every line of every document.
+declared 'The process chain is readable end to end from a clone.' \
+  && r=exempt || r=flagged
+assert_eq "exempt" "$r" "a line carrying no overclaim is not flagged"
 
 # And the correction has to still be there, or deleting it would silently pass
 # the check above.
