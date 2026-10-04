@@ -367,7 +367,20 @@ The section an assessor should read first. Each of these is a real gap, not a fo
 
 **4. Whether every claim in a discovery artifact is graded and sourced.** CTRL-7 gates the phase now, but not this. It needs a claim to be a delimited thing, and the two topics write claims as prose paragraphs in different markup with no boundary a script can find. The gate checks that the grades *used* are from the enum, not that every assertion carries one. A reader counting graded claims against ungraded ones is still the only way to know.
 
-**5. Develop has no gate.** One options artifact existed when its contract was written, so a gate would have encoded that artifact's accidents. The reasoning that justified waiting still holds.
+**5. Develop has no gate.** One options artifact existed when its contract was written, so a gate would have encoded that artifact's accidents. **That reason expired on 2026-10-03 and this item claimed it still held until 2026-10-04.**
+
+```
+$ ls process/04-develop/options/
+agent-pr-approval.md  producing-themes.md
+```
+
+The second artifact did what the deferral was for. `develop-contract.md` now records what it showed: the three required fields, six options, the do-nothing option, the cross-cutting test and the *what none of these solves* section all held in both, four of the five things required of an option are a labelled field in both, and the fifth — *what it is* — is a label in one artifact and an unlabelled lead paragraph in the other, so a gate keyed to it would have encoded the newer markup as the rule.
+
+So the honest reason Develop has no gate is **that nobody has decided to build one**, not that it cannot be derived. What that leaves uncontrolled is what the contract names as the thing most likely to decay: an author who has already decided writes several options and one answer wearing an option's clothes, and nothing refuses. Building the gate is the owner's decision and is surfaced in the contract rather than taken here.
+
+**And nothing watches a deferral's condition, which is why two of them expired unnoticed.** Four contracts deferred enforcement until a second artifact. Discover's was spent and the contract was updated and gated. Define's is live — one cycle exists. Develop's and Deliver's both fired and neither sentence was re-read; Deliver's contradicted itself thirty lines apart, saying `amends` was added *after the second decision* and that Deliver's shape still waited for one.
+
+A check for this was considered and **not built**, for a stated reason rather than by omission. Finding the deferrals lexically — a scan for *second artifact*, *run once*, *waits for* — is the word search this repository has now shipped and repaired three times, and it fails open on the fourth phrasing nobody thought of. The sound version is the shape used elsewhere: an in-band declaration beside the sentence it governs, naming the directory and the count that spends it, with the count read off disk rather than from a list anybody maintains. That is a convention spanning five contracts and a new refusal needing a control to claim it, which is a design decision rather than a correction, and it belongs to the owner alongside the Develop gate. A line in `bin/cycle.sh`'s status report was the cheap alternative and was rejected: this repository has already paid for a status report nothing fails on, which is the only thing that noticed a problem referencing no topic.
 
 **6. Configuration drift.** §3 now states the requirement explicitly — the toggles that let an agent approval satisfy a merge gate stay off at every level. GitHub publishes **no API representation** for that policy, so the setting cannot be read, set or drift-checked programmatically. It is a UI setting and a promise, and nobody has verified the current state of our own repositories. §3 also records that the approval can outlive the diff, because dismissing a stale approval on push is optional per ruleset.
 

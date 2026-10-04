@@ -1,6 +1,6 @@
 # Develop contract
 
-**Status:** derived from one artifact. `options/producing-themes.md` was written first; this describes the shape it turned out to need.
+**Status:** derived from `options/producing-themes.md`, which was written first, and **not re-derived against the second artifact.** This said *"derived from one artifact"* until 2026-10-04, by which time `options/agent-pr-approval.md` had existed since 2026-10-03. What the second artifact showed is recorded under *Why there is no gate*; the body of this contract is still the shape the first one turned out to need.
 
 **No gate yet.** See *Why there is no gate* at the end.
 
@@ -57,17 +57,46 @@ This is harder than it sounds and it is the thing most likely to decay. An autho
 
 ## Why there is no gate
 
-Develop has run once, on one problem, in one shape. A gate now would encode this problem's accidents — six options suited a build-or-wait question, and a problem with two real alternatives would look nothing like it.
+**The reason this section used to give has expired, and the new reason is weaker.** It said *"Develop has run once, on one problem, in one shape"*, and that a gate would encode one problem's accidents. Develop has run twice:
 
-What a gate should check when a second problem shows which parts are real, all mechanical:
+```
+$ ls process/04-develop/options/
+agent-pr-approval.md  producing-themes.md
+$ sed -n 's/^dated:[[:space:]]*//p' process/04-develop/options/*.md | head -2
+2026-10-03
+2026-09-30
+```
+
+The second artifact was written on 2026-10-03, three days after the first, and nothing re-read this sentence. So the deferral's condition — a second problem showing which parts are real — was spent while the contract went on claiming it was not. **The honest reason there is no gate now is that nobody has decided to build one**, which is a different statement and belongs on the record as one.
+
+### What the second artifact showed
+
+The condition did its job. Measured over both option sets:
+
+- **Held in both.** The three required fields; six options each, headed `## A · …` through `## F · …`; a do-nothing or defer option, at F in both; a section naming the test that cuts across options; and a *what none of these options solves* section.
+- **Held in both, as a labelled field.** Four of the five things required of an option — *Costs*, *Assumes*, *Fails when*, *Would be right if* — are written as `**Costs.**` and so on in both artifacts.
+- **Did not hold.** *What it is.* `agent-pr-approval` labels it `**What it is.**` six times; `producing-themes` writes it as the option's unlabelled opening paragraph, zero times. Both satisfy what this contract asks for. A gate keyed to the label would have made the newer artifact's markup the rule, which is the exact failure the Discover gate records avoiding, and the reason this deferral was worth having.
+
+```
+$ for f in process/04-develop/options/*.md; do grep -c '^\*\*What it is' "$f"; done
+6
+0
+```
+
+### What a gate could now check, and what it still could not
+
+All mechanical, and all now derivable from two artifacts rather than one:
 
 - `problem` is declared and resolves
-- every option carries all four required sections
-- no decision or preference language — the vocabulary the scan's `assessment` check already refuses, plus comparatives like "best", "clearly", "obviously"
+- every option carries *Costs*, *Assumes*, *Fails when* and *Would be right if*
 - at least one option is a do-nothing or defer option
-- a "what none of these solves" section exists, and says so explicitly when empty
+- a *what none of these options solves* section exists, and declares itself empty when it is — the declared form `<!-- declared-empty: reason -->`, which `discovery-contract.md` and `define-contract.md` already use, rather than a search of its prose for a word
+- **not** *what it is*, because the two artifacts write it differently and both are correct
+- **not** "no decision or preference language". The Discover contract already records why a pattern match on this class is the trap: it fires on a correct disclaimer, and the real failure is a neutral-sounding paragraph that steers. The rule this contract calls *the thing most likely to decay* is the one a gate cannot hold.
 
-**Until then this contract is asserted, not enforced**, and should be described that way.
+**Whether to build it is the owner's.** It is surfaced here rather than built: the cost is a gate, a control in `CONTROLS.md` to claim its refusals, and a suite, against a repository whose machinery already outweighs its output several times over. What `CONTROLS.md` records in the meantime is that Develop has no gate and why — see *what is not controlled*, item 5.
+
+**This contract is asserted, not enforced**, and should be described that way. The risk that carries is named above: an author who has already decided writes five options and one answer wearing an option's clothes, and nothing here would notice.
 
 ## Open
 

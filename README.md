@@ -82,6 +82,8 @@ The last box is not a phase. A decision records `amends:` naming the document it
 
 **Most** phase contracts were written after the artifact they describe, from what that artifact turned out to need — and each is asserted rather than enforced until a second, differently shaped artifact shows which parts were real. It holds for Define, Develop and Discover; git shows Scan's contract landing before its worked example, and Deliver's one second before its first record. Three of five, and `spec.md` has the detail. (Corrected here on 2026-10-03 — `spec.md` was fixed for this and this copy was missed.)
 
+**The "until a second artifact" half is what the repository intends, and twice it did not happen.** Discover's second topic arrived and its contract was updated and gated. Develop's and Deliver's arrived on 2026-10-03 and neither deferral was re-read until 2026-10-04. `CONTROLS.md` item 5 records that nothing watches the condition, and why no check for it was built.
+
 ## Status
 
 ```bash
