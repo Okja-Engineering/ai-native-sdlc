@@ -1,6 +1,6 @@
 # Intent
 
-**Status:** draft, unaccepted — **and that no longer matches how this document is used.** Accepting it is a decision, which under [`DECIDERS.md`](DECIDERS.md) belongs to a named person and is not an agent's to make. So this records the discrepancy instead of resolving it.
+**Status:** accepted 2026-10-03 by Matthew Van Dusen.
 
 **What rests on this.** Seven tracked files cite this document as the authority for a rule they enforce or a choice they justify, and one of them is a gate:
 
