@@ -65,6 +65,38 @@ field()  { sed -n "s/^$2:[[:space:]]*//p" "$1" 2>/dev/null | head -1 | sed 's/[[
 # has <file> <extended-regex> -> 0 if present, case-insensitive
 has() { grep -qiE "$2" "$1"; }
 
+# declares_empty <section body> -> 0 if the section declares itself empty
+#
+# A section with nothing in it has to SAY it is empty, in band, with a reason:
+#
+#   <!-- declared-empty: every question in scope was answered -->
+#
+# Checked for the same two things as the `not-a-claim` and `dead-pointer`
+# declarations in bin/validate-standards.sh: the declaration is present, and it
+# carries a reason. NOT whether the reason is true — an author can declare a
+# section empty that should not be, and CONTROLS.md says so under what is not
+# controlled rather than pretending otherwise.
+#
+# WHY THIS REPLACED A WORD SEARCH. The check read the section's body for three
+# short words — the same shape as the two-number coverage proxy above and the
+# four-phrase dead-pointer match, which is three times this repository has
+# shipped a search standing in for a reading. An external review deleted all
+# seven items from the open section of topics/agent-pr-approval.md, left "The
+# discovery was exhaustive and nothing of consequence remains outstanding", and
+# this gate reported the artifact within the contract: the artifact deleted every
+# disclosure it owed, asserted the opposite, and passed on one incidental word.
+#
+# This predicate is also written, identically, in
+# process/03-define/validate-define.sh, which owns the other section that may be
+# empty. The gates share no library and adding one would put a load-bearing
+# script outside the enumeration bin/validate-controls.sh builds from the tree —
+# the gap that document records. So the form is declared once in the two
+# contracts and in CONTROLS.md, and what holds the two copies together is that
+# both suites pin the same behaviour rather than the expression.
+declares_empty() {
+  printf '%s\n' "$1" | grep -qE '<!--[[:space:]]*declared-empty:[^>]*[A-Za-z][^>]*-->'
+}
+
 # tokens <text> -> the words of a text, one per line.
 #
 # Backticks are dropped first, so a name written as a code span and the same
@@ -252,23 +284,42 @@ check_topic() {
       "no 'what could not be established' section: this is the section a reader checks to find out whether the question was actually answered, and omitting it claims completeness"
   else
     # Same reasoning as Define's empty-outlier check: an omitted list and an
-    # empty one look identical, so an empty one must say so.
+    # empty one look identical, so an empty one must say so — and SAYING SO IS A
+    # DECLARATION, not a sentence that happens to carry the right word. See
+    # declares_empty above.
     #
     # No `\?` in this address. It is a GNU extension to BRE: BSD sed does not
     # support it, so the range matched nothing on macOS and the check refused
     # every artifact, while passing on the Linux CI leg. Same class of bug as
     # `\b` in git grep, found the same way — by running it on both.
-    # Scoped to the SECTION, not to the end of the file. The range ran to EOF,
-    # so list items in later sections counted as open items and emptying the
-    # open section entirely still passed. Same scope error the audit found in
-    # the coverage checks, in a different place.
+    #
+    # THE SECTION ENDS AT THE NEXT HEADING OR THE NEXT `---`, which is how
+    # Define already scopes its outlier section. Stopping only at the next `## `
+    # left the section's own trailing separator inside the body, and `---` begins
+    # with a list marker, so an open section emptied of every one of its items
+    # still counted one and the emptiness check never ran at all. That path
+    # needed no word: it was the third way in, found while repairing the first
+    # two. An earlier version of this range ran to end of file, which counted
+    # list items in later sections.
     opensec="$(awk '/^#+.*could not .*establish/ { inside = 1; next }
-                    /^## / { if (inside) exit }
+                    inside && (substr($0, 1, 3) == "## " || $0 ~ /^---[[:space:]]*$/) { exit }
                     inside { print }' "$f")"
-    seen=$(printf '%s\n' "$opensec" | grep -cE '^[-*0-9]|\[O\]')
-    if [ "$seen" -eq 0 ] && ! printf '%s\n' "$opensec" | grep -qiE 'none|nothing|everything was'; then
+    # AN OPEN ITEM IS A LIST ITEM CARRYING AN `[O]` GRADE — the form this
+    # contract asks for ("a mandatory section, listing [O] items explicitly") and
+    # the form both shipped topics use, one as `- **[O]` …`, the other as
+    # `**1. … [O]**`. Both markers are accepted because the contract says section
+    # form may differ between artifacts; what may not differ is that an item is
+    # an item.
+    #
+    # This was `^[-*0-9]` OR an `[O]` anywhere in the body, as an alternation. So
+    # one line of prose carrying a grade marker counted as an open item, which is
+    # the second way a hollowed section passed: write the assertion, append the
+    # marker, and the emptiness check is skipped rather than satisfied.
+    seen=$(printf '%s\n' "$opensec" \
+      | grep -cE '^[[:space:]]*([-*+][[:space:]]|[0-9]+[.)][[:space:]]|\*\*).*\[O\]')
+    if [ "$seen" -eq 0 ] && ! declares_empty "$opensec"; then
       refuse "$f" "-" "silent-empty-open" \
-        "the open section lists nothing and does not say so: an artifact with nothing open is making a strong claim and has to make it explicitly"
+        "the open section lists no [O] item and does not declare itself empty: an artifact with nothing open is making a strong claim, and it has to make it as a declaration in the section — <!-- declared-empty: reason --> — not as a sentence. This was a search of the section's prose for a short word until 2026-10-04, and an artifact that deleted all seven of its items and asserted the opposite passed on the word \"nothing\""
     fi
   fi
 
