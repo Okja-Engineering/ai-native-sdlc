@@ -226,6 +226,17 @@ out="$(run "$t" 2026-09-29)"
 assert_contains "$out" "producing-themes" "the cycle that owns a problem still lists it"
 assert_contains "$out" "Several problems exist" "and is asked which one"
 
+# And once the second cycle has a problem of its own, the list it is offered is
+# its own and not the other cycle's. Counting and listing are two places the same
+# filter has to be applied, and the count alone passing proved nothing about the
+# list.
+sed 's|cycles/2026-09-29|cycles/2026-11-01|g' \
+  "$t/process/03-define/problems/producing-themes.md" > "$t/process/03-define/problems/cadence.md"
+out="$(run "$t" 2026-11-01)"
+assert_contains "$out" "cadence" "the second cycle is offered its own problem"
+assert_not_contains "$out" "producing-themes" "and not the first cycle's"
+assert_not_contains "$out" "agent-pr-approval" "nor the first cycle's other one"
+
 # --- the count it writes is the count the source records ----------------------
 # next.sh:83 was `rows=$(grep -cE '^| [A-Z]' "$findings")` — the exact expression
 # define-contract.md names as the one an external audit defeated, still writing
