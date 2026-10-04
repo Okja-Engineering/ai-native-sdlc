@@ -16,7 +16,28 @@ cd "$ROOT" || exit 2
 
 ok="  ok "; no="  -- "; miss="  !! "
 
-count_rows()   { grep -cE '^\| F[0-9]+ \|' "$1" 2>/dev/null || echo 0; }
+# What a finding is, is stage 1's declaration, and this used to carry its own copy
+# of it: `grep -cE '^\| F[0-9]+ \|'`. Anchored, so it survived the lowercasing
+# exploit, and it read the WHOLE file — so a markdown table anywhere in a findings
+# file was reported as findings. findings-contract.md permits content in
+# `## Looked at`, and a contract-valid file with two findings and one table of
+# unreached ground there was reported as four. The report and the Define gate now
+# read the same harvester, so they cannot disagree about a cycle's size.
+IDS="process/01-scan/findings-ids.sh"
+[ -f "$IDS" ] || {
+  printf 'cycle: no findings id harvester at %s — a report with its own idea of what a finding is was how this over-counted, so it will not run without it\n' "$IDS" >&2
+  exit 2
+}
+
+# `?`, not 0, when the harvester cannot answer. Zero is a real and valid count — a
+# cycle that found nothing — so reporting it for a cycle nobody could read would
+# say the scan was quiet when the truth is that nothing was measured. That is the
+# same shape as a gate reporting a clean tree having evaluated nothing.
+count_rows() {
+  local ids
+  ids=$(bash "$IDS" "$1" 2>/dev/null) || { printf '%s\n' '?'; return; }
+  printf '%s\n' "$ids" | grep -c .
+}
 count_themes() { grep -cE '^### [0-9]+ · ' "$1" 2>/dev/null || echo 0; }
 count_opts()   { grep -cE '^## [A-F] · ' "$1" 2>/dev/null || echo 0; }
 count_outl()   { sed -n '/## Outliers/,/^---/p' "$1" 2>/dev/null | grep -cE '^- \*\*' || echo 0; }
