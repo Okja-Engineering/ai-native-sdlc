@@ -40,7 +40,20 @@
 
 **Evidence note.** The allowlist was read out of [`DECIDERS.md`](DECIDERS.md) as the first cell of every row in the file, header included, so `decided_by: Name` was an authorized decider until 2026-10-03. It is now the `Name` column of whichever tables declare one, data rows only, skipping fenced examples — so a second table, an example row and the heading itself all donate nothing. A file that declares no such column authorizes nobody, which is the same choice as a missing file.
 
-**What it does not cover.** Whether the named person actually read the change. A name is attributable, not a guarantee of attention — see *What is not controlled*, item 1.
+**When the proof of a person starts.** This control establishes **who is authorized** to decide. Proof that a person rather than an agent recorded the decision starts with the **next** decision, by commit signature. A signature is evidence that a specific private key was present when the commit was made; an author field is a string anyone can set, which is why the author field cannot carry this. Nothing in the published history is signed — measured on `main` at `12ca5cd` on 2026-10-04:
+
+```
+$ git log 12ca5cd --format='%G?' | sort -u
+N
+```
+
+`N` is git's code for no signature, and it is the only value every commit reachable from that one returns. The ref is a commit rather than a branch name so the measurement stays reproducible; `tests/test_doc_claims.sh` runs the command and refuses a transcript git disagrees with.
+
+Signing for decision commits is **not configured**, and configuring it belongs to the decider, so this is an obligation that **starts at the next decision rather than one already met**. A control with a start date is an ordinary thing for an assessor to read; a history that cannot be verified is not.
+
+**The two decisions that predate it.** `59b7cd2` set `chosen: D` and `f808ff5` set `chosen: F`. Both are unsigned, both carry an identity an agent also uses, and both are the `chosen:`-setting commits `bin/validate-authorship.sh` refuses today. They are recorded as predating the obligation rather than relabelled to satisfy it. Rewriting history to assign them an identity was weighed and refused, because the history holds no signal that could decide it and the rewrite would have put an invented separation in the one file that exists to say who is authorized — *What is not controlled*, item 10, carries the measurement and the reasoning.
+
+**What it does not cover.** Whether the named person actually read the change. A name is attributable, not a guarantee of attention — see *What is not controlled*, item 1. And, for those two decisions, whether a person rather than an agent typed `decided_by:` at all. A clone can establish who is authorized; for the records that already exist it cannot establish who sat at the keyboard, and nothing added later can make it.
 
 ---
 
@@ -320,7 +333,7 @@ Two shapes of entry. `the gate itself` means the gate needs no control and none 
 
 | Gate | Refusal | Why no control covers it |
 |---|---|---|
-| `bin/validate-authorship.sh` | the gate itself | It refuses today and is deliberately not wired into CI, so it gates nothing yet. Turning it on needs a git history rewrite that belongs to the decider; *what is not controlled*, item 10, states what. A control claiming enforcement by a gate nothing runs would be the overclaim this document exists to avoid. |
+| `bin/validate-authorship.sh` | the gate itself | It refuses today and is deliberately not wired into CI, so it gates nothing yet. What CTRL-1 now carries instead is a start date: proof that a person recorded a decision begins with the next decision, by commit signature, and the two existing decisions are recorded as predating that. Turning this gate on needs the decider to commit under the declared address — not a history rewrite, which was weighed and refused; *what is not controlled*, item 10, holds the measurement. A control claiming enforcement by a gate nothing runs would be the overclaim this document exists to avoid. |
 | `bin/validate-controls.sh` | the gate itself | It checks this document against the gates rather than checking a process artifact. A control over the control document would be this document asserting a control over itself. Its own refusals are covered by `tests/test_controls.sh`. |
 
 `bin/validate-claims.sh` needs no entry. CTRL-9 names it, and it emits no refusal code at all — it exits non-zero and prints the matching lines — so the backward check has nothing to find and the control naming it is not asked for a refusal table it could only invent.
@@ -361,9 +374,23 @@ Nothing mechanical checks this, and it is not a candidate for one: a rule tellin
 
 **10. Who committed a decision.** CTRL-1 establishes that `decided_by` names an authorized person. It does not establish that the person, rather than an agent, wrote the field. Both commits that set `chosen:` are authored by an identity an agent uses, and the identity `DECIDERS.md` declares a decision commit must carry authors no commits at all — so `git log` cannot separate the parties for the one act this control is about. A distinct agent address was configured on 2026-10-03, which separates agent-driven commits from the rest and leaves this item exactly where it was: the two display names sharing `imagineux@gmail.com` are the shape `STANDARDS.md` 3 convicts a vendor of, and the decider's declared address is still unused. This item said *"every commit on `main` is authored under one address"* until 2026-10-04, a day after that stopped being true, with the sentence below telling the reader to run the gate that was printing the contradiction. <!-- corrected-claim: under one address — the correction has to quote the sentence it corrects -->
 
-Run `bin/validate-authorship.sh` for the live tally. The numbers are not repeated here on purpose: this section carried a transcribed tally until 2026-10-03 and it was wrong, because it had been measured in a working tree holding unpushed branches. `DECIDERS.md` holds the one transcribed copy, labelled with the commit it was measured at, and `tests/test_doc_claims.sh` checks both that it agrees with git and that no document contradicts the gate in the present tense.
+Run `bin/validate-authorship.sh` for the live tally. The identity tally is not repeated here on purpose: this section carried a transcribed copy until 2026-10-03 and it was wrong, because it had been measured in a working tree holding unpushed branches. It also changes every time anybody commits, so a copy here would go stale on its own. `DECIDERS.md` holds the one transcribed copy, labelled with the commit it was measured at, and `tests/test_doc_claims.sh` checks both that it agrees with git and that no document contradicts the gate in the present tense.
 
-`bin/validate-authorship.sh` checks it and **refuses today**: a commit setting `chosen:` must be authored by the identity declared in `DECIDERS.md`, and that identity must not be shared. Neither holds. It is deliberately **not wired into CI**, because a gate that cannot pass blocks every branch, and what turns it on is a configuration change plus a workflow change that both belong to the decider. `DECIDERS.md` states exactly what they are, and they are **deferred to a git history cleanup on `main`** — a force-push that rewrites every SHA and therefore every commit citation in the tracked documents. Tracked as issue #51 and not scheduled into a sprint.
+**A history rewrite was weighed and refused, so this gap is permanent for the records that already exist.** The one measurement worth transcribing here is a fixed fact about commits that already exist rather than a live tally, so it does not go stale — author against committer on `main` at `12ca5cd`:
+
+```
+$ git log 12ca5cd --format='%an|%cn' | sort | uniq -c | sort -rn
+  85 imagineux|imagineux                        <- made locally, either party
+  74 Matthew Van Dusen|GitHub                   <- web merges, the owner
+  43 ai-native-sdlc agent|ai-native-sdlc agent  <- the agent
+   4 imagineux|ai-native-sdlc agent
+```
+
+Those 85 carry no signal at all: author and committer are both `imagineux`, the commit was made locally, and it was made by either the owner or an agent. Committer does not separate them and neither does timing or message style. A rewrite could only assign them an identity by fiat, producing a history that looks separated while the separation is invented — and nobody, including whoever ran it, could check it afterwards. That is the overclaim this document exists to avoid, in the file that answers who is authorized. It would also force a push past the `non_fast_forward` rule on `main` and break every commit citation the tracked documents carry, including the `fa7538a` pointer `bin/validate-standards.sh` now resolves.
+
+**What replaces it is a start date, not an enforcement.** CTRL-1 now records that proof of a person begins with the next decision, by commit signature, and that the two existing decisions predate the obligation. It carries the command and the measurement that show no commit in the published history is signed. Signing for decision commits is not configured and configuring it is the decider's, so the honest position is that the proof obligation starts, not that it is met.
+
+`bin/validate-authorship.sh` checks the author field and **refuses today**: a commit setting `chosen:` must be authored by the identity declared in `DECIDERS.md`, and that identity must not be shared. Neither holds. It is deliberately **not wired into CI**, because a gate that cannot pass blocks every branch. What would turn it on is the decider committing under the declared address and making the `chosen:` commit personally — `DECIDERS.md` states both. Neither is waiting on a history change: the issue that tracked rewriting `main` is closed as won't-fix for the reason above, and nothing is deferred to it.
 
 **11. Whether a person checked what a coverage part says they checked.** CTRL-7 requires the verified-by-hand part, and the reached and not-reached parts, to name something the artifact carries somewhere else — a file, an id, a measurement, a product, an address. That establishes two things and no more: the part names something checkable, and the artifact itself carries that thing. It does not establish that anybody looked at it.
 

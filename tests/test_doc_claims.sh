@@ -504,6 +504,100 @@ case "$(stale_tallies "$TMP/tally-noref.md")" in
 esac
 assert_eq "yes" "$fires" "a tally whose command names no ref is reported"
 
+# --- a transcribed signature check agrees with git ----------------------------
+# CTRL-1's start date rests on nothing in the history being signed: proof that a
+# person recorded a decision begins with the next decision, by commit signature,
+# and the two decisions that already exist are recorded as predating that. The
+# claim underneath it is a present-tense statement about `git log`, so it is held
+# to the same rule as the author tally above — the document transcribes the command
+# and its output, and this runs the command.
+#
+# `N` is not pinned. The expected value is whatever git reports, so the day a
+# commit is signed this goes red and the sentences resting on the claim have to be
+# revisited. That is the point of the check rather than a side effect of it: the
+# start date stops being a start date once something is signed.
+#
+# A mention of the command in prose is not a transcription. The reasoning is the
+# same as the linked-path exemption at the top of this file — you cannot both quote
+# a command inline and be transcribing its output on the next line — so only an
+# occurrence opening a fenced block is read as one.
+#
+# The ref comes out of the document's own command and has to resolve, reusing
+# `tally_ref` above rather than a second copy of it. Both checks are then one rule
+# said twice: a transcribed git measurement equals what git prints at the ref its
+# command names. `main` would not do here — it moves, and on a pull-request checkout
+# it does not resolve at all — which is why CTRL-1 names a commit.
+SIG_COMMAND="--format='%G?'"
+
+sig_transcripts() { # <files...> -> `file:line(got)` for each transcript that disagrees
+  local hit f n prev cmd ref want got
+  for hit in $(grep -nF -- "$SIG_COMMAND" "$@" /dev/null 2>/dev/null | cut -d: -f1,2 | sort -u); do
+    f="${hit%%:*}"; n="${hit##*:}"
+    [ "$n" -gt 1 ] || continue
+    prev="$(sed -n "$((n - 1))p" "$f")"
+    case "$prev" in '```'*) ;; *) continue ;; esac
+    cmd="$(sed -n "${n}p" "$f")"
+    ref="$(tally_ref "$cmd")"
+    if [ -z "$ref" ] || ! git rev-parse --verify --quiet "$ref^{commit}" >/dev/null 2>&1; then
+      printf '%s(ref:%s) ' "$hit" "${ref:-none}"
+      continue
+    fi
+    want="$(git log "$ref" --format='%G?' 2>/dev/null | sort -u | tr '\n' ' ')"
+    got="$(sed -n "$((n + 1)),\$p" "$f" | awk '/^```/ { exit } { print }' | tr '\n' ' ')"
+    [ "${got% }" = "${want% }" ] || printf '%s(%s) ' "$hit" "${got% }"
+  done
+}
+
+# shellcheck disable=SC2046
+sigfiles="$(git grep -lF -- "$SIG_COMMAND" -- '*.md' ':(exclude)tests/*' 2>/dev/null)"
+sigbad="$(sig_transcripts $sigfiles)"
+assert_eq "" "${sigbad% }" "a transcribed signature check agrees with what git reports"
+
+# And a document actually transcribes it, or the sweep above walked nothing. The
+# claim CTRL-1's start date rests on has to be somewhere a reader can check.
+nsig=0
+for f in $sigfiles; do
+  nsig=$((nsig + $(grep -cF -- "$SIG_COMMAND" "$f" || true)))
+done
+[ "$nsig" -ge 1 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "a document carries the signature check CTRL-1 rests on (found $nsig)"
+
+# The detection has to fire. The expected transcript is built from what git reports
+# for this checkout, never from `N` typed here, so it cannot drift into agreement.
+sig_head="$(git log HEAD --format='%G?' 2>/dev/null | sort -u | tr '\n' ' ')"
+sig_head="${sig_head% }"
+[ -n "$sig_head" ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "git reports a signature status for this checkout (got '$sig_head')"
+
+sig_fixture() { # <file> <ref> <transcript>
+  { printf '```\n$ git log %s %s | sort -u\n' "$2" "$SIG_COMMAND"
+    printf '%s\n```\n' "$3"
+  } > "$1"
+}
+
+sig_fixture "$TMP/sig-true.md" HEAD "$sig_head"
+assert_eq "" "$(sig_transcripts "$TMP/sig-true.md")" \
+  "a transcript that agrees with git at the ref it names passes"
+
+sig_fixture "$TMP/sig-wrong.md" HEAD "G"
+case "$(sig_transcripts "$TMP/sig-wrong.md")" in
+  "$TMP/sig-wrong.md:2(G)"*) fires=yes ;; *) fires=no ;;
+esac
+assert_eq "yes" "$fires" "the detection fires on a transcript git does not agree with"
+
+sig_fixture "$TMP/sig-deadref.md" no-such-ref-here "$sig_head"
+case "$(sig_transcripts "$TMP/sig-deadref.md")" in
+  *"(ref:no-such-ref-here)"*) fires=yes ;; *) fires=no ;;
+esac
+assert_eq "yes" "$fires" "a signature transcript sourced to a ref that does not resolve is reported"
+
+# A mention in prose is not a transcript, or every sentence naming the command
+# would be demanding that the next line be its output.
+printf 'Run `git log main %s | sort -u` to check it yourself.\nThe start date is in CTRL-1.\n' \
+  "$SIG_COMMAND" > "$TMP/sig-mention.md"
+assert_eq "" "$(sig_transcripts "$TMP/sig-mention.md")" \
+  "a command mentioned in prose is not read as a transcript"
+
 # --- a present-tense claim about `git log` agrees with what the gate prints -----
 # Three documents said, in the present tense, that every commit on `main` was
 # authored under one address, and named `bin/validate-authorship.sh` in the same
