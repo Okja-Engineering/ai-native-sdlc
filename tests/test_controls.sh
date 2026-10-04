@@ -129,6 +129,81 @@ out="$(run "$TMP/bad-hook.md")"; st=$?
 assert_status 1 "$st" "a hook path a control names and the repository does not have is refused"
 assert_contains "$out" "refuse[enforcement-unresolved]" "and the refusal says which path"
 
+# --- backward: a refusal a gate emits and no control claims -------------------
+# `validate-decision.sh` emitted `no-chosen-field` with no control and no test, and
+# the scan gate emitted seven more the same way. A one-directional check cannot see
+# any of them: the document resolves fine, and the gap is in what it does not say.
+awk '{ if ($0 ~ /^\| `undated-decision`/) next; print }' "$DOC" > "$TMP/uncited.md"
+out="$(run "$TMP/uncited.md")"; st=$?
+assert_status 1 "$st" "a refusal a gate emits and no control cites is refused"
+assert_contains "$out" "refuse[uncited-refusal]" "and the refusal is uncited-refusal"
+assert_contains "$out" 'emits refusal `undated-decision`' "and it names the unclaimed code"
+
+# The forward direction still passes on that document, which is what makes this a
+# test of the second direction rather than a second test of the first.
+assert_not_contains "$out" "refuse[cited-not-emitted]" \
+  "the forward check is satisfied by the same document"
+
+# --- and the citation has to be by a control naming THAT gate -----------------
+# A control citing the code is not enough: it has to be a control that names the
+# gate emitting it. `no-method` moves from CTRL-5, which names the define gate, to
+# CTRL-1, which names the deliver gate. The define gate still emits it and no
+# control naming the define gate claims it any more.
+#
+# Found by loosening the comparison to "some control cites this code", which the
+# assertions above did not catch. That is the same defect as the one being repaired,
+# one direction over: a document-wide union standing in for a per-control binding.
+awk '{
+       if ($0 ~ /^\| `no-method`/) next
+       print
+       if ($0 ~ /^\| `undecided-by`/) print "| `no-method` | moved to a control naming a different gate |"
+     }' "$DOC" > "$TMP/wrong-control.md"
+out="$(run "$TMP/wrong-control.md")"; st=$?
+assert_status 1 "$st" "a code cited by a control naming a different gate is refused"
+assert_contains "$out" 'emits refusal `no-method`' "and the gate that emits it is reported as unclaimed"
+
+# --- sideways: a gate no control names ----------------------------------------
+# The surface is enumerated from the tree. Both hooks were missing from this
+# document until an external audit found them, and nothing reading only the
+# document could have noticed.
+awk '{ gsub(/`process\/02-discover\/validate-discovery.sh`/, "`process/02-discover/validate-discovery.sh `"); print }' \
+  "$DOC" > "$TMP/unnamed-gate.md"
+out="$(run "$TMP/unnamed-gate.md")"; st=$?
+assert_status 1 "$st" "a gate no control names is refused rather than skipped"
+assert_contains "$out" "refuse[uncontrolled-gate]" "and the refusal names the gate with no control"
+assert_contains "$out" "validate-discovery.sh" "and says which one"
+
+# Both hooks are in the surface, so the check covers them. Asserted by name,
+# because "the surface" is the claim and the hooks are the case that was missing.
+for h in .githooks/commit-msg .githooks/pre-push; do
+  awk -v h="$h" '{ gsub("`" h "`", "`" h "x`"); print }' "$DOC" > "$TMP/drop-hook.md"
+  out="$(run "$TMP/drop-hook.md")"; st=$?
+  assert_status 1 "$st" "dropping $h from the document is refused"
+  assert_contains "$out" "refuse[uncontrolled-gate]" "and $h is reported as having no control"
+done
+
+# --- an exception has to name something real and carry a reason ---------------
+# The exception table is the replacement for silent exclusion, so an entry with no
+# reason is the thing it was built to stop.
+awk '{ if ($0 ~ /^\| `bin\/validate-authorship.sh`/) print "| `bin/validate-authorship.sh` | the gate itself |  |"; else print }' \
+  "$DOC" > "$TMP/no-reason-exc.md"
+out="$(run "$TMP/no-reason-exc.md")"; st=$?
+assert_status 1 "$st" "an exception with no reason is refused"
+assert_contains "$out" "refuse[exception-no-reason]" "and the refusal says a reason is required"
+
+awk '{ if ($0 ~ /^\| `bin\/validate-authorship.sh`/) print "| `bin/validate-nothere.sh` | the gate itself | because |"; else print }' \
+  "$DOC" > "$TMP/absent-exc.md"
+out="$(run "$TMP/absent-exc.md")"; st=$?
+assert_status 1 "$st" "an exception naming a script that is not here is refused"
+assert_contains "$out" "refuse[enforcement-unresolved]" "and the refusal says the path does not resolve"
+assert_contains "$out" "refuse[uncontrolled-gate]" "and the gate it was meant to cover is uncovered again"
+
+# The exception table is not empty, or every assertion about it would be about a
+# mechanism nothing uses.
+nexc="$(printf '%s\n' "$(run "$DOC")" | sed -n 's/.*read, \([0-9]*\) exception.*/\1/p')"
+[ "${nexc:-0}" -ge 1 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "the document declares at least one exception (reported ${nexc:-none})"
+
 # --- a document the gate cannot read must not report clean -------------------
 # Exit 2 is "could not run". Exit 0 on a document with no controls would make every
 # assertion above pass against an empty denominator.
