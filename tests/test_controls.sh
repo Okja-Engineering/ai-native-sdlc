@@ -15,54 +15,127 @@ DOC="$ROOT/CONTROLS.md"
 
 assert_file_exists "$DOC" "the controls document exists"
 
-# --- every gate named in the document exists ----------------------------------
-# Scripts are cited as `process/<phase>/validate-<thing>.sh` in backticks.
-# Gates live beside their phase, except the STANDARDS.md gate, which has no phase
-# to live beside: applying a decision is a field plus a link — `amends:` on the
-# decision, `decided:` back from the amended claim — rather than a sixth phase, so
-# nothing called `process/06-update/` exists for that gate to sit in. The reasoning
-# is in process/05-deliver/deliver-contract.md, section "`amends`, and why Update
-# is not a sixth phase"; decided in issue #18, which a clone cannot read.
+# --- the per-control binding, driven through the gate -------------------------
+# This section used to do the checking itself, with two string searches, and both
+# were vacuous:
 #
-# The first version of this pattern matched only process/ and reported CTRL-8's
-# refusals as emitted by nothing.
-gates="$(grep -oE '(process/[0-9a-z-]+|bin)/validate-[a-z-]+\.sh' "$DOC" | sort -u)"
-assert_contains "$gates" "validate-decision.sh" "the document cites the deliver gate"
-assert_contains "$gates" "validate-define.sh" "the document cites the define gate"
-assert_contains "$gates" "validate-findings.sh" "the document cites the scan gate"
+#   * It collected every gate path named anywhere in the document into one set and
+#     asked whether a cited code appeared in ANY of them. Pointing CTRL-1 at the
+#     scan gate, which emits none of its four codes, passed 18 of 18.
+#   * The membership test was `grep -q -- "$code" "$gate"` — a plain substring over
+#     the whole file. Adding one comment line to any gate made a fabricated refusal
+#     code pass.
+#
+# The checking now lives in bin/validate-controls.sh, for the same reason
+# bin/validate-claims.sh stopped being a line in ci.yml: a check embedded in its own
+# test cannot be run against a document built to break it. This drives that gate
+# against the shipped document and against documents constructed to fail.
+#
+# Most of the failing documents are DERIVED from the live CONTROLS.md at run time
+# rather than checked in. A checked-in copy goes stale the moment someone edits a
+# control, and then the drift test is testing an old document.
+GATE="$ROOT/bin/validate-controls.sh"
+FIX="$TEST_DIR/fixtures/controls"
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
-missing_gates=""
-for g in $gates; do
-  [ -f "$ROOT/$g" ] || missing_gates="$missing_gates $g"
-done
-assert_eq "" "$missing_gates" "every gate the document names exists"
+assert_file_exists "$GATE" "the gate that checks the document exists"
 
-# --- every refusal code cited appears in some gate ----------------------------
-# Codes appear in the refusal tables as `code` in backticks. Collect anything
-# shaped like a refusal code, then require each to be present in a gate script.
-# This is the check that stops a control claiming enforcement it does not have.
-codes="$(grep -oE '^\| `[a-z][a-z-]{3,}`' "$DOC" | tr -d '|` ' | sort -u)"
-n=0; orphans=""
-for c in $codes; do
-  n=$((n + 1))
-  found=no
-  for g in $gates; do
-    grep -q -- "$c" "$ROOT/$g" && { found=yes; break; }
-  done
-  [ "$found" = yes ] || orphans="$orphans $c"
-done
+# run <document> — the gate's output, with its exit status returned.
+run() { out="$(/bin/bash "$GATE" "$1" 2>&1)"; st=$?; printf '%s\n' "$out"; return "$st"; }
 
-assert_eq "" "$orphans" "every refusal code cited is emitted by a gate"
-[ "$n" -ge 15 ] && ok=yes || ok=no
-assert_eq "yes" "$ok" "the document cites at least 15 refusal codes (found $n)"
+out="$(run "$DOC")"; st=$?
+assert_status 0 "$st" "the shipped document passes the gate"
 
-# --- codes mentioned in prose, not only in tables -----------------------------
-# CTRL-6 lists its refusals inline rather than as a table. Spot-check that those
-# resolve too, since a prose list is exactly where an invented code would hide.
-for c in nothing-found empty-cycle filename; do
-  assert_contains "$(cat "$ROOT/process/01-scan/validate-findings.sh")" "$c" \
-    "scan gate emits '$c' as the document claims"
-done
+# A gate that checked nothing would also exit 0, so the denominator is printed and
+# asserted. This whole repair is about a check that could not fail.
+nsites="$(printf '%s\n' "$out" | sed -n 's/.*refusals, \([0-9]*\) emission sites.*/\1/p')"
+[ "${nsites:-0}" -ge 80 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "it read a real denominator of emission sites (reported ${nsites:-none})"
+ncited="$(printf '%s\n' "$out" | sed -n 's/.*controls, \([0-9]*\) cited refusals.*/\1/p')"
+[ "${ncited:-0}" -ge 40 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "it resolved every refusal the document cites (reported ${ncited:-none})"
+nctrl="$(printf '%s\n' "$out" | sed -n 's/validate-controls: \([0-9]*\) controls.*/\1/p')"
+[ "${nctrl:-0}" -ge 9 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "it found every control block (reported ${nctrl:-none})"
+
+# --- a code emitted by a DIFFERENT gate does not satisfy the control ----------
+# The invariant, stated as the assertion. `undecided-by` is emitted by the deliver
+# gate, so the document-wide union this replaces passed the derived document below.
+# The per-control binding must not.
+awk '{ gsub(/process\/05-deliver\/validate-decision.sh/, "process/01-scan/validate-findings.sh"); print }' \
+  "$DOC" > "$TMP/wrong-gate.md"
+out="$(run "$TMP/wrong-gate.md")"; st=$?
+assert_status 1 "$st" "a control pointed at a gate that emits none of its codes is refused"
+assert_contains "$out" "refuse[cited-not-emitted]" "and the refusal says the cited code is not emitted"
+assert_contains "$out" 'cites refusal `undecided-by`' "and it names the code that does not resolve"
+
+# The code is still emitted somewhere in the repository, which is what makes this a
+# test of the binding rather than of the code's existence.
+assert_contains "$(/bin/bash "$ROOT/bin/list-refusals.sh" "$ROOT/process/05-deliver/validate-decision.sh")" \
+  "undecided-by" "the code is still emitted by the gate the document stopped naming"
+
+# --- a mention is not an emission site ----------------------------------------
+# The two fixture documents differ in one thing: the path on the Enforced by line.
+# The two fixture gates differ in one thing: whether the code is in a comment or in
+# a call. So the red and green here can only be about that difference.
+out="$(run "$FIX/comment-only.md")"; st=$?
+assert_status 1 "$st" "a code that appears only in a comment is refused"
+assert_contains "$out" "refuse[cited-not-emitted]" "and the refusal is cited-not-emitted"
+assert_contains "$out" 'cites refusal `fixture-refusal`' "and it names the code"
+
+assert_contains "$(cat "$FIX/mentions-in-a-comment.sh")" "fixture-refusal" \
+  "the comment-only fixture does carry the code as a substring"
+
+out="$(run "$FIX/emission-site.md")"
+assert_not_contains "$out" "refuse[cited-not-emitted]" \
+  "the same code at a real emission site is accepted"
+
+# --- a code in prose rather than in the table ---------------------------------
+# The table is the only place the check reads codes from, so a code that drifts into
+# prose would be unchecked. CTRL-5 named `no-method` on its Enforced by line and
+# CTRL-6 named eight codes in a sentence; all nine were outside the old check.
+awk '{ if ($0 ~ /^\| `not-a-person`/) print "This control also emits `not-a-person`."; else print }' \
+  "$DOC" > "$TMP/in-prose.md"
+out="$(run "$TMP/in-prose.md")"; st=$?
+assert_status 1 "$st" "a code moved out of the table into prose is refused"
+assert_contains "$out" "refuse[code-in-prose]" "and the refusal says to put it back in the table"
+
+# --- a control with no enforcement at all -------------------------------------
+# CTRL-9 had no Enforced by line, which is how its five hook and CI controls were
+# outside the check.
+awk 'BEGIN { done = 0 }
+     /^\*\*Enforced by\*\*/ && done == 0 { done = 1; next }
+     { print }' "$DOC" > "$TMP/no-enforced-by.md"
+out="$(run "$TMP/no-enforced-by.md")"; st=$?
+assert_status 1 "$st" "a control naming no enforcement is refused"
+assert_contains "$out" "refuse[no-enforced-by]" "and the refusal says a control names what refuses"
+
+awk '{ if ($0 ~ /^\| `no-method`/) next; print }' "$DOC" > "$TMP/no-codes.md"
+out="$(run "$TMP/no-codes.md")"; st=$?
+assert_status 1 "$st" "a control naming a gate and citing no refusal is refused"
+assert_contains "$out" "refuse[no-refusal-cited]" "and the refusal says where the codes go"
+
+# --- CTRL-9's enforcement is resolved, not excluded ---------------------------
+# Two hooks, a script and three CI jobs, and no refusal table. That put it outside
+# the old check twice: codes came from table rows, and the gate pattern matched only
+# validate-*.sh so neither hook could be checked even if they had been harvested.
+awk '{ gsub(/`commit-messages`/, "`commit-msgs`"); print }' "$DOC" > "$TMP/bad-job.md"
+out="$(run "$TMP/bad-job.md")"; st=$?
+assert_status 1 "$st" "a CI job a control names and the workflow does not declare is refused"
+assert_contains "$out" "refuse[job-unresolved]" "and the refusal says which job"
+
+awk '{ gsub(/`.githooks\/pre-push`/, "`.githooks/pre-pish`"); print }' "$DOC" > "$TMP/bad-hook.md"
+out="$(run "$TMP/bad-hook.md")"; st=$?
+assert_status 1 "$st" "a hook path a control names and the repository does not have is refused"
+assert_contains "$out" "refuse[enforcement-unresolved]" "and the refusal says which path"
+
+# --- a document the gate cannot read must not report clean -------------------
+# Exit 2 is "could not run". Exit 0 on a document with no controls would make every
+# assertion above pass against an empty denominator.
+printf '# Not a controls document\n\nNothing here.\n' > "$TMP/empty.md"
+run "$TMP/empty.md" >/dev/null 2>&1
+assert_status 2 "$?" "a document declaring no controls exits 2 rather than reporting clean"
+
 
 # --- the other document that makes enforcement claims -------------------------
 # This suite read one document. The enforcement claims live in several, and the
@@ -90,7 +163,9 @@ REG_DOC="$ROOT/SOURCES.md"
 STD_GATE="$ROOT/bin/validate-standards.sh"
 assert_file_exists "$REG_DOC" "the source register exists"
 
-TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+# TMP and its trap are declared once, in the section above. A second mktemp -d
+# here would leave the first directory behind, because the trap only removes
+# whatever TMP points at last.
 
 # A declaration honoured only when it carries a reason. One copy of the pattern,
 # used by the sweep and by the count, so the two cannot disagree about what

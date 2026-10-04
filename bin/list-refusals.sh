@@ -18,7 +18,7 @@
 # Two things read this, and they have to agree on the denominator:
 #
 #   bin/validate-controls.sh   binds a cited code to the gate its control names
-#   tests/mutate-sweep.sh      mutates every site by line number
+#   a mutation sweep           mutates every site by line number
 #
 # When those two disagree, a guard can be invisible to the document check and
 # invisible to the sweep at the same time, which is how the `id` refusal in

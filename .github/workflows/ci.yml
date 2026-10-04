@@ -49,6 +49,13 @@ jobs:
         # route to evidence that was a branch which does not exist.
         run: /bin/bash bin/validate-standards.sh
 
+      - name: Validate CONTROLS.md against the gates it names
+        # The control document is what README.md tells an assessor to read first,
+        # and the sentence inviting them to trust it was checked by a substring
+        # search. Pointing a control at a gate emitting none of its codes passed,
+        # and a fabricated refusal code passed once one comment was added anywhere.
+        run: /bin/bash bin/validate-controls.sh
+
       - name: Validate every discovery topic
         # Fields, the question in the asker's own words, coverage in three parts,
         # the open section, and that grades come from the enum. The macOS leg
