@@ -291,8 +291,16 @@ assert_status 0 "$rc" "a reciprocated link is accepted once restored"
 # rewrite using a different mechanism has to pass these too.
 MANY="$TMP/MANY.md"
 
-# amendment <n> -> a record amending claim <n> of MANY.md, path on stdout
+# amendment <n> [anchor] -> a record amending claim <n> of MANY.md, path on stdout
+#
+# The anchor defaults to the claim the record is about. Pass another one to point
+# the record at a different claim, or NONE for a link carrying no anchor at all.
 amendment() {
+  local anchor="${2-claim-$1}" link
+  case "$anchor" in
+    NONE) link="../../../MANY.md" ;;
+    *)    link="../../../MANY.md#$anchor" ;;
+  esac
   cat > "$TMP/process/05-deliver/decisions/d$1.md" <<EOF
 # Decision — d$1
 
@@ -301,7 +309,7 @@ options: [o](../../04-develop/options/thing.md)
 chosen: A
 decided_by: Ada Lovelace
 dated: 2026-10-01
-amends: [\`MANY.md\` claim $1](../../../MANY.md#claim-$1)
+amends: [\`MANY.md\` claim $1]($link)
 EOF
   printf '%s' "$TMP/process/05-deliver/decisions/d$1.md"
 }
@@ -337,6 +345,154 @@ printf '\n## Claim 3\n\nSomething.\n\ndecided: [d1](process/05-deliver/decisions
 out="$(bash "$GATE" "$(amendment 3)" 2>&1)"; rc=$?
 assert_status 1 "$rc" "a record that no back-link names is still refused"
 assert_contains "$out" "refuse[amends-not-reciprocated]" "the refusal is amends-not-reciprocated"
+
+# --- reciprocity holds on the claim, not merely on the file -------------------
+# `amends:` names a claim through its #anchor, and the anchor was stripped before
+# the comparison. So deleting a claim's back-link and re-inserting the identical
+# `decided:` line in a different claim — while `amends:` still named the first —
+# passed. The gate established that two documents pointed at each other, not that
+# they pointed at the same claim.
+#
+# The invariant: the back-link has to sit inside the claim `amends:` names.
+cat > "$MANY" <<'DOC'
+# Many claims
+
+## Claim 1
+
+Something.
+
+## Claim 2
+
+Something else.
+
+decided: [d1](process/05-deliver/decisions/d1.md)
+DOC
+out="$(bash "$GATE" "$(amendment 1)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a back-link in a different claim than amends: names is refused"
+assert_contains "$out" "refuse[amends-not-reciprocated]" "the refusal is amends-not-reciprocated"
+assert_contains "$out" "not inside the claim" "the message says the back-link is in the wrong claim"
+
+# The same file, the same pair, the back-link moved into the claim that was
+# amended. Nothing else differs, so this is the one fact under test.
+cat > "$MANY" <<'DOC'
+# Many claims
+
+## Claim 1
+
+Something.
+
+decided: [d1](process/05-deliver/decisions/d1.md)
+
+## Claim 2
+
+Something else.
+DOC
+out="$(bash "$GATE" "$(amendment 1)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "and the same pair passes once the back-link sits in that claim"
+
+# A claim includes its subsections. A back-link under a deeper heading inside the
+# claim has not left it, and refusing that would push authors into flattening a
+# document to satisfy a gate.
+cat > "$MANY" <<'DOC'
+# Many claims
+
+## Claim 1
+
+Something.
+
+### Why this changed
+
+decided: [d1](process/05-deliver/decisions/d1.md)
+
+## Claim 2
+
+Something else.
+DOC
+out="$(bash "$GATE" "$(amendment 1)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "a back-link under a subsection of the named claim reciprocates"
+
+# An anchor the document carries no heading for. `amends:` then names a claim
+# that does not exist, which is a refusal and not an empty section to search.
+many_doc 1 2
+out="$(bash "$GATE" "$(amendment 1 claim-9)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "an anchor no heading in the document carries is refused"
+assert_contains "$out" "refuse[amends-claim-unresolved]" "the refusal is amends-claim-unresolved"
+
+# An anchor present in neither half: the record names it and the document has no
+# such heading, so there is nothing for the pair to agree about.
+out="$(bash "$GATE" "$(amendment 1 'a-claim-nobody-wrote')" 2>&1)"; rc=$?
+assert_status 1 "$rc" "an anchor in neither document is refused"
+assert_contains "$out" "refuse[amends-claim-unresolved]" "and it is the same refusal"
+
+# No anchor at all. Without one the record names a document rather than a claim,
+# and the section-level check could be switched off by leaving the anchor out —
+# which is the denylist shape: a control an author disables by omission.
+out="$(bash "$GATE" "$(amendment 1 NONE)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "amends: naming a document and no claim within it is refused"
+assert_contains "$out" "refuse[amends-no-claim]" "the refusal is amends-no-claim"
+
+# The anchor is matched against the headings the document actually has, so a
+# heading whose text differs only in punctuation and case still resolves. These
+# are the forms a forge generates and an author pastes.
+cat > "$MANY" <<'DOC'
+# Many claims
+
+## 7. Learning has to improve the generating system
+
+Something.
+
+decided: [d1](process/05-deliver/decisions/d1.md)
+DOC
+out="$(bash "$GATE" "$(amendment 1 '7-learning-has-to-improve-the-generating-system')" 2>&1)"; rc=$?
+assert_status 0 "$rc" "a numbered heading with punctuation resolves to its forge anchor"
+
+# A back-link shown as an EXAMPLE does not reciprocate. Found by attacking this
+# check after it was written. The same class has already cost this repository
+# once: an example row in a fenced block in DECIDERS.md would have authorized
+# everyone it named, which is why the deciders list skips fences.
+cat > "$MANY" <<'DOC'
+# Many claims
+
+## Claim 1
+
+This is what a back-link looks like:
+
+```
+decided: [d1](process/05-deliver/decisions/d1.md)
+```
+DOC
+out="$(bash "$GATE" "$(amendment 1)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a back-link inside a fenced example does not reciprocate"
+assert_contains "$out" "refuse[amends-not-reciprocated]" "the refusal is amends-not-reciprocated"
+
+# A heading inside a fence is not a heading, so an anchor cannot resolve to one.
+cat > "$MANY" <<'DOC'
+# Many claims
+
+Example of a claim:
+
+```
+## Claim 1
+
+decided: [d1](process/05-deliver/decisions/d1.md)
+```
+DOC
+out="$(bash "$GATE" "$(amendment 1)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "an anchor cannot resolve to a heading inside a fenced example"
+assert_contains "$out" "refuse[amends-claim-unresolved]" "the refusal is amends-claim-unresolved"
+
+# Two decisions amending the SAME claim. The claim then carries two back-links and
+# each record has to find its own.
+cat > "$MANY" <<'DOC'
+# Many claims
+
+## Claim 1
+
+decided: [d1](process/05-deliver/decisions/d1.md)
+decided: [d2](process/05-deliver/decisions/d2.md)
+DOC
+out="$(bash "$GATE" "$(amendment 1)" "$(amendment 2 claim-1)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "two decisions amending one claim both pass"
 
 # --- the stated problem must be linked ---------------------------------------
 # `problem:` was a required field in the contract and nothing read it. Deleting

@@ -218,8 +218,48 @@ check_record() {
 # `amends: none` is valid and expected. A decision to measure rather than act
 # changes nothing about how we work, and saying so is what makes the absence
 # visible instead of indistinguishable from an omission.
+
+# claim_lines <document> <anchor> -> the lines of the claim that anchor names
+#
+# A heading's anchor is its text, lowercased, with everything but letters, digits,
+# spaces, hyphens and underscores removed, and spaces turned into hyphens. That is
+# computed here from the headings the document actually has, rather than guessed
+# at, so an anchor is matched against a real claim or against nothing.
+#
+# A claim runs to the next heading at the same depth or shallower, so it INCLUDES
+# its subsections. A back-link under a deeper heading inside the claim has not
+# left it, and refusing that would push an author into flattening a document to
+# satisfy a gate.
+#
+# A FENCED BLOCK is not part of the claim. Found by attacking this check once it
+# was written: a document showing what a back-link looks like, inside a fenced
+# example, reciprocated the real thing. This repository has already been burnt by
+# that class — an example row in a fenced block in `DECIDERS.md` would have
+# authorized everyone it named — so the deciders list skips fences for the same
+# reason. A heading inside a fence is not a heading either.
+#
+# exit 3  no heading in the document slugs to that anchor
+claim_lines() { # document anchor
+  LC_ALL=C awk -v want="$2" '
+    function slug(s) {
+      s = tolower(s); gsub(/[^a-z0-9 _-]/, "", s); gsub(/ /, "-", s); return s
+    }
+    /^[ \t]*(```|~~~)/ { fence = !fence; next }
+    fence { next }
+    /^#+[ \t]/ {
+      match($0, /^#+/); lvl = RLENGTH
+      h = substr($0, lvl + 1); sub(/^[ \t]+/, "", h); sub(/[ \t]+$/, "", h)
+      if (found) { if (inside && lvl <= depth) inside = 0 }
+      else if (slug(h) == want) { found = 1; inside = 1; depth = lvl }
+      next
+    }
+    inside { print }
+    END { exit (found ? 0 : 3) }
+  ' "$1"
+}
+
 check_amends() { # file
-  local f="$1" amends target resolved first rest self backs
+  local f="$1" amends link target anchor resolved first rest self claim backs
   local back back_target back_resolved matched linked unresolved other
   amends="$(field "$f" amends)"
 
@@ -243,7 +283,11 @@ check_amends() { # file
     return
   fi
 
-  target="$(printf '%s' "$amends" | sed -n 's/.*](\([^)#]*\)[^)]*).*/\1/p')"
+  # The link is parsed once, into the document and the claim within it. It used to
+  # be read with `[^)#]*`, which DISCARDED the anchor before anything compared it.
+  link="$(printf '%s' "$amends" | sed -n 's/.*](\([^)]*\)).*/\1/p')"
+  target="${link%%#*}"
+  case "$link" in *#*) anchor="${link#*#}" ;; *) anchor="" ;; esac
   if [ -z "$target" ]; then
     refuse "$f" "-" "amends-not-linked" \
       "amends: names something but does not link it, so nothing can verify the change landed"
@@ -253,6 +297,24 @@ check_amends() { # file
   resolved="$(cd "$(dirname "$f")" && cd "$(dirname "$target")" 2>/dev/null && pwd)/$(basename "$target")"
   if [ ! -f "$resolved" ]; then
     refuse "$f" "-" "amends-unresolved" "the amended document does not resolve: $target"
+    return
+  fi
+
+  # A decision amends a CLAIM, not a file. The anchor is what says which one, and
+  # without it the section-level half of this check could be switched off by
+  # leaving it out — the denylist shape AGENTS.md rules against, a control an
+  # author disables by omission. A document amended as a whole is still named
+  # through the heading that carries the claim.
+  if [ -z "$anchor" ]; then
+    refuse "$f" "-" "amends-no-claim" \
+      "amends: links $target and names no claim within it: a decision changes a claim, so the link carries the #anchor of the heading that holds it, and reciprocity is checked inside that claim"
+    return
+  fi
+
+  claim="$(claim_lines "$resolved" "$anchor")"
+  if [ "$?" -eq 3 ]; then
+    refuse "$f" "-" "amends-claim-unresolved" \
+      "$(basename "$resolved") carries no heading whose anchor is #$anchor: amends: names a claim this document does not have, so there is nothing for the two halves to agree about"
     return
   fi
 
@@ -279,11 +341,21 @@ check_amends() { # file
   # The pair is (decision, claim). What has to hold is that SOME back-link names
   # this record; a back-link naming a different one is only a disagreement when no
   # other back-link names this one.
+  # And every one of them INSIDE THE CLAIM. The anchor was stripped before the
+  # comparison, so a back-link anywhere in the file reciprocated: deleting a
+  # claim's `decided:` line and re-inserting the identical line in a different
+  # claim, while `amends:` still named the first, passed. The gate established that
+  # two documents pointed at each other, not that they pointed at the same claim.
   self="$(cd "$(dirname "$f")" && pwd)/$(basename "$f")"
-  backs="$(sed -n 's/^decided:[[:space:]]*//p' "$resolved")"
+  backs="$(printf '%s\n' "$claim" | sed -n 's/^decided:[[:space:]]*//p')"
   if [ -z "$backs" ]; then
-    refuse "$f" "-" "amends-not-reciprocated" \
-      "$(basename "$resolved") carries no 'decided:' line: an amended claim links back to the record that changed it, or the grade on that claim is unsupported"
+    if grep -q '^decided:' "$resolved"; then
+      refuse "$f" "-" "amends-not-reciprocated" \
+        "$(basename "$resolved") carries a 'decided:' line, but not inside the claim amends: names (#$anchor): a back-link in another claim pairs this record with a claim it did not amend"
+    else
+      refuse "$f" "-" "amends-not-reciprocated" \
+        "$(basename "$resolved") carries no 'decided:' line: an amended claim links back to the record that changed it, or the grade on that claim is unsupported"
+    fi
     return
   fi
 
