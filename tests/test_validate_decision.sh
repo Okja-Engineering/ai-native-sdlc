@@ -280,6 +280,64 @@ cp "$TMP/STANDARD.bak" "$TMP/STANDARD.md"
 out="$(bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01)" 2>&1)"; rc=$?
 assert_status 0 "$rc" "a reciprocated link is accepted once restored"
 
+# --- one document, amended more than once ------------------------------------
+# STANDARDS.md is THE document decisions amend, and it already carried one
+# amendment. The back-link was read with `head -1`, so the SECOND correctly
+# formed amendment was refused — with a message accusing a correct pair of
+# disagreeing — and no further decision could ever land on that document.
+#
+# The invariant is that reciprocity holds between a decision and the claim its
+# `amends:` names. Nothing below says how the gate finds the back-link, so a
+# rewrite using a different mechanism has to pass these too.
+MANY="$TMP/MANY.md"
+
+# amendment <n> -> a record amending claim <n> of MANY.md, path on stdout
+amendment() {
+  cat > "$TMP/process/05-deliver/decisions/d$1.md" <<EOF
+# Decision — d$1
+
+problem: [p](../../03-define/problems/thing.md)
+options: [o](../../04-develop/options/thing.md)
+chosen: A
+decided_by: Ada Lovelace
+dated: 2026-10-01
+amends: [\`MANY.md\` claim $1](../../../MANY.md#claim-$1)
+EOF
+  printf '%s' "$TMP/process/05-deliver/decisions/d$1.md"
+}
+
+# many_doc <n>... -> MANY.md carrying claim <n> and its back-link, in the order given
+many_doc() {
+  printf '# Many claims\n' > "$MANY"
+  for n in "$@"; do
+    printf '\n## Claim %s\n\nSomething.\n\ndecided: [d%s](process/05-deliver/decisions/d%s.md)\n' \
+      "$n" "$n" "$n" >> "$MANY"
+  done
+}
+
+many_doc 1 2
+out="$(bash "$GATE" "$(amendment 1)" "$(amendment 2)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "two decisions amending one document both pass"
+assert_not_contains "$out" "amends-not-reciprocated" "neither correct pair is accused of disagreeing"
+
+# Order must not decide it. This is the half `head -1` got right by accident.
+many_doc 2 1
+out="$(bash "$GATE" "$(amendment 1)" "$(amendment 2)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "and both pass with the back-links in the other order"
+
+many_doc 1 2 3
+out="$(bash "$GATE" "$(amendment 1)" "$(amendment 2)" "$(amendment 3)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "a third amendment on the same document passes as well"
+
+# Reading every back-link must not become "any back-link will do". Claim 3 is
+# present and carries a link to a different record, so the record under test is
+# named by nothing.
+many_doc 1 2
+printf '\n## Claim 3\n\nSomething.\n\ndecided: [d1](process/05-deliver/decisions/d1.md)\n' >> "$MANY"
+out="$(bash "$GATE" "$(amendment 3)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a record that no back-link names is still refused"
+assert_contains "$out" "refuse[amends-not-reciprocated]" "the refusal is amends-not-reciprocated"
+
 # --- the stated problem must be linked ---------------------------------------
 # `problem:` was a required field in the contract and nothing read it. Deleting
 # the line left the gate reporting the record within the contract, so the

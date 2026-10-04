@@ -83,6 +83,8 @@
 
 **Evidence.** The `amends:` field on the record and the `decided:` link on the amended claim. `STANDARDS.md` §3 and `process/05-deliver/decisions/agent-pr-approval.md` are the worked pair.
 
+**Evidence note.** The back-link was read with `head -1` until 2026-10-04 — the first `decided:` line in the amended document and no others. `STANDARDS.md` is the document decisions amend and already carried one amendment, so a second decision pointing at a different claim in it was refused for naming a different record, and the control allowed exactly one amendment per document. Every `decided:` line is now read, and the refusal fires only when none of them names the record under test.
+
 **What it does not cover.** Two things, both stated in the contract rather than implied:
 
 - **Skills.** The stated output is "standards *and our skills*". Skills are not in this repository, so this reaches one of the two.
