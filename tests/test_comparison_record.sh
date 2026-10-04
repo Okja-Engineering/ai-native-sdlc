@@ -114,6 +114,19 @@ assert_contains "$out" "Nothing missing" "and says the comparison record is alre
 # offering to state a problem from the model's grouping.
 assert_not_contains "$out" "The next step is yours" "it does not offer to start a problem from a comparison"
 
+# Nothing reads `compares:`, so a link to a record that is not there would sit in
+# the skeleton looking resolved. Said rather than refused: a comparison with
+# nothing to compare against is still a grouping of the scan.
+t="$(fresh nocounterpart)"
+rm -f "$t/process/03-define/cycles/2026-09-29.md"
+out="$(run "$t" 2026-09-29.by-model)"; rc=$?
+assert_status 0 "$rc" "scaffolding a comparison with no counterpart still exits 0"
+assert_contains "$out" "no such record yet" "and says the record it compares against is absent"
+t="$(fresh counterpart)"
+assert_file_exists "$t/process/03-define/cycles/2026-09-29.md" "this tree does have the hand record"
+out="$(run "$t" 2026-09-29.by-model)"
+assert_not_contains "$out" "no such record yet" "and says nothing about it when the counterpart is there"
+
 # And a comparison over a scan that does not exist still fails for the right
 # reason: the source is the part before the dot.
 t="$(fresh noscan)"
