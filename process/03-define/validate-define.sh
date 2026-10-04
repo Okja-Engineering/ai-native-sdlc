@@ -133,6 +133,14 @@ main() {
     printf 'validate-define: %s refusal(s) across %s file(s)\n' "$refusals" "$files" >&2
     exit 1
   fi
+  # A run that read no artifact does not get to report conformance. This printed
+  # "0 file(s) within the contract" over an empty cycles directory, and CI runs this
+  # gate with no arguments. Still exit 0: an empty phase is a real state, as the scan
+  # gate already settled. What changes is the claim.
+  if [ "$files" -eq 0 ]; then
+    printf 'validate-define: no cycle files in %s, so nothing was checked\n' "$CYCLES"
+    return 0
+  fi
   printf 'validate-define: %s file(s) within the contract\n' "$files"
 }
 
