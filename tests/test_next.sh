@@ -133,6 +133,69 @@ run "$t" 2026-09-29 producing-themes >/dev/null
 after="$(cd "$t" && find process -type f -exec cksum {} + | sort)"
 assert_eq "$before" "$after" "a complete cycle is left byte-identical"
 
+# --- the scaffold produces every structural input the gate reads ---------------
+# A scaffolded cycle carried no `<!-- accounting:ids -->` block, because
+# define-contract.md declared that block as a worked example rather than as a
+# field or a section, and the scaffold reads fields and sections. So the gate
+# refused its own skeleton with `no-accounting` — the one input it depends on
+# most.
+#
+# The invariant is NOT that a skeleton passes the gate. It cannot, and should not:
+# `method` is a person's declaration of how the themes were produced, the themes
+# are the work itself, and an empty outlier list has to say it is empty, which is
+# also a claim. Scaffolding those would be inventing them, which is the same
+# reason this script refuses to scaffold a problem without a human's pick.
+#
+# What is testable, and what actually matters, is the split: every refusal left on
+# a fresh skeleton names content a person must write, and none of them names
+# structure the scaffold should have produced.
+t="$(fresh scaffold_gate)"
+rm -f "$t/process/03-define/cycles/2026-09-29.md"
+run "$t" 2026-09-29 >/dev/null
+made="$t/process/03-define/cycles/2026-09-29.md"
+out="$(/bin/bash "$ROOT/process/03-define/validate-define.sh" "$made" 2>&1)"
+
+codes="$(printf '%s\n' "$out" | sed -n 's/.*refuse\[\([a-z-]*\)\].*/\1/p' | sort | tr '\n' ' ')"
+assert_eq "counts-disagree no-method silent-empty-outliers " "$codes" \
+  "the only refusals left on a fresh skeleton are the ones naming unwritten content"
+
+# Spelled out as well as compared as a set, because the set assertion above would
+# also pass if the gate stopped emitting a structural refusal altogether.
+assert_not_contains "$out" "refuse[no-accounting]" "the skeleton carries an accounting block"
+assert_contains "$(cat "$made")" "<!-- accounting:ids -->" "and the block's markers come from the contract"
+assert_not_contains "$(cat "$made")" "scaffold:source-ids" "the placeholder was substituted, not copied"
+
+# The ids in the block are the ids the source records, read through the same
+# harvester the gate reads. Compared, not written literally.
+block="$(sed -n '/accounting:ids -->/,/\/accounting:ids -->/p' "$made" \
+  | grep -oE 'F[0-9]+' | sort | tr '\n' ' ')"
+want="$(/bin/bash "$ROOT/process/01-scan/findings-ids.sh" "$t/process/01-scan/findings/2026-09-29.md" \
+  | sort | tr '\n' ' ')"
+assert_eq "$want" "$block" "the block accounts for exactly the ids the source records"
+[ -n "$want" ] && any=yes || any=no
+assert_eq "yes" "$any" "and that comparison ran against a non-empty set"
+
+# The sections come out in the order the contract lists them, so a cycle file is
+# comparable with the next one.
+assert_eq "Themes Outliers Accounting Where" \
+  "$(grep '^## ' "$made" | sed -e 's/^## //' -e 's/ .*//' | tr '\n' ' ' | sed 's/ *$//')" \
+  "the sections are in the order the contract declares"
+
+# --- a skeleton is declared by the contract, not by this script ----------------
+# The same property the field case below asserts, for a section that carries a
+# literal shape. A contract that declares one gets it scaffolded; one that does
+# not gets *To be written.*
+t="$(fresh skeleton)"
+perl -0pi -e 's/^### Where this stops$/### Reviewed\n\n```markdown\n<!-- review:signoff -->\n<!-- \/review:signoff -->\n```\n\n### Where this stops/m' \
+  "$t/process/03-define/define-contract.md"
+rm -f "$t/process/03-define/cycles/2026-09-29.md"
+run "$t" 2026-09-29 >/dev/null
+made="$t/process/03-define/cycles/2026-09-29.md"
+assert_contains "$(cat "$made")" "<!-- review:signoff -->" \
+  "a section skeleton added to the contract appears in the scaffold, with no script edit"
+assert_contains "$(cat "$made")" "*To be written.*" \
+  "and a section declaring no skeleton still gets the placeholder"
+
 # --- a problem is a human's pick ---------------------------------------------
 t="$(fresh pick)"
 rm -f "$t"/process/03-define/problems/*.md
@@ -140,6 +203,39 @@ out="$(run "$t" 2026-09-29)"; rc=$?
 assert_status 0 "$rc" "no problem yet exits 0"
 assert_contains "$out" "The next step is yours" "it hands the pick back to a person"
 assert_contains "$out" "would be inventing the pick" "it says why it will not scaffold one"
+
+# --- and it is a pick per cycle ----------------------------------------------
+# next.sh:95 counted `problems/*.md` across every cycle, so from the second cycle
+# onward the count was never zero and the hand-back above could never be reached.
+# A second cycle was instead offered the FIRST cycle's problems to continue, which
+# is a different cycle's work. bin/cycle.sh already filters problems by the cycle
+# their own `from:` names; this reads the same linkage.
+t="$(fresh second_cycle)"
+sed 's/^since: first run$/since: 2026-09-29/' \
+  "$t/process/01-scan/findings/2026-09-29.md" > "$t/process/01-scan/findings/2026-11-01.md"
+sed 's|findings/2026-09-29|findings/2026-11-01|g' \
+  "$t/process/03-define/cycles/2026-09-29.md" > "$t/process/03-define/cycles/2026-11-01.md"
+out="$(run "$t" 2026-11-01)"; rc=$?
+assert_status 0 "$rc" "a second cycle with no problem of its own exits 0"
+assert_contains "$out" "The next step is yours" "and the pick is handed back for THAT cycle"
+assert_not_contains "$out" "producing-themes" "the first cycle's problems are not offered to continue"
+
+# The first cycle still sees its own, so the filter did not simply stop finding
+# anything.
+out="$(run "$t" 2026-09-29)"
+assert_contains "$out" "producing-themes" "the cycle that owns a problem still lists it"
+assert_contains "$out" "Several problems exist" "and is asked which one"
+
+# And once the second cycle has a problem of its own, the list it is offered is
+# its own and not the other cycle's. Counting and listing are two places the same
+# filter has to be applied, and the count alone passing proved nothing about the
+# list.
+sed 's|cycles/2026-09-29|cycles/2026-11-01|g' \
+  "$t/process/03-define/problems/producing-themes.md" > "$t/process/03-define/problems/cadence.md"
+out="$(run "$t" 2026-11-01)"
+assert_contains "$out" "cadence" "the second cycle is offered its own problem"
+assert_not_contains "$out" "producing-themes" "and not the first cycle's"
+assert_not_contains "$out" "agent-pr-approval" "nor the first cycle's other one"
 
 # --- the count it writes is the count the source records ----------------------
 # next.sh:83 was `rows=$(grep -cE '^| [A-Z]' "$findings")` — the exact expression

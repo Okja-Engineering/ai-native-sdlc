@@ -57,7 +57,39 @@ sections() {
     | sed -n 's/^### //p'
 }
 
-emit() { # contract title extra-frontmatter [fields-heading]
+# skeleton <contract> <section> -> the first fenced block that section declares.
+#
+# Some sections have a literal shape a reader cannot be expected to retype, and
+# one of them is the Define gate's most load-bearing input. The accounting block
+# was declared as a worked example inside a prose section instead, so the scaffold
+# — which reads fields and sections — never saw it, and the gate refused its own
+# skeleton with `no-accounting`. A section that declares a skeleton now gets it;
+# one that does not still gets *To be written.*
+skeleton() {
+  awk -v h="### $2" '
+    $0 == h { inside = 1; next }
+    # The NEXT heading of either level ends the section. Resetting only on `## `
+    # let every section read the next one: asking for "Themes" returned the
+    # accounting block, because that is the first fence below it, and the skeleton
+    # was written into three sections.
+    inside && (substr($0, 1, 3) == "## " || substr($0, 1, 4) == "### ") { exit }
+    inside && substr($0, 1, 3) == "```" {
+      if (fenced) exit
+      fenced = 1; next
+    }
+    inside && fenced { print }
+  ' "$1"
+}
+
+# wrap_ids <ids, one per line> -> the same ids, sixteen to a line.
+# Sixty-four on one line is a line nobody reads, and the shipped cycle wraps them.
+wrap_ids() {
+  printf '%s\n' "$1" | awk '
+    NF { printf "%s%s", (n % 16 == 0 ? (n == 0 ? "" : "\n") : " "), $1; n++ }
+    END { if (n) printf "\n" }'
+}
+
+emit() { # contract title extra-frontmatter [fields-heading] [source-ids]
   local c="$1" h="${4:-$FIELDS_HEADING}" f
   printf '# %s\n\n' "$2"
   [ -n "${3:-}" ] && printf '%s\n' "$3"
@@ -75,10 +107,40 @@ emit() { # contract title extra-frontmatter [fields-heading]
   # `--` is not a format string: printf would read it as end-of-options and the
   # comment would never close, swallowing every section below it.
   printf '%s\n' '-->'
-  local s
+  local s body
+  # A `while` loop reading from a pipe runs in a subshell, so the body cannot be
+  # a function that sets a variable the loop needs. Everything here is printed.
   sections "$c" | while IFS= read -r s; do
     [ -n "$s" ] || continue
-    printf '\n## %s\n\n*To be written.*\n' "$s"
+    printf '\n## %s\n\n' "$s"
+    body="$(skeleton "$c" "$s")"
+    if [ -z "$body" ]; then
+      printf '*To be written.*\n'
+      continue
+    fi
+    case "$body" in
+      *'<!-- scaffold:source-ids -->'*)
+        # Declared by the contract, substituted here. The literal token is never
+        # written through: a cycle carrying it would be refused by the gate for an
+        # accounting block that looks present and lists nothing.
+        #
+        # No ids is a real state in two ways — a cycle that found nothing, and an
+        # artifact this contract declares that is not a cycle, because the section
+        # list is not yet per-artifact the way the field table now is. Both get a
+        # note saying what belongs here, which is what a skeleton is.
+        printf '%s\n' "$body" | while IFS= read -r line; do
+          case "$line" in
+            '<!-- scaffold:source-ids -->')
+              if [ -n "${5:-}" ]; then
+                wrap_ids "$5"
+              else
+                printf '%s\n' '<!-- every id the source records. None were available to scaffold. -->'
+              fi ;;
+            *) printf '%s\n' "$line" ;;
+          esac
+        done ;;
+      *) printf '%s\n' "$body" ;;
+    esac
   done
 }
 
@@ -123,12 +185,28 @@ if [ ! -f "$define" ]; then
   c="process/03-define/define-contract.md"
   write_once "$define" emit "$c" "Define — cycle $cycle" \
 "from: [\`$findings\`](../../01-scan/findings/$cycle.md), $rows findings
-status: defined, not decided"
+status: defined, not decided" \
+    '' "$ids"
   exit 0
 fi
 
 # --- a problem is a human's pick, not something to scaffold blind --------------
-probs=$(ls process/03-define/problems/*.md 2>/dev/null | wc -l | tr -d ' ')
+# Problems are counted for THIS cycle, read from the cycle their own `from:` field
+# names. The count was `ls process/03-define/problems/*.md | wc -l`, across every
+# cycle, so from the second cycle onward it was never zero: the hand-back below
+# could not be reached, and a new cycle was offered the previous cycle's problems
+# to continue — a different cycle's work. bin/cycle.sh already filters problems
+# this way, and that filter was written for the same defect in the same shape.
+mine=""
+probs=0
+for p in process/03-define/problems/*.md; do
+  [ -f "$p" ] || continue
+  if grep -q "cycles/$cycle\.md" "$p" 2>/dev/null; then
+    mine="$mine $p"
+    probs=$((probs + 1))
+  fi
+done
+
 if [ "$probs" -eq 0 ] && [ -z "$slug" ]; then
   printf 'Define is done for %s. The next step is yours:\n' "$cycle"
   printf '  pick a theme, then: bin/next.sh %s <slug>\n' "$cycle"
@@ -137,7 +215,11 @@ if [ "$probs" -eq 0 ] && [ -z "$slug" ]; then
   exit 0
 fi
 
-[ -n "$slug" ] || { printf 'Several problems exist. Say which: bin/next.sh %s <slug>\n' "$cycle"; ls process/03-define/problems/*.md 2>/dev/null | sed 's|.*/|  |;s|\.md$||'; exit 0; }
+if [ -z "$slug" ]; then
+  printf 'Several problems exist. Say which: bin/next.sh %s <slug>\n' "$cycle"
+  for p in $mine; do printf '%s\n' "$p" | sed 's|.*/|  |;s|\.md$||'; done
+  exit 0
+fi
 
 problem="process/03-define/problems/$slug.md"
 options="process/04-develop/options/$slug.md"
