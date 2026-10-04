@@ -312,6 +312,28 @@ out="$(runat 2027-01-10)"
 assert_contains "$out" "no decision declares one" \
   "a tree where nothing declares an expiry says so"
 
+# `none` is a declaration that the decision does not expire, and that is NOT the
+# same state as the field being absent. Reporting both as "no decision declares
+# one" would hide a record that answered the question.
+set_expiry "none — nothing about this one is waiting on a measurement"
+out="$(runat 2027-01-10)"
+line="$(printf '%s\n' "$out" | grep 'expir')"
+assert_contains "$line" 'declare `none`' "a declared \`none\` is reported as a declaration"
+assert_not_contains "$line" "no decision declares one" "and not as an absent field"
+
+# And `none` has to be the whole first word. `amends:` had the prefix version of
+# this defect, where `nonetheless, ...` read as a declaration that nothing changed.
+set_expiry "nonetheless this one runs out on 2027-01-20"
+out="$(runat 2027-01-10)"
+line="$(printf '%s\n' "$out" | grep 'expir')"
+assert_contains "$line" "not a date" "a value beginning \`nonetheless\` is not read as \`none\`"
+
+# A date followed by a note is a date.
+set_expiry "2027-01-20 — unless the comparison lands first"
+out="$(runat 2027-01-10)"
+line="$(printf '%s\n' "$out" | grep 'expir')"
+assert_contains "$line" "in 10 days" "a date followed by a note is read as the date"
+
 cp "$TMP/decision.bak" "$decision"
 
 # The shipped record's own expiry is read, not repeated. Hardcoding the date here

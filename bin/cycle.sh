@@ -361,18 +361,18 @@ main() {
     printf '%slast scan    no findings file carries a date, so nothing can be counted from one\n' "$miss"
   fi
 
-  local decisions=0 declared=0 unreadable=0 near="" near_n="" near_slug="" v first slug e
+  local decisions=0 dated=0 nones=0 unreadable=0 near="" near_n="" near_slug="" v first slug e
   for dl in process/05-deliver/decisions/*.md; do
     [ -f "$dl" ] || continue
     decisions=$((decisions + 1))
     slug=$(basename "$dl" .md)
     v="$(field "$dl" expires)"
     [ -n "$v" ] || continue
-    declared=$((declared + 1))
     # `none` has to be the whole first word. The Deliver gate had the prefix
     # version of this defect: `amends: nonetheless, ...` read as "nothing changed".
     first="$(printf '%s' "$v" | awk '{print tolower($1)}' | tr -d '.,;:')"
-    [ "$first" = none ] && continue
+    if [ "$first" = none ]; then nones=$((nones + 1)); continue; fi
+    dated=$((dated + 1))
     # The date is the first field of the value, so a date followed by a note is
     # read rather than refused.
     e="$(printf '%s' "$v" | awk '{print $1}')"
@@ -386,13 +386,21 @@ main() {
     fi
   done
 
+  # The denominator is printed with the answer. A report that evaluates nothing
+  # and prints a tidy line reads exactly like one that found nothing to worry
+  # about, which is the shape the gates here keep being repaired for. A declared
+  # `none` and an absent field are also two different states, and the second is
+  # the one nobody chose.
   if [ -n "$near_n" ]; then
     local mark="$no"
     [ "$near_n" -lt "$TODAY_N" ] && mark="$miss"
-    printf '%sexpiry       %s, %s, %s — nearest of %s declared, across %s decision(s)\n' \
-      "$mark" "$near_slug" "$near" "$(how_long "$near_n")" "$declared" "$decisions"
+    printf '%sexpiry       %s, %s, %s — nearest of %s dated, across %s decision(s)\n' \
+      "$mark" "$near_slug" "$near" "$(how_long "$near_n")" "$dated" "$decisions"
   elif [ "$unreadable" -gt 0 ]; then
     printf '%sexpiry       no readable expiry, across %s decision(s)\n' "$miss" "$decisions"
+  elif [ "$nones" -gt 0 ]; then
+    printf '%sexpiry       no date declared; %s of %s decision(s) declare `none`\n' \
+      "$no" "$nones" "$decisions"
   else
     printf '%sexpiry       no decision declares one, across %s decision(s)\n' "$no" "$decisions"
   fi
