@@ -107,21 +107,54 @@ check_messages() {
 }
 
 # ---- 3 · publish disclosure + never-publish guard ---------------------------
+# A missing list is a missing POLICY, not an empty one, and a guard with no policy
+# cannot say a push is clean. That is the rule the rest of this repository already
+# holds and states in code: `validate-findings.sh` refuses to run when a contract
+# list is "empty or missing, so the gate would pass everything", and
+# `validate-decision.sh` refuses when `DECIDERS.md` is absent.
+#
+# Until 2026-10-04 this check held the opposite rule. Everything below was wrapped
+# in `if [ -r "$never_publish" ]` with no else, so `hits` stayed 0 and the push
+# went through — with the disclosure printed as if nothing had changed. The
+# quietest way to turn off the only control on the local-to-remote boundary was to
+# rename one file. Reproduced: with the list moved away, a commit touching
+# `.scuba/state.md` pushed with exit 0.
+#
+# The pattern count comes out of the same loop that does the matching, rather than
+# from a second expression deciding separately what a usable line is. One rule in
+# two places is the drift this repository keeps paying for.
 check_publish() {
-  local out="$tmp/publish" hits=0 pat f
+  local out="$tmp/publish" hits=0 pat f patterns=0
   : > "$out"
-  if [ -r "$never_publish" ]; then
-    while IFS= read -r pat; do
-      case "$pat" in ''|'#'*) continue ;; esac
-      printf '%s\n' "$files" | while IFS= read -r f; do
-        [ -n "$f" ] || continue
-        case "$f" in
-          $pat) echo "NEVER-PUBLISH: $f matches '$pat'" >> "$out" ;;
-        esac
-      done
-    done < "$never_publish"
-    [ -s "$out" ] && hits=1
+
+  if [ ! -r "$never_publish" ]; then
+    echo "NEVER-PUBLISH: .githooks/never-publish is missing or unreadable" >> "$out"
+    echo "  the guard has no policy to apply, so it cannot pass this push" >> "$out"
+    return 1
   fi
+
+  # `|| [ -n "$pat" ]` because a file whose last line carries no newline makes
+  # `read` return non-zero with the line already in `pat`, and the loop body is
+  # skipped. Measured: a one-line list written with `printf '%s' .scuba/*` yielded
+  # zero patterns. The same silent loss of a pattern as the missing list, one line
+  # at a time.
+  while IFS= read -r pat || [ -n "$pat" ]; do
+    case "$pat" in ''|'#'*) continue ;; esac
+    patterns=$((patterns + 1))
+    printf '%s\n' "$files" | while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      case "$f" in
+        $pat) echo "NEVER-PUBLISH: $f matches '$pat'" >> "$out" ;;
+      esac
+    done
+  done < "$never_publish"
+
+  if [ "$patterns" -eq 0 ]; then
+    echo "NEVER-PUBLISH: .githooks/never-publish declares no patterns" >> "$out"
+    echo "  the guard has no policy to apply, so it cannot pass this push" >> "$out"
+  fi
+
+  [ -s "$out" ] && hits=1
   return "$hits"
 }
 
