@@ -68,15 +68,20 @@
 | `bare-none-amends` | `amends: none` with no reason — indistinguishable from an oversight |
 | `amends-not-linked` | names a document without linking it |
 | `amends-unresolved` | links a document that does not exist |
-| `amends-not-reciprocated` | the amended document does not cite the decision back |
+| `amends-not-reciprocated` | the amended claim does not cite the decision back |
+| `amends-no-claim` | the link names a document and no claim within it |
+| `amends-claim-unresolved` | the link names a claim the amended document does not carry |
 
 **Evidence.** The `amends:` field on the record and the `decided:` link on the amended claim. `STANDARDS.md` §3 and `process/05-deliver/decisions/agent-pr-approval.md` are the worked pair.
+
+**Evidence note.** Reciprocity was compared at **file** level until 2026-10-04. `amends:` carries the anchor of the claim it changes and the anchor was stripped before the comparison, so deleting §3's back-link and re-inserting the identical `decided:` line in §7 — while `amends:` still named §3 — reported the pair within the contract. The control established that two documents pointed at each other, not that they pointed at the same claim. The back-link now has to sit inside the claim the anchor names, subsections included, and the anchor itself is required.
 
 **Evidence note.** The back-link was read with `head -1` until 2026-10-04 — the first `decided:` line in the amended document and no others. `STANDARDS.md` is the document decisions amend and already carried one amendment, so a second decision pointing at a different claim in it was refused for naming a different record, and the control allowed exactly one amendment per document. Every `decided:` line is now read, and the refusal fires only when none of them names the record under test.
 
 **What it does not cover.** Two things, both stated in the contract rather than implied:
 
 - **Skills.** The stated output is "standards *and our skills*". Skills are not in this repository, so this reaches one of the two.
+- **Whether the claim says what the decision decided.** The repaired check establishes that the record names a claim the document carries and that the claim links back to that record. It reads neither side's prose, so a claim rewritten under an unchanged heading still reciprocates with a decision that no longer matches it. The links agree; the content is a reader's job.
 - **The reciprocal check verifies a link, not a mention.** It was a bare filename match until 2026-10-03, when an external audit replaced the `decided:` link with the sentence *"A note: the file agent-pr-approval.md exists somewhere in this repository"* and the gate reported the pair reciprocated. It now requires a `decided:` line carrying a link that resolves back to that record, and refuses a back-link pointing at a different one.
 
 ---
