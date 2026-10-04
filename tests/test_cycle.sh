@@ -124,6 +124,26 @@ reported="$(printf '%s\n' "$out" | sed -n 's/.*01 scan *\([0-9][0-9]*\) findings
 assert_eq "$want" "$reported" "the report counts the findings the source records"
 rm -f "$decoy"
 
+# A count it cannot establish must not be reported as zero. Zero is a real count —
+# a cycle that found nothing — so printing it for a cycle nobody could read would
+# say the scan was quiet when nothing was measured.
+cp "$SB/process/01-scan/findings-contract.md" "$TMP/contract.bak"
+awk '$0 == "<!-- contract:columns -->" { print; print "- `what`"; skip = 1; next }
+     skip > 0 && /^- / { next }
+     { skip = 0; print }' "$TMP/contract.bak" > "$SB/process/01-scan/findings-contract.md"
+out="$(run 2026-09-29)"
+assert_not_contains "$out" "0 findings" "a count that cannot be established is not reported as zero"
+assert_contains "$out" "? findings" "it is reported as unknown"
+cp "$TMP/contract.bak" "$SB/process/01-scan/findings-contract.md"
+
+# And the report refuses to run at all without the harvester, rather than
+# falling back to an idea of its own about what a finding is.
+mv "$SB/process/01-scan/findings-ids.sh" "$TMP/findings-ids.sh"
+out="$(run 2026-09-29)"; rc=$?
+assert_status 2 "$rc" "no harvester exits 2"
+assert_contains "$out" "will not run without it" "and says it will not run without one"
+mv "$TMP/findings-ids.sh" "$SB/process/01-scan/findings-ids.sh"
+
 # --- one cycle by name --------------------------------------------------------
 out="$(run 2026-09-29)"; rc=$?
 assert_status 0 "$rc" "naming a cycle exits 0"

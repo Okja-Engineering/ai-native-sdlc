@@ -98,7 +98,25 @@ findings="process/01-scan/findings/$cycle.md"
 [ -f "$findings" ] || die "no findings for $cycle — a cycle starts with a scan"
 
 define="process/03-define/cycles/$cycle.md"
-rows=$(grep -cE '^\| [A-Z]' "$findings")
+
+# The count written into a new cycle's `from:` line, which the Define gate reads
+# and compares against the source. This was `grep -cE '^\| [A-Z]'` — the exact
+# expression define-contract.md names as the one an external audit defeated, still
+# writing the denominator of every new cycle. It counted any table row starting
+# with a capital, so a findings file with two findings and one table of unreached
+# ground inside `## Looked at`, which findings-contract.md permits, was scaffolded
+# as four findings; and the case of a finding's first letter decided whether it
+# counted at all.
+#
+# One harvester, read by this, by bin/cycle.sh and by the gate, so the scaffold
+# cannot write a count the gate then refuses.
+IDS="process/01-scan/findings-ids.sh"
+[ -f "$IDS" ] || die "no findings id harvester at $IDS — the count a cycle declares is read from it, and a wrong denominator is worse than no scaffold"
+ids=$(bash "$IDS" "$findings") || die "could not read the ids of $findings"
+# Counted in a second step on purpose: `| grep -c .` would make the exit status
+# grep's, and grep exits 1 on no match, so a cycle that honestly found nothing
+# would be read as a failure to read the file.
+rows=$(printf '%s\n' "$ids" | grep -c .)
 
 # --- define -------------------------------------------------------------------
 if [ ! -f "$define" ]; then
