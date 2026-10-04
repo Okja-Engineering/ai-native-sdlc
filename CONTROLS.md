@@ -4,7 +4,17 @@
 
 **What this is not.** Not a compliance assertion. This repository has not been audited against SOC 2, ISO 27001, PCI DSS or anything else, and nothing here should be read as a claim that it would pass. It demonstrates a process shaped so that controls are statable and evidenced.
 
-**Derived, not designed.** Every control below describes a gate that already exists. None was written as a requirement first. Each cites the refusal its gate actually emits, and `tests/test_controls.sh` fails if a cited refusal is not in the named script — so a control cannot drift from its enforcement.
+**Derived, not designed.** Every control below describes a gate that already exists. None was written as a requirement first.
+
+**What keeps this document in step with the code.** `bin/validate-controls.sh` checks the wiring between the two in three directions, and `tests/test_controls.sh` drives it against this document and against documents built to break it.
+
+- **Forward.** Every refusal code a control cites is emitted at an **emission site** — a `refuse` call carrying that code as an argument — in a script that control's own **Enforced by** line names. A code in a comment does not satisfy it, and neither does a code some other gate emits.
+- **Backward.** Every refusal code any gate emits is cited by a control that names that gate, or is listed under *Refusals and gates no control covers* with a reason.
+- **Sideways.** Every gate script, and both git hooks, is either named by a control or listed there. The surface comes from the tree, so a gate this document forgets is refused rather than absent.
+
+**It checks the wiring, not the claim.** That a control cites `not-a-person` and that `process/05-deliver/validate-decision.sh` emits `not-a-person` says nothing about whether the condition behind that code is the condition the Condition column describes. That is a reader's job, and it is where an assessor's time is now worth spending, because everything mechanical about this document is checked and this is not. *What is not controlled*, item 13, states that and three narrower limits.
+
+**This paragraph was wrong until 2026-10-03, and it was the sentence inviting you to trust the document.** It said a control "cannot drift from its enforcement", and the check behind it was a substring search. Three ways it was false were each run against the shipped suite: a control pointed at a gate emitting none of its four codes passed 18 assertions out of 18; a fabricated refusal code passed once one comment line was added to any gate; and CTRL-9's five hook and CI controls were outside the check altogether, because its table has no code column and the gate pattern recognised only `validate-*.sh`. A fourth was found while repairing it: nothing checked the other direction, and eight refusals the gates emit were claimed by no control at all.
 
 **The evidence trail for every control below is git.** Every artifact, its author, its date, and the merge that accepted it. There is no separate audit store to keep in step.
 
@@ -262,7 +272,7 @@ This control enforces by exit status rather than by refusal codes, so it has no 
 
 Every refusal any gate in this repository emits is either cited by a control above or listed here with a reason, and so is every gate no control names. `bin/validate-controls.sh` refuses if something is in neither place, so this table cannot be quietly short.
 
-Two shapes of entry. `the gate itself` means the gate needs no control and none of its refusals needs a citation; a backticked code would exempt that one refusal. Both entries below are the first shape, which is the broader: a refusal added later to a gate excepted that way does not turn the check red.
+Two shapes of entry. `the gate itself` means the gate needs no control and none of its refusals needs a citation; a backticked code would exempt that one refusal. Both entries below are the first shape, which is the broader of the two — see *what is not controlled*, item 13.
 
 | Gate | Refusal | Why no control covers it |
 |---|---|---|
@@ -333,11 +343,15 @@ Stated rather than closed, for one reason: accepting `intent.md` is a decision b
 
 - a line asserting that a path or a **phase** this repository has does not exist, and a transcribed git measurement with no command above it to reproduce it
 - a sentence in `CONTROLS.md` or `SOURCES.md` claiming a named gate refuses something, where the refusal it names is not one that gate emits
+- a control citing a refusal the gate **that control names** does not emit at an emission site, a gate emitting a refusal no control claims, and a gate or hook no control names — the three directions at the top of this document
 
 That is the whole of it. **The documents are not otherwise verified, and nothing mechanical does that.** Three known gaps in the two checks, each probed deliberately rather than assumed:
 
 - **An absence claim with a long qualifier escapes.** The phase has to sit within about forty characters of the claim, because that window is what distinguishes the subject of a sentence from a mention elsewhere in it. *"Define, the convergent half of the first diamond that groups every finding, does not exist"* passes. Widening the window brings four true sentences back in as false positives, including this document's own note about the Update stage that was genuinely never built.
 - **An absence claim that does not name the phase escapes.** *"the next stage ... does not exist yet"* and *"the phase that owns that decision does not exist yet"* were two of the three survivors, and neither names what it means. Both are corrected by hand. A check for an unnamed referent would fire on honest prose about something that really is not built.
-- **A true-looking claim that cites a real refusal for the wrong condition escapes.** The check establishes that a named refusal is one the gate emits, not that the gate emits it for the reason the sentence gives.
+- **A true-looking claim that cites a real refusal for the wrong condition escapes.** The check establishes that a named refusal is one the gate emits, not that the gate emits it for the reason the sentence gives. The same limit applies to every control's Condition column above: a control could cite `not-a-person` and describe it as checking a date, and all three directions would pass.
+- **A control naming several scripts is satisfied by any one of them.** The binding is to the set the control declares, not to a single script. CTRL-9 names two hooks, a script and three CI jobs. A control that named every gate would be back to the document-wide union that made the old check vacuous; that is visible in the document and nothing mechanical stops it.
+- **An exception taken on `the gate itself` covers every refusal that gate emits, including ones added later.** Both entries in *Refusals and gates no control covers* are that shape.
+- **A fabricated refusal code in prose is not detectable.** The check refuses a code a gate really emits appearing outside its control's table, because it can recognise those. A backticked word that was never a refusal code anywhere reads as ordinary prose, and nothing can tell the difference.
 
 Everything else a document asserts — that a number is right, that a description matches what a script does, that a limitation bounds a claim the way it says — is a reader's job and is not covered.
