@@ -256,6 +256,16 @@ assert_status 1 "$rc" "a cycle whose source is marked as an example exits 1"
 assert_contains "$out" "refuse[source-is-example]" "and the refusal names the marker"
 assert_contains "$out" "not a real scan" "and says what the marker means"
 
+# `example: no` is the field's other legal value and says the opposite. Loosening
+# the comparison from `= yes` to "the field is present" refuses this, and nothing
+# else in this suite notices — found by mutating it.
+t="$(fresh_tree example_no)"
+SRC="$t/process/01-scan/findings/2026-09-29.md"
+perl -0pi -e 's/^nothing found: (.*)$/nothing found: $1\nexample: no/m' "$SRC"
+assert_contains "$(cat "$SRC")" "example: no" "the fixture declares the source is not an example"
+out="$(gate "$t")"; rc=$?
+assert_status 0 "$rc" "a source that declares \`example: no\` is within the contract"
+
 # The worked example that ships here is read by nothing, and must stay within the
 # contract — the refusal is about the dependency, not about the marker.
 out="$(/bin/bash "$ROOT/process/01-scan/validate-findings.sh" \
