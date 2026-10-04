@@ -444,10 +444,15 @@ stale_tallies() { # <files...> -> `file:line` for each tally that disagrees
       printf '%s(ref:%s) ' "$hit" "${ref:-none}"
       continue
     fi
-    want="$(git log "$ref" --format='%an <%ae>' 2>/dev/null | sort | uniq -c \
-            | sed -E 's/^[[:space:]]*//')"
+    # A failed `git log` must not read as an empty tally, for the same reason
+    # `bin/validate-authorship.sh` refuses to run when it cannot read the history.
+    if ! want="$(git log "$ref" --format='%an <%ae>' 2>/dev/null)"; then
+      printf '%s(git-log-failed-at:%s) ' "$hit" "$ref"
+      continue
+    fi
+    want="$(printf '%s\n' "$want" | sort | uniq -c | sed -E 's/^[[:space:]]*//')"
     got="$(tally_entry "$(sed -n "${n}p" "$f")")"
-    printf '%s\n' "$want" | grep -qxF "$got" || printf '%s(%s) ' "$hit" "$got"
+    printf '%s\n' "$want" | grep -qxF "$got" || printf '%s(doc:%s) ' "$hit" "$got"
   done
 }
 
@@ -503,6 +508,184 @@ case "$(stale_tallies "$TMP/tally-noref.md")" in
   *"(ref:none)"*) fires=yes ;; *) fires=no ;;
 esac
 assert_eq "yes" "$fires" "a tally whose command names no ref is reported"
+
+# --- a transcribed signature check agrees with git ----------------------------
+# CTRL-1's start date rests on nothing in the history being signed: proof that a
+# person recorded a decision begins with the next decision, by commit signature,
+# and the two decisions that already exist are recorded as predating that. The
+# claim underneath it is a present-tense statement about `git log`, so it is held
+# to the same rule as the author tally above — the document transcribes the command
+# and its output, and this runs the command.
+#
+# `N` is not pinned. The expected value is whatever git reports, so the day a
+# commit is signed this goes red and the sentences resting on the claim have to be
+# revisited. That is the point of the check rather than a side effect of it: the
+# start date stops being a start date once something is signed.
+#
+# A mention of the command in prose is not a transcription. The reasoning is the
+# same as the linked-path exemption at the top of this file — you cannot both quote
+# a command inline and be transcribing its output on the next line — so only an
+# occurrence opening a fenced block is read as one.
+#
+# WHAT IS COMPARED, AND WHY IT IS PER COMMIT
+#
+# The transcript's rows are read and each one is checked against git: a row is a
+# revision and the status the document says it has. Not the whole command's output,
+# because `%G?` over a range is not reproducible — it is a fact about the reader's
+# keyring, not about the objects. 74 of the commits here carry GitHub's PGP
+# signature on merges it performed, and `%G?` for those reads `E` where the key is
+# missing and `N` on a machine with no `gpg` at all. That is how a claim that
+# nothing in this repository is signed came to be written down: it was measured
+# where `gpg` was not installed, and the first version of this check went green
+# locally and red on both CI legs for exactly that reason.
+#
+# A row naming an unsigned commit is reproducible everywhere, because a commit with
+# no signature header reads `N` with or without `gpg`. So the document transcribes
+# the commits the control is about, and this checks those.
+SIG_COMMAND="--format='%h %G?'"
+
+# Does this object carry a signature header? A fact about the object, readable with
+# no keyring and no `gpg` binary, unlike the status. Only the commit headers are
+# read, so a message line starting with the word cannot be mistaken for one.
+carries_signature() { # <rev> -> 0 when it does
+  git cat-file -p "$1" 2>/dev/null \
+    | awk '/^$/ { exit } /^gpgsig/ { found = 1 } END { exit !found }'
+}
+
+sig_transcripts() { # <files...> -> `file:line(...)` for each row git disagrees with
+  local hit f n prev row rev said want rows
+  for hit in $(grep -nF -- "$SIG_COMMAND" "$@" /dev/null 2>/dev/null | cut -d: -f1,2 | sort -u); do
+    f="${hit%%:*}"; n="${hit##*:}"
+    [ "$n" -gt 1 ] || continue
+    prev="$(sed -n "$((n - 1))p" "$f")"
+    case "$prev" in '```'*) ;; *) continue ;; esac
+    rows=0
+    while IFS= read -r row; do
+      [ -n "$row" ] || continue
+      rev="${row%% *}"; said="${row##* }"
+      rows=$((rows + 1))
+      if ! git cat-file -e "$rev^{commit}" 2>/dev/null; then
+        printf '%s(unreadable:%s) ' "$hit" "$rev"
+        continue
+      fi
+      # A row naming a commit that DOES carry a signature is refused outright,
+      # whatever status it claims. That status is a fact about the reader's keyring,
+      # so the row would be true on one machine and false on the next — which is the
+      # defect this check was built after walking into. Transcribe the commits the
+      # control is about; they have no signature and read `N` everywhere.
+      if carries_signature "$rev"; then
+        printf '%s(%s carries a signature, so its status depends on the reader) ' "$hit" "$rev"
+        continue
+      fi
+      # A FAILED `git log` MUST NOT READ AS A STATUS. `bin/validate-authorship.sh`
+      # carries the same rule after a mistyped ref turned that gate off and reported
+      # the thing it exists to refuse.
+      if ! want="$(git log -1 --format='%G?' "$rev" 2>/dev/null)"; then
+        printf '%s(unreadable:%s) ' "$hit" "$rev"
+        continue
+      fi
+      # Both sides in the message. A failure naming only the transcript makes the
+      # reader rerun the command by hand to find out what it disagreed with.
+      [ "$said" = "$want" ] || printf '%s(%s doc:%s|git:%s) ' "$hit" "$rev" "$said" "$want"
+    done <<EOF
+$(sed -n "$((n + 1)),\$p" "$f" | awk '/^```/ { exit } { print }')
+EOF
+    # A fenced block with no rows in it is a claim with nothing under it.
+    [ "$rows" -gt 0 ] || printf '%s(no-rows) ' "$hit"
+  done
+}
+
+# shellcheck disable=SC2046
+sigfiles="$(git grep -lF -- "$SIG_COMMAND" -- '*.md' ':(exclude)tests/*' 2>/dev/null)"
+sigbad="$(sig_transcripts $sigfiles)"
+assert_eq "" "${sigbad% }" "a transcribed signature check agrees with what git reports"
+
+# And a document actually transcribes it, or the sweep above walked nothing. The
+# claim CTRL-1's start date rests on has to be somewhere a reader can check.
+nsig=0
+for f in $sigfiles; do
+  nsig=$((nsig + $(grep -cF -- "$SIG_COMMAND" "$f" || true)))
+done
+[ "$nsig" -ge 1 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "a document carries the signature check CTRL-1 rests on (found $nsig)"
+
+# The detection has to fire. The expected transcript is built from what git reports
+# for this checkout, never from `N` typed here, so it cannot drift into agreement.
+# The fixtures name a commit found in this history rather than `HEAD`. `HEAD` on a
+# pull-request checkout is the merge commit the forge made, which the forge signs —
+# so fixtures built on it were refused as signed on both CI legs while passing
+# locally. A fixture pinned to a property of the current checkout is the same defect
+# as a document pinned to the reader's keyring, one layer down.
+sig_unsigned=""
+for c in $(git rev-list -n 300 HEAD); do
+  if ! carries_signature "$c"; then sig_unsigned="$c"; break; fi
+done
+[ -n "$sig_unsigned" ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "the history holds an unsigned commit to build fixtures on"
+sig_status="$(git log -1 --format='%G?' "$sig_unsigned" 2>/dev/null)"
+assert_eq "N" "$sig_status" "an unsigned commit reports N, on any machine"
+
+sig_fixture() { # <file> <row...>
+  local out="$1"; shift
+  { printf '```\n$ git log --no-walk %s %s\n' "$SIG_COMMAND" "$sig_unsigned"
+    printf '%s\n' "$@"
+    printf '```\n'
+  } > "$out"
+}
+
+sig_fixture "$TMP/sig-true.md" "$sig_unsigned $sig_status"
+assert_eq "" "$(sig_transcripts "$TMP/sig-true.md")" \
+  "a transcript that agrees with git on every row passes"
+
+sig_fixture "$TMP/sig-wrong.md" "$sig_unsigned G"
+case "$(sig_transcripts "$TMP/sig-wrong.md")" in
+  "$TMP/sig-wrong.md:2($sig_unsigned doc:G|git:$sig_status)"*) fires=yes ;; *) fires=no ;;
+esac
+assert_eq "yes" "$fires" "the detection fires on a row git does not agree with"
+
+# One true row must not cover a false one, or a transcript could be padded into
+# passing.
+sig_fixture "$TMP/sig-mixed.md" "$sig_unsigned $sig_status" "$sig_unsigned G"
+case "$(sig_transcripts "$TMP/sig-mixed.md")" in
+  *"($sig_unsigned doc:G|git:$sig_status)"*) fires=yes ;; *) fires=no ;;
+esac
+assert_eq "yes" "$fires" "a true row does not cover a false one in the same transcript"
+
+sig_fixture "$TMP/sig-deadrev.md" "no-such-rev-here N"
+case "$(sig_transcripts "$TMP/sig-deadrev.md")" in
+  *"(unreadable:no-such-rev-here)"*) fires=yes ;; *) fires=no ;;
+esac
+assert_eq "yes" "$fires" "a row naming a revision git cannot read is reported, not skipped"
+
+# And a row naming a commit that carries a signature is refused however it reads.
+# Found from the history rather than named here: the web merges carry GitHub's PGP
+# key, and a status for one of them is true on a machine with that key and false on
+# a machine without it.
+sig_signed=""
+for c in $(git rev-list -n 300 HEAD); do
+  if carries_signature "$c"; then sig_signed="$c"; break; fi
+done
+[ -n "$sig_signed" ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "the history holds a signed commit to test the refusal against"
+sig_fixture "$TMP/sig-signed.md" "$sig_signed N"
+case "$(sig_transcripts "$TMP/sig-signed.md")" in
+  *"carries a signature"*) fires=yes ;; *) fires=no ;;
+esac
+assert_eq "yes" "$fires" "a row naming a signed commit is refused whatever status it claims"
+
+# An empty fence is a claim with nothing under it.
+printf '```\n$ git log --no-walk %s HEAD\n```\n' "$SIG_COMMAND" > "$TMP/sig-empty.md"
+case "$(sig_transcripts "$TMP/sig-empty.md")" in
+  *"(no-rows)"*) fires=yes ;; *) fires=no ;;
+esac
+assert_eq "yes" "$fires" "a transcript with no rows is reported"
+
+# A mention in prose is not a transcript, or every sentence naming the command
+# would be demanding that the next line be its output.
+printf 'Run `git log --no-walk %s 59b7cd2` to check it yourself.\nThe start date is in CTRL-1.\n' \
+  "$SIG_COMMAND" > "$TMP/sig-mention.md"
+assert_eq "" "$(sig_transcripts "$TMP/sig-mention.md")" \
+  "a command mentioned in prose is not read as a transcript"
 
 # --- a present-tense claim about `git log` agrees with what the gate prints -----
 # Three documents said, in the present tense, that every commit on `main` was
