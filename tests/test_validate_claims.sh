@@ -41,6 +41,33 @@ clear_claim() { rm -f "$SB/claim.md"; ( cd "$SB" && git add -A >/dev/null 2>&1 )
 out="$(cd "$SB" && bash bin/validate-claims.sh 2>&1)"; rc=$?
 assert_status 0 "$rc" "the shipped tree carries no speed claim"
 assert_contains "$out" "no speed claims" "it says so"
+# And it says how many documents that was over. The gate's own header already holds
+# the rule that a check which evaluated nothing must not read as "nothing found" —
+# it fixed the >1 exit from a pattern that would not compile, and left this half:
+# `git grep` exits 1 both for "no match" and for "the pathspec matched no files".
+# Pinned as a NUMBER and not as the words "tracked document", which the old message
+# already contained — the first version of this assertion passed against the unfixed
+# gate for exactly that reason. Not pinned to a literal count either, because that
+# grows with the repository and would make the suite a staleness alarm.
+scanned_n="$(printf '%s' "$out" | sed -n 's/.* in \([0-9][0-9]*\) tracked document.*/\1/p')"
+counted=no
+[ -n "$scanned_n" ] && [ "$scanned_n" -gt 1 ] && counted=yes
+assert_eq "yes" "$counted" "the clean report names how many documents it read"
+
+# --- a pathspec that matches nothing is not a clean tree -----------------------
+# Measured in a throwaway clone: with every markdown file dropped from the index
+# this printed the same "no speed claims in tracked documents" line and exited 0,
+# over 32 documents and over none. One over-broad `:(exclude)` does it, and the
+# excludes are edited whenever a new directory of recorded claims appears.
+#
+# Driven by emptying the index rather than by editing the pathspec, so the
+# assertion is about the gate's answer and not about the spelling of one exclude.
+( cd "$SB" && git rm -q --cached $(git ls-files -- '*.md') ) >/dev/null 2>&1
+out="$(cd "$SB" && bash bin/validate-claims.sh 2>&1)"; rc=$?
+assert_status 2 "$rc" "a pathspec matching no tracked document cannot run"
+assert_contains "$out" "nothing was checked" "and the gate says nothing was checked"
+assert_not_contains "$out" "no speed claims" "and does not report the tree clean"
+( cd "$SB" && git reset -q HEAD -- . ) >/dev/null 2>&1
 
 # --- the six forms the audit used --------------------------------------------
 # Each is asserted separately. The audit's document contained all six at once, so
@@ -119,5 +146,54 @@ clear_claim
 
 src="$(cat "$ROOT/bin/validate-claims.sh")"
 assert_contains "$src" "not enforcement of the rule" "the gate says it is a tripwire, not enforcement"
+
+
+# --- the percentage and multiplier clauses, on their own -----------------------
+# Found by tests/mutate-sweep.sh, by dropping one alternative of the pattern at a
+# time. Two clauses — PCT and the line carrying MULT and PCT together — could be
+# removed with every case above still passing, because each of those cases is caught
+# by a different clause. `Our lead time dropped 40%` is the RATE clause, not PCT;
+# `A 40% velocity improvement` is RATE as well, because PCT wants "improvement in
+# velocity" and not "velocity improvement".
+#
+# Same rule as the block above, one clause further down: a guard that never fires on
+# its own cannot be told from one that does not work.
+for c in \
+  'Reviews are 50% faster.' \
+  'The loop is 30% quicker.' \
+  'Engineers are 25% more productive.' \
+  'We measured a 20% improvement in throughput.' \
+  'We measured a 15% improvement in velocity.'
+do
+  out="$(claim "$c")"; rc=$?
+  assert_status 1 "$rc" "refuses the percentage form: $c"
+done
+clear_claim
+
+for c in \
+  'It is 3x faster.' \
+  'A 2.5x quicker loop.' \
+  'Teams are 4x more effective.' \
+  'We saw 10x productivity.'
+do
+  out="$(claim "$c")"; rc=$?
+  assert_status 1 "$rc" "refuses the multiplier form: $c"
+done
+clear_claim
+
+# A third clause nothing reached: the verb-then-rate form. Every case above that
+# names a rate word puts it FIRST — "lead time dropped", "throughput is up" — and
+# this clause is the other word order. It could be dropped with every case above
+# still passing.
+for c in \
+  'We improved our velocity.' \
+  'That increased throughput.' \
+  'We reduced lead time.' \
+  'It cut cycle time.'
+do
+  out="$(claim "$c")"; rc=$?
+  assert_status 1 "$rc" "refuses the verb-then-rate form: $c"
+done
+clear_claim
 
 assert_done

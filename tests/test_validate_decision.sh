@@ -73,6 +73,18 @@ out="$(bash "$GATE" "$(record pending '' '')" 2>&1)"; rc=$?
 assert_status 0 "$rc" "a pending record with nobody named exits 0"
 assert_contains "$out" "within the contract" "pending is reported as within the contract"
 
+# --- a run that read nothing does not report conformance -----------------------
+# Over an empty decisions directory this said "0 file(s) within the contract" and
+# exited 0: no record was read, and the gate reported every one of them within the
+# contract. CI runs this gate with no arguments. An empty phase stays exit 0, as the
+# scan gate already settled; the claim is what changes.
+mkdir -p "$TMP/no-decisions"
+out="$(DECISIONS_DIR="$TMP/no-decisions" bash "$GATE" 2>&1)"; rc=$?
+assert_status 0 "$rc" "an empty decisions directory is not a refusal"
+assert_contains "$out" "nothing was checked" "but the gate says it read nothing"
+assert_not_contains "$out" "within the contract" \
+  "and does not report files within the contract when it read none"
+
 # --- the gate the contract named ---------------------------------------------
 out="$(bash "$GATE" "$(record A '' 2026-10-01)" 2>&1)"; rc=$?
 assert_status 1 "$rc" "chosen without a decider exits 1"
@@ -530,5 +542,140 @@ assert_status 0 "$rc" "the record that amends STANDARDS.md is within the contrac
 assert_contains "$(cat "$ROOT/DECIDERS.md")" \
   "$(sed -n 's/^decided_by:[[:space:]]*//p' "$ROOT/process/05-deliver/decisions/agent-pr-approval.md" | head -1)" \
   "the real decider list names the person the real record names"
+
+
+# --- a missing option set is named once, not twice -----------------------------
+# Found by tests/mutate-sweep.sh, by loosening `-eq 1` to `-ge 0` on the guard that
+# skips resolution when there is nothing to resolve. The gate then tried to resolve
+# an empty path and added `options-unresolved` on top of `no-options-link`: two
+# refusals naming two different problems where the record has one. The existing
+# assertion on `no-options-link` passes either way, which is why nothing caught it.
+#
+# This gate's own sibling already records what that costs a reader. The scan gate's
+# header describes an index shifted by one producing "four confident refusals that
+# each named the wrong problem".
+{
+  printf '%s\n\n' '# Decision — thing'
+  printf '%s\n' 'problem: [p](../../03-define/problems/thing.md)'
+  printf 'chosen: %s\n' 'A'
+  printf 'decided_by: %s\n' 'Ada Lovelace'
+  printf 'dated: %s\n' '2026-10-01'
+  printf 'amends: %s\n' '[s](../../../STANDARD.md#a-standard)'
+} > "$TMP/process/05-deliver/decisions/thing.md"
+assert_eq "0" "$(grep -c '^options:' "$TMP/process/05-deliver/decisions/thing.md")" \
+  "the fixture declares no option set"
+out="$(bash "$GATE" "$TMP/process/05-deliver/decisions/thing.md" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a decided record declaring no option set exits 1"
+assert_contains "$out" "refuse[no-options-link]" "and the refusal is no-options-link"
+assert_not_contains "$out" "refuse[options-unresolved]" \
+  "and the gate does not also refuse an option set it was never given"
+
+# --- the gate with no arguments reads the decisions directory ------------------
+# Found by tests/mutate-sweep.sh, by loosening `-gt 0` to `-ge 0` on the argument
+# count. The gate then took the "files were named" branch with nothing named, looped
+# over nothing, and reported "0 file(s) within the contract" and exit 0. CI runs this
+# gate with no arguments, so that is the gate this repository says guards the one
+# thing that cannot be reconstructed afterwards, reporting clean having read nothing.
+#
+# DECIDERS_FILE is unset for this call. The rest of the suite supplies its own decider
+# list on purpose, and here the point is the real records against the real list.
+out="$(cd "$ROOT" && unset DECIDERS_FILE && bash process/05-deliver/validate-decision.sh 2>&1)"
+rc=$?
+assert_status 0 "$rc" "the gate with no arguments passes over the real decision records"
+assert_not_contains "$out" "0 file(s)" "and does not report having checked nothing"
+nrec="$(ls "$ROOT"/process/05-deliver/decisions/*.md 2>/dev/null | grep -c .)"
+assert_contains "$out" "$nrec file(s)" "it checked every decision record (found $nrec)"
+
+
+# --- a missing option set is named once, not twice -----------------------------
+# Found by tests/mutate-sweep.sh, by loosening `-eq 1` to `-ge 0` on the guard that
+# skips resolution when there is nothing to resolve. The gate then tried to resolve
+# an empty path and added `options-unresolved` on top of `no-options-link`: two
+# refusals naming two different problems where the record has one. The existing
+# assertion on `no-options-link` passes either way, which is why nothing caught it.
+#
+# This gate's own sibling already records what that costs a reader. The scan gate's
+# header describes an index shifted by one producing "four confident refusals that
+# each named the wrong problem".
+{
+  printf '%s\n\n' '# Decision — thing'
+  printf '%s\n' 'problem: [p](../../03-define/problems/thing.md)'
+  printf 'chosen: %s\n' 'A'
+  printf 'decided_by: %s\n' 'Ada Lovelace'
+  printf 'dated: %s\n' '2026-10-01'
+  printf 'amends: %s\n' '[s](../../../STANDARD.md#a-standard)'
+} > "$TMP/process/05-deliver/decisions/thing.md"
+assert_eq "0" "$(grep -c '^options:' "$TMP/process/05-deliver/decisions/thing.md")" \
+  "the fixture declares no option set"
+out="$(bash "$GATE" "$TMP/process/05-deliver/decisions/thing.md" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a decided record declaring no option set exits 1"
+assert_contains "$out" "refuse[no-options-link]" "and the refusal is no-options-link"
+assert_not_contains "$out" "refuse[options-unresolved]" \
+  "and the gate does not also refuse an option set it was never given"
+
+# --- the gate with no arguments reads the decisions directory ------------------
+# Found by tests/mutate-sweep.sh, by loosening `-gt 0` to `-ge 0` on the argument
+# count. The gate then took the "files were named" branch with nothing named, looped
+# over nothing, and reported "0 file(s) within the contract" and exit 0. CI runs this
+# gate with no arguments, so that is the gate this repository says guards the one
+# thing that cannot be reconstructed afterwards, reporting clean having read nothing.
+#
+# DECIDERS_FILE is unset for this call. The rest of the suite supplies its own decider
+# list on purpose, and here the point is the real records against the real list.
+out="$(cd "$ROOT" && unset DECIDERS_FILE && bash process/05-deliver/validate-decision.sh 2>&1)"
+rc=$?
+assert_status 0 "$rc" "the gate with no arguments passes over the real decision records"
+assert_not_contains "$out" "0 file(s)" "and does not report having checked nothing"
+nrec="$(ls "$ROOT"/process/05-deliver/decisions/*.md 2>/dev/null | grep -c .)"
+assert_contains "$out" "$nrec file(s)" "it checked every decision record (found $nrec)"
+
+# --- chosen: has to be a field, and the option has to be a heading --------------
+# Found by tests/mutate-sweep.sh, by dropping the `^` from `grep -q '^chosen:'` and
+# from `grep -qE "^## $chosen · "`.
+#
+# Unanchored, a record with no `chosen:` field passes as long as some line mentions
+# the word, and an option set passes as long as it mentions the chosen option
+# somewhere rather than declaring it as a heading. CTRL-1 cites the first refusal and
+# CTRL-2 the second, so both are controls a reader is invited to trust.
+#
+# Every case above either has a real `chosen:` field or has nothing resembling one,
+# which is why nothing could see the difference.
+{
+  printf '%s\n\n' '# Decision — thing'
+  printf '%s\n' 'problem: [p](../../03-define/problems/thing.md)'
+  printf '%s\n' 'options: [o](../../04-develop/options/thing.md)'
+  printf '%s\n' 'A note: chosen: is the field this record is missing.'
+  printf 'decided_by: %s\n' 'Ada Lovelace'
+  printf 'dated: %s\n' '2026-10-01'
+  printf 'amends: %s\n' '[s](../../../STANDARD.md#a-standard)'
+} > "$TMP/process/05-deliver/decisions/thing.md"
+out="$(bash "$GATE" "$TMP/process/05-deliver/decisions/thing.md" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a record that mentions chosen: without declaring it is refused"
+assert_contains "$out" "refuse[no-chosen-field]" "and the refusal is no-chosen-field"
+
+# The chosen option named in prose rather than declared as a heading. Paired against
+# the real option set in the same breath, so a gate refusing every option set would
+# fail the first of the two rather than passing the second.
+cat > "$TMP/process/04-develop/options/thing.md" <<'OPTS'
+# Develop — thing
+## A · First way
+## B · Second way
+OPTS
+out="$(bash "$GATE" "$(record A 'Ada Lovelace' 2026-10-01 OMIT)" 2>&1)"
+assert_not_contains "$out" "refuse[chosen-not-an-option]" \
+  "an option declared as a heading resolves"
+
+# The option's heading QUOTED mid-line rather than written as a heading. A sentence
+# with no locator in it is refused either way, so the fixture has to carry the exact
+# text the gate looks for, somewhere other than the start of a line.
+cat > "$TMP/process/04-develop/options/thing.md" <<'OPTS'
+# Develop — thing
+
+Two ways were weighed. The first was going to be written up as ## A · First way and
+never was, and the second as ## B · Second way.
+OPTS
+out="$(bash "$GATE" "$(record A 'Ada Lovelace' 2026-10-01 OMIT)" 2>&1)"
+assert_contains "$out" "refuse[chosen-not-an-option]" \
+  "an option heading quoted mid-line is not a declared option"
 
 assert_done

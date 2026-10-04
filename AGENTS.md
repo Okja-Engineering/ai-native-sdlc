@@ -97,7 +97,9 @@ The tests that were supposed to catch the `decided_by` defect asserted exactly `
 Two rules follow:
 
 - **Include inputs the implementation was not written for.** Multi-word forms, versioned names, truncations, case variants, a plausible value that is simply not authorized. If a reasonable rewrite of the check would still pass the suite, the suite is pinning behaviour; if only this implementation passes, it is pinning the implementation.
-- **Mutation-test the comparison, not just the guard.** Deleting a check and seeing red proves the check is *reachable*. Loosening it — exact match to substring, anchored to unanchored — proves it is *sufficient*. A sweep of all five gates found two more instances of this the first way had missed, one of them in a gate written an hour earlier.
+- **Mutation-test the comparison, not just the guard.** Deleting a check and seeing red proves the check is *reachable*. Loosening it — exact match to substring, anchored to unanchored, threshold to zero, an enumerated list to anything — proves it is *sufficient*.
+
+  **Run the sweep with `tests/mutate-sweep.sh`, and read its denominator before its result.** This said "a sweep of all five gates found two more instances of this the first way had missed". That sweep was by hand and by pattern, and the sentence was wrong about its own coverage: it missed a whole guard. The `id` refusal in the scan gate had no test at all, and replacing its condition with `if false` left every suite green. A sweep decides what exists by how it enumerates, so the enumeration is the part to argue with — `tests/mutate-sweep.sh --list` prints it and runs nothing.
 
 ### Write it the way you would say it
 
