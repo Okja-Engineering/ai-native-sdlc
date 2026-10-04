@@ -204,6 +204,22 @@ define_line="$(printf '%s\n' "$out" | grep '03 define')"
 assert_contains "$define_line" "not recorded" \
   "a cycle that records no duration is reported as not recording one"
 
+# And "not recorded" is only a true sentence while the contract still declares the
+# field the report looks for. A report that hardcodes a field name goes on saying
+# "not recorded" after a rename, about an artifact that records one — so the drift
+# is announced.
+cp "$SB/process/03-define/define-contract.md" "$TMP/define-contract.bak"
+grep -v "^| \`$dur_field\` |" "$TMP/define-contract.bak" > "$SB/process/03-define/define-contract.md"
+assert_eq "0" "$(grep -c "^| \`$dur_field\` |" "$SB/process/03-define/define-contract.md")" \
+  "the fixture really did remove the declaration"
+out="$(run 2026-09-29)"
+assert_contains "$out" "no longer declared" \
+  "the report says so when the contract stops declaring the field it reads"
+cp "$TMP/define-contract.bak" "$SB/process/03-define/define-contract.md"
+out="$(run 2026-09-29)"
+assert_not_contains "$out" "no longer declared" \
+  "and says nothing about drift while the declaration is there"
+
 # --- a cycle with no themes is reported as a cycle with no themes --------------
 # count_themes() was `grep -cE ... || echo 0`. `grep -c` ALREADY prints 0 and
 # exits 1 when it matches nothing, so the fallback printed a second zero and the
