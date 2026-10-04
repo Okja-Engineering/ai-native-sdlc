@@ -117,6 +117,56 @@ perl -0pi -e 's/^\| F03 \| A study of/| F03 | a study of/m' "$t/process/01-scan/
 out="$(gate "$t")"; rc=$?
 assert_status 0 "$rc" "lowercasing a finding's first letter no longer removes it"
 
+# --- an empty outlier list says so in the BODY, not in the heading -------------
+# define-contract.md calls Outliers "the load-bearing section", and the refusal
+# that makes it load-bearing read the heading along with the list: the section was
+# taken as `/^## Outliers/,/^---/`, so any of `none`, `empty` or `nothing`
+# anywhere in that range satisfied it — including in the heading.
+#
+# The contract's own name for the section is "Outliers — surfaced because they fit
+# nothing". A cycle using the contract's wording and listing no outliers at all
+# therefore passed, which is exactly the case the refusal exists for. Found when
+# bin/next.sh was made to scaffold the section from the contract: every skeleton it
+# produced defeated the check by carrying the contract's heading.
+# empty_outliers <tree> [body line] — replace the whole Outliers section with the
+# contract's own heading, and optionally one line of body.
+empty_outliers() {
+  perl -0pi -e "s/^## Outliers.*?(?=^---)/## Outliers — surfaced because they fit nothing\n\n${2:-}\n/ms" \
+    "$1/$CYCLE_REL"
+}
+
+t="$(fresh_tree empty_outliers_heading)"
+empty_outliers "$t"
+body="$(sed -n '/^## Outliers/,/^---/p' "$t/$CYCLE_REL")"
+assert_eq "0" "$(printf '%s\n' "$body" | grep -cE '^- \*\*')" "the fixture lists no outliers"
+assert_contains "$body" "they fit nothing" "and its heading carries the word the check looked for"
+out="$(gate "$t")"
+# Not asserted on the exit status: emptying the outlier list also makes the theme
+# counts disagree, so exit 1 would be satisfied by a refusal that has nothing to do
+# with this check — which is the whole failure mode this suite is being repaired
+# for. The refusal code is the assertion.
+assert_contains "$out" "refuse[silent-empty-outliers]" \
+  "the emptiness has to be stated in the section, not implied by its title"
+
+# And a section that does say it is empty still passes that check, so the fix is
+# not simply "always refuse an empty list".
+t="$(fresh_tree empty_outliers_stated)"
+empty_outliers "$t" "None this cycle: every finding fitted a theme."
+out="$(gate "$t")"
+assert_not_contains "$out" "refuse[silent-empty-outliers]" \
+  "a section that states it is empty is accepted"
+
+# The stated limit of this check, asserted so nobody reads it as more. It is a
+# lexical test for three words over the section's body, so prose that merely uses
+# one of them satisfies it — the shipped cycle's own explanation of why outliers
+# matter contains "clusters with nothing". Closing that means requiring a declared
+# form rather than a sentence, which is a contract change and not this one.
+t="$(fresh_tree empty_outliers_prose)"
+empty_outliers "$t" "The one that clusters with nothing is often the most valuable."
+out="$(gate "$t")"
+assert_not_contains "$out" "refuse[silent-empty-outliers]" \
+  "prose that merely uses the word satisfies it — a lexical check, NOT a declaration"
+
 # --- method -------------------------------------------------------------------
 t="$(fresh_tree method)"
 perl -0pi -e 's/^method: .*\n//m' "$t/$CYCLE_REL"
