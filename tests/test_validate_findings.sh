@@ -70,6 +70,35 @@ STATUS=$?
 assert_status 0 "$STATUS" "an empty findings directory exits 0"
 assert_contains "$OUT" "first run" "an empty findings directory reports a first run"
 
+# --- every finding carries an id Define can account for -----------------------
+# This refusal had no test at all. Replacing its condition with `if false` left
+# all twelve suites green over 82 assertions, and the gate then accepted a row
+# with an empty id cell. It is the precondition for the whole accounting
+# mechanism in Define, which compares id sets: a row with no id is outside the
+# denominator, so a dropped finding and a nameless one read the same.
+#
+# The inputs are forms the condition was not written for, not just the empty cell.
+# A suite that only tested the empty cell would pass a gate checking `-z`, which
+# is a different and weaker rule than "an id is F followed by a number".
+for bad in '' 'f01' 'F' '01' 'F-1' 'F01a' 'FO1' '1F' 'F 01'; do
+  gate "$(prepare "$WITH_FINDINGS" 2026-10-01.md "s/^| F01 /| $bad /")"
+  assert_status 1 "$STATUS" "an id of \"$bad\" is refused"
+  assert_contains "$OUT" "refuse[id]" "an id of \"$bad\" is refused under id"
+done
+
+# And the refusal says why it matters, because the reader has to know that this is
+# about Define's accounting rather than about tidiness.
+gate "$(prepare "$WITH_FINDINGS" 2026-10-01.md 's/^| F01 /| /')"
+assert_contains "$OUT" "cannot be accounted for" "the id refusal says what the id is for"
+
+# The other direction, or the loop above would pass against a gate that refuses
+# every id. A number of any length is an id; the first version of this condition
+# could have been written against the single digit the fixtures happen to use.
+for good in 'F01' 'F1' 'F999' 'F0' 'F1234567'; do
+  gate "$(prepare "$WITH_FINDINGS" 2026-10-01.md "s/^| F01 /| $good /")"
+  assert_status 0 "$STATUS" "an id of \"$good\" is accepted"
+done
+
 # --- no source, no finding ----------------------------------------------------
 
 gate "$(prepare "$WITH_FINDINGS" 2026-10-01.md 's|https://example.invalid/notes/one||')"
