@@ -219,7 +219,8 @@ check_record() {
 # changes nothing about how we work, and saying so is what makes the absence
 # visible instead of indistinguishable from an omission.
 check_amends() { # file
-  local f="$1" amends target resolved first rest back back_target back_resolved
+  local f="$1" amends target resolved first rest self backs
+  local back back_target back_resolved matched linked unresolved other
   amends="$(field "$f" amends)"
 
   if [ -z "$amends" ]; then
@@ -266,27 +267,59 @@ check_amends() { # file
   # What is required now is a `decided:` line carrying a markdown link whose
   # target resolves back to THIS record. Same two-way discipline the `from:`
   # check in Define already uses.
-  back="$(sed -n 's/^decided:[[:space:]]*//p' "$resolved" | head -1)"
-  if [ -z "$back" ]; then
+  # EVERY `decided:` line, not the first.
+  #
+  # This was `... | head -1`. A document is amended more than once — STANDARDS.md
+  # is the document decisions amend, and it already carried one amendment — so the
+  # second correctly-formed amendment was refused, with a message accusing a
+  # correct pair of disagreeing, and no further decision could land on that
+  # document. One amendment per document was never the rule; it was an artefact of
+  # reading one line.
+  #
+  # The pair is (decision, claim). What has to hold is that SOME back-link names
+  # this record; a back-link naming a different one is only a disagreement when no
+  # other back-link names this one.
+  self="$(cd "$(dirname "$f")" && pwd)/$(basename "$f")"
+  backs="$(sed -n 's/^decided:[[:space:]]*//p' "$resolved")"
+  if [ -z "$backs" ]; then
     refuse "$f" "-" "amends-not-reciprocated" \
       "$(basename "$resolved") carries no 'decided:' line: an amended claim links back to the record that changed it, or the grade on that claim is unsupported"
     return
   fi
 
-  back_target="$(printf '%s' "$back" | sed -n 's/.*](\([^)#]*\)[^)]*).*/\1/p')"
-  if [ -z "$back_target" ]; then
+  # Each back-link is classified, and the refusal reported is the closest one to
+  # being right: a link that resolves elsewhere is a disagreement, a link that
+  # resolves to nothing is a dangling pointer, and no link at all is a mention.
+  matched=no; linked=no; unresolved=""; other=""
+  while IFS= read -r back; do
+    [ -n "$back" ] || continue
+    back_target="$(printf '%s' "$back" | sed -n 's/.*](\([^)#]*\)[^)]*).*/\1/p')"
+    [ -n "$back_target" ] || continue
+    linked=yes
+    back_resolved="$(cd "$(dirname "$resolved")" && cd "$(dirname "$back_target")" 2>/dev/null && pwd)/$(basename "$back_target")"
+    if [ ! -f "$back_resolved" ]; then
+      unresolved="${unresolved:+$unresolved, }$back_target"
+    elif [ "$self" = "$back_resolved" ]; then
+      matched=yes
+      break
+    else
+      other="${other:+$other, }$(basename "$back_resolved")"
+    fi
+  done <<EOF
+$backs
+EOF
+
+  [ "$matched" = no ] || return
+
+  if [ "$linked" = no ]; then
     refuse "$f" "-" "amends-not-reciprocated" \
       "$(basename "$resolved") mentions a decision but does not link it: a filename in prose is not a link, and the pair cannot be verified from a mention"
-    return
-  fi
-
-  back_resolved="$(cd "$(dirname "$resolved")" && cd "$(dirname "$back_target")" 2>/dev/null && pwd)/$(basename "$back_target")"
-  if [ ! -f "$back_resolved" ]; then
+  elif [ -n "$other" ]; then
     refuse "$f" "-" "amends-not-reciprocated" \
-      "$(basename "$resolved") links a decision that does not resolve: $back_target"
-  elif [ "$(cd "$(dirname "$f")" && pwd)/$(basename "$f")" != "$back_resolved" ]; then
+      "$(basename "$resolved") links back to $other, not to $(basename "$f"): the two halves name different records, which is the disagreement this check exists to catch"
+  else
     refuse "$f" "-" "amends-not-reciprocated" \
-      "$(basename "$resolved") links back to $(basename "$back_resolved"), not to $(basename "$f"): the two halves name different records, which is the disagreement this check exists to catch"
+      "$(basename "$resolved") links a decision that does not resolve: $unresolved"
   fi
 }
 

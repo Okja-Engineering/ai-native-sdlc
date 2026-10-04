@@ -44,6 +44,8 @@ So Update is **a field on the decision plus a reciprocal link on the claim**, an
 
 A one-way pointer would be the duplicated-declaration failure again: the standard says one thing, the decision another, and nothing notices. `validate-decision.sh` refuses `amends-not-reciprocated` for exactly that.
 
+**One document is amended more than once, and that is the ordinary case.** `STANDARDS.md` is *the* document decisions amend, so a second decision landing on a different claim in it is expected rather than exceptional. Each amended claim carries its own `decided:` link, and the check reads every one of them and asks whether any names the record under test. It read only the first until 2026-10-04, which made the second correctly-formed amendment refuse — with a message accusing a correct pair of disagreeing — and meant no further decision could land on `STANDARDS.md` at all. One amendment per document was never the rule; it was an artefact of reading one line.
+
 **`amends: none` is valid and expected.** A decision to measure before acting changes nothing about how we work. Bare `none` is refused — `bare-none-amends` — because on its own it cannot be told apart from an oversight, which is the same reasoning as the Define contract requiring an empty outlier section to say it is empty.
 
 **What this leaves open.** The stated output is standards *and skills*. Skills are not in this repository, so `amends` currently reaches one of the two, and saying so is better than implying coverage.
