@@ -186,4 +186,85 @@ ncyc="$(ls "$ROOT"/process/03-define/cycles/*.md 2>/dev/null | grep -c .)"
 assert_contains "$out" "$ncyc file(s) within the contract" \
   "it checked every cycle file in the directory (found $ncyc)"
 
+# --- a problem is checked too -------------------------------------------------
+# No gate read a problem or an option at all. `rests on:` is the only thing
+# carrying the Discover-to-Define edge, and nothing resolved it: `cycle.sh`
+# reported `classifier-models` as referenced by no problem and that was the whole
+# of the enforcement. The invariant is that a problem names a Discover topic that
+# exists, or says in band that it ran without one.
+PROBLEM_REL="process/03-define/problems/producing-themes.md"
+pgate() { bash "$ROOT/process/03-define/validate-define.sh" "$1/$PROBLEM_REL" 2>&1; }
+
+t="$(fresh_tree problem)"
+out="$(pgate "$t")"; rc=$?
+assert_status 0 "$rc" "the shipped problem is within the contract"
+
+t="$(fresh_tree problem2)"
+out="$(bash "$ROOT/process/03-define/validate-define.sh" \
+  "$t/process/03-define/problems/agent-pr-approval.md" 2>&1)"; rc=$?
+assert_status 0 "$rc" "and so is the other shipped problem"
+
+t="$(fresh_tree norests)"
+perl -0pi -e 's/^rests on: .*\n//m' "$t/$PROBLEM_REL"
+out="$(pgate "$t")"; rc=$?
+assert_status 1 "$rc" "a problem with no rests on: exits 1"
+assert_contains "$out" "refuse[no-rests-on]" "the refusal is no-rests-on"
+assert_contains "$out" "a declared skip" "the message says why a skip has to be declared"
+
+# `none` with a reason is the declared way to record a problem stated without
+# discovery. Bare `none` cannot be told from the field being forgotten, which is
+# the same reasoning as `amends: none` and an empty outlier list.
+t="$(fresh_tree bare_none)"
+perl -0pi -e 's/^rests on: .*/rests on: none/m' "$t/$PROBLEM_REL"
+out="$(pgate "$t")"; rc=$?
+assert_status 1 "$rc" "a bare rests on: none exits 1"
+assert_contains "$out" "refuse[bare-none-rests-on]" "the refusal is bare-none-rests-on"
+
+t="$(fresh_tree real_none)"
+perl -0pi -e 's/^rests on: .*/rests on: none — the cycle stated this question specifically enough to define from/m' \
+  "$t/$PROBLEM_REL"
+out="$(pgate "$t")"; rc=$?
+assert_status 0 "$rc" "rests on: none with a reason is accepted"
+
+# `none` has to be the whole first word. The same prefix defect was found in the
+# Deliver gate, where `amends: nonetheless, ...` was read as a declaration that
+# nothing changed.
+for sneaky in \
+  'nonetheless, we read around the question first' \
+  'nonexistent, there was no topic to point at'
+do
+  t="$(fresh_tree "sneaky$(printf '%s' "$sneaky" | cksum | cut -d' ' -f1)")"
+  perl -0pi -e "s/^rests on: .*/rests on: $sneaky/m" "$t/$PROBLEM_REL"
+  out="$(pgate "$t")"; rc=$?
+  assert_status 1 "$rc" "refuses a rests on: starting with none but not meaning it: ${sneaky%%,*}"
+done
+
+t="$(fresh_tree unlinked)"
+perl -0pi -e 's/^rests on: .*/rests on: the classifier discovery/m' "$t/$PROBLEM_REL"
+out="$(pgate "$t")"
+assert_contains "$out" "refuse[rests-on-not-linked]" "a topic named but not linked is refused"
+
+t="$(fresh_tree topicgone)"
+rm -f "$t/process/02-discover/topics/classifier-models.md"
+out="$(pgate "$t")"
+assert_contains "$out" "refuse[rests-on-unresolved]" "a topic link that does not resolve is refused"
+
+# Resolving is not enough: it has to resolve to a DISCOVER TOPIC. A link to any
+# file that happens to exist would satisfy "the topic exists" while establishing
+# nothing about the edge.
+t="$(fresh_tree nottopic)"
+perl -0pi -e 's|^rests on: .*|rests on: [`../cycles/2026-09-29.md`](../cycles/2026-09-29.md)|m' "$t/$PROBLEM_REL"
+out="$(pgate "$t")"
+assert_contains "$out" "refuse[rests-on-not-a-topic]" "a link to something that is not a Discover topic is refused"
+
+# And problems are in the denominator of a bare run, not only of an explicit one.
+# A check nobody invokes is not a control, and CI invokes this with no arguments.
+t="$(fresh_tree bare_run)"
+perl -0pi -e 's/^rests on: .*\n//m' "$t/$PROBLEM_REL"
+out="$(DEFINE_CYCLES_DIR="$t/process/03-define/cycles" \
+       DEFINE_PROBLEMS_DIR="$t/process/03-define/problems" \
+       bash "$ROOT/process/03-define/validate-define.sh" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a run with no arguments reads problems as well as cycles"
+assert_contains "$out" "refuse[no-rests-on]" "and refuses the problem it found"
+
 assert_done
