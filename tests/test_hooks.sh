@@ -388,4 +388,51 @@ assert_status 0 "$rc" "an ordinary file is not called a secret"
 # half-done in two places. Everything above runs with the list PRESENT, and stays
 # true either way.
 
+
+# --- the conventional prefix has to START the subject ---------------------------
+# Found by tests/mutate-sweep.sh, by dropping the `^` from the conventional-subject
+# expression in both the hook and the pre-push re-check. Unanchored, any subject that
+# contains `fix: ` anywhere passes — `WIP fix: repair the thing` is the shape that
+# actually happens, and every case above either matches at the start or matches
+# nowhere, so none of them could see the difference.
+for s in \
+  'WIP fix: repair the thing' \
+  'draft feat: add the thing' \
+  'revert of docs: say what it does' \
+  '[squash] chore: tidy up'
+do
+  hook_msg "$s"
+  assert_status 1 "$rc" "a conventional prefix not at the start is refused: $s"
+done
+
+# The same rule, server-side, over a real pushed range. The hook and the job drifted
+# apart on the merge exemption once already, so the anchor is checked in both.
+(
+  cd "$R" || exit 2
+  printf 'anchored\n' > g.txt && git add -A
+  git commit -q --no-verify -m 'WIP fix: repair the thing'
+) >/dev/null 2>&1
+out="$(push_out origin main)"; rc=$?
+assert_status 1 "$rc" "pre-push refuses a conventional prefix not at the start"
+assert_contains "$out" "not a conventional commit" "and names the rule"
+( cd "$R" && git fetch -q origin && git reset -q --hard origin/main ) >/dev/null 2>&1
+
+# --- a subject carrying a hash is still the subject -----------------------------
+# The hook strips the template's comment lines with `grep -v '^#'`. Unanchored that
+# drops every line containing a hash, so a subject naming an issue number disappears
+# and the line below it is read as the subject instead. This repository writes issue
+# numbers in commit bodies, so it is a shape that will arrive.
+hook_msg "$(printf 'fix: repair the thing behind #30\n\nSome body text.\n')"
+assert_status 0 "$rc" "a subject containing a hash is accepted"
+hook_msg "$(printf 'repair the thing behind #30\n\nfix: a line that would pass\n')"
+assert_status 1 "$rc" "and a bad subject containing a hash is still read as the subject"
+assert_contains "$out" "repair the thing behind #30" "the refusal quotes the real subject"
+
+# The body is stripped the same way, and the attribution ban reads the body. A trailer
+# on a line that also carries a hash has to survive the stripping, or the ban is
+# defeated by adding an issue number to the trailer.
+hook_msg "$(printf 'fix: repair the thing\n\nCo-Authored-By: Somebody <nobody@example.invalid> #30\n')"
+assert_status 1 "$rc" "an attribution trailer on a line that also carries a hash is refused"
+assert_contains "$out" "Co-Authored-By trailer is not allowed" "and the refusal names the trailer"
+
 assert_done
