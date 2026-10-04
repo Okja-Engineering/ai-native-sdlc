@@ -235,6 +235,35 @@ assert_not_contains "$out" "0 file(s) within the contract" \
 ncyc="$(ls "$ROOT"/process/03-define/cycles/*.md 2>/dev/null | grep -c .)"
 assert_contains "$out" "$ncyc file(s) within the contract" \
   "it checked every cycle file in the directory (found $ncyc)"
+# --- a cycle cannot rest on a worked example ----------------------------------
+# `example: yes` means "not a real scan". Two words in the findings file and
+# bin/cycle.sh collapsed to a skipped line, both gates reported the files within
+# the contract, and the Define cycle's `from:` still resolved to the now-example
+# file and was accepted. findings-contract.md disclosed the inverse case — an
+# example that forgets its marker — and this direction nowhere.
+#
+# The marker is not refused on its own: an example with nothing reading it is
+# exactly what findings/2026-09-01.md is. What is refused is the contradiction
+# between the marker and a cycle that depends on the file.
+t="$(fresh_tree example_source)"
+SRC="$t/process/01-scan/findings/2026-09-29.md"
+perl -0pi -e 's/^nothing found: (.*)$/nothing found: $1\nexample: yes/m' "$SRC"
+assert_contains "$(cat "$SRC")" "example: yes" "the fixture marks the source as an example"
+out="$(/bin/bash "$ROOT/process/01-scan/validate-findings.sh" "$SRC" 2>&1)"; rc=$?
+assert_status 0 "$rc" "stage 1 accepts the marker, because an example is a legitimate file"
+out="$(gate "$t")"; rc=$?
+assert_status 1 "$rc" "a cycle whose source is marked as an example exits 1"
+assert_contains "$out" "refuse[source-is-example]" "and the refusal names the marker"
+assert_contains "$out" "not a real scan" "and says what the marker means"
+
+# The worked example that ships here is read by nothing, and must stay within the
+# contract — the refusal is about the dependency, not about the marker.
+out="$(/bin/bash "$ROOT/process/01-scan/validate-findings.sh" \
+  "$ROOT/process/01-scan/findings/2026-09-01.md" 2>&1)"; rc=$?
+assert_status 0 "$rc" "the shipped worked example is still within the contract"
+assert_contains "$(cat "$ROOT/process/01-scan/findings/2026-09-01.md")" "example: yes" \
+  "and it does carry the marker, so that assertion is about a marked file"
+
 # --- the declared count is the denominator ------------------------------------
 # The set comparison establishes that the accounting matches the source. It says
 # nothing about what the source was supposed to contain, so a finding could be

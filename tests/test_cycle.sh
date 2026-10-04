@@ -47,7 +47,22 @@ assert_contains "$out" "2026-09-29" "a cycle marked as an example still appears 
 assert_contains "$out" "skipped" "it is reported as skipped"
 assert_contains "$out" "example: yes" "the report says why it was skipped"
 assert_not_contains "$out" "64 findings" "and it is not reported as a cycle"
+
+# Announcing the skip was #36's repair and it is not enough on its own. The whole
+# of the cycle below the findings file — its themes, its problems, its two
+# decisions — still left the report, and what the reader is told is that a file is
+# an example. The report now says which Define cycles are reading it, because that
+# is the contradiction: a worked example cannot be a real cycle's source.
+assert_contains "$out" "2026-09-29" "the dependent Define cycle is named"
+assert_contains "$out" "reads it" "and the report says it is being read"
 git -C "$SB" checkout -q -- process/01-scan/findings/2026-09-29.md
+
+# The worked example that ships here is read by nothing, so it gets the skip line
+# and no contradiction — the report is about the dependency, not the marker.
+out="$(run)"
+example_block="$(printf '%s\n' "$out" | awk '/^2026-09-01$/{on=1;next} /^[0-9]{4}-/{on=0} on')"
+assert_contains "$example_block" "skipped" "the shipped worked example is reported as skipped"
+assert_not_contains "$example_block" "reads it" "and nothing is reported as reading it"
 
 # --- problems belong to their own cycle --------------------------------------
 # Never exercised before, because only one cycle exists. A second cycle with its
