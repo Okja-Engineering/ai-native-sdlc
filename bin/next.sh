@@ -52,8 +52,17 @@ hint() {
 }
 
 # sections <contract> -> one section heading per line, from Required sections
+#
+# A FENCED BLOCK IS LITERAL CONTENT, NOT A DECLARATION. A section's skeleton is
+# declared in a fence, and a theme is a `### ` heading — so the moment the Themes
+# section declared the shape of a theme, the heading inside that fence was read
+# here as the name of another required section, and the scaffold emitted
+# `## N · a name that is a claim` as a section of its own. Same class as the
+# fenced `rests on:` example that donated its value to the Define gate's field
+# reader, and the fence-skipping is written the same way it is there.
 sections() {
   sed -n '/^## Required sections/,/^## What/p' "$1" 2>/dev/null \
+    | awk '/^[ \t]*(```|~~~)/ { fence = !fence; next } !fence' \
     | sed -n 's/^### //p'
 }
 
@@ -68,15 +77,20 @@ sections() {
 skeleton() {
   awk -v h="### $2" '
     $0 == h { inside = 1; next }
-    # The NEXT heading of either level ends the section. Resetting only on `## `
-    # let every section read the next one: asking for "Themes" returned the
-    # accounting block, because that is the first fence below it, and the skeleton
-    # was written into three sections.
-    inside && (substr($0, 1, 3) == "## " || substr($0, 1, 4) == "### ") { exit }
+    # The fence is read FIRST, and the heading test only applies outside one. A
+    # heading inside a fence is literal content: the section that declares the
+    # shape of a theme has to put a `### ` line in its skeleton, and testing the
+    # heading first truncated that skeleton at the heading — emitting the heading
+    # and nothing under it.
     inside && substr($0, 1, 3) == "```" {
       if (fenced) exit
       fenced = 1; next
     }
+    # The NEXT heading of either level ends the section. Resetting only on `## `
+    # let every section read the next one: asking for "Themes" returned the
+    # accounting block, because that is the first fence below it, and the skeleton
+    # was written into three sections.
+    inside && !fenced && (substr($0, 1, 3) == "## " || substr($0, 1, 4) == "### ") { exit }
     inside && fenced { print }
   ' "$1"
 }

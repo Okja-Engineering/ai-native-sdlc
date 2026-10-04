@@ -2,7 +2,7 @@
 
 **Status:** derived from one artifact. `cycles/2026-09-29.md` was written first; this describes the shape it turned out to need.
 
-**Four checks are enforced; two remain deferred.** See *The gate* at the end.
+**Four checks are enforced; two are deferred; and two parts of a cycle are declared and not yet enforced.** See *The gate* at the end.
 
 ## What Define is for
 
@@ -59,7 +59,7 @@ Together with the set comparison this gives a three-way agreement — the declar
 
 **Where the count comes from.** `process/01-scan/findings-ids.sh`, which is also what `bin/next.sh` and `bin/cycle.sh` read. A finding is a row inside the source's `## Findings` section whose `id` cell is exactly `F` plus a number, with the cell's position read from `findings-contract.md`. Three counters existed before that and none agreed with the others; the gate will not run if the harvester is missing, because a gate with no denominator reports a clean tree having evaluated nothing.
 
-**From the next cycle, each theme lists its own ids.** The set check closes dropping. It cannot detect a finding *moved* between themes, because moving one leaves the set unchanged — that is a count-accuracy defect rather than a dropping defect. Cycle `2026-09-29` predates ids and recorded counts only, so its membership is not recoverable; its artifact says so rather than reconstructing a mapping nobody made.
+**From the next cycle, each theme lists its own ids.** The set check closes dropping. It cannot detect a finding *moved* between themes, because moving one leaves the set unchanged — that is a count-accuracy defect rather than a dropping defect. Cycle `2026-09-29` predates ids and recorded counts only, so its membership is not recoverable; its artifact says so rather than reconstructing a mapping nobody made. The block a theme writes them in is declared under *Required sections* and scaffolded; it is read by nothing yet, and that section says what would make reading it right.
 
 The problem Define exists for is that **reading** is the wall. Sixty-four rows is more than anyone gets through, and a process people stop opening catches nothing regardless of how complete its record is. Trust in an automated feed is spent, not easily earned back, and every low-value item is a withdrawal. Themes reduce what must be read without reducing what is kept.
 
@@ -72,7 +72,18 @@ Define produces two artifacts and they do not have the same shape. These are **a
 | `dated` | when Define was run |
 | `from` | the source artifact, linked, with its item count. The count is checked against the source, not decoration |
 | `method` | how the themes were produced — by hand, by model, by classifier. **Not optional**: a reader must know what produced the grouping before trusting it |
+| `pass took` | how long the convergence pass took, rounded, in the words a person would use. `unrecorded` plus the reason when nobody timed it. **Declared, not yet enforced** |
 | `status` | `defined, not decided` |
+
+### `pass took`, and why it is rounded rather than precise
+
+**Added because a decision asked for a number nothing could hold.** The `producing-themes` decision chose to measure two more cycles and record the finding rate, the pass duration and which themes recur. The finding rate has a home — `from:` carries the count and the gate reads it. The other two had none, and this field is the first of them.
+
+The form is a rounded duration, written the way a person would say it out loud: `about two hours`, `about forty minutes, in one sitting`, `two sittings of roughly an hour`. **Rounded on purpose.** One pass yields one data point and nobody runs a stopwatch over reading sixty-four rows, so a figure to the minute would be a precision this record does not have — and the question the number is for is whether a hand pass stays affordable as the source grows, which turns on hours. The decision record's own estimate of the first pass is *"roughly the time of reading them plus the judgment"*, which is the honest grain.
+
+**`unrecorded` needs the reason.** A pass nobody timed is a real and acceptable state; a forgotten field looks exactly like it. Same reasoning as `rests on: none` below and `amends: none` in the Deliver contract, and a bare `unrecorded` says nothing a reader can check.
+
+**Declared, not yet enforced.** `bin/next.sh` scaffolds the field and `bin/cycle.sh` reports it; nothing refuses a cycle that omits it, and nothing reads the value. That is deliberate rather than unfinished: no artifact carries this field yet, so a gate would be checking a shape invented here rather than one an artifact showed was real — which is the thing `README.md` and `spec.md` say a contract waits for. **What would make gating it right:** two cycles carrying it, which is exactly what the decision commits to. If both write a duration a person can read and compare, the shape held and a `no-pass-duration` refusal is worth building; if the second cycle writes something the first's form cannot express, the form was wrong and gating it would have frozen the wrong one.
 
 ## Required fields — a problem
 
@@ -104,8 +115,26 @@ Each carries:
 - **A name that is a claim, not a category.** "The software factory became a named practice" — not "Factories." A reader should be able to disagree with it.
 - **Its item count, and the consequence spread** of the items under it.
 - **Why we think it is a theme.** The evidence for the grouping itself, stated so it can be argued with. In the worked artifact: *"five independent companies, one week, converging vocabulary."* Without this a theme is an assertion, and a reader has nothing to check but the label.
+- **Its own ids**, from the next cycle — the finding ids that sit under this theme, in a fenced block. **Declared, not yet enforced.** See below.
+
+The shape, which `bin/next.sh` emits once for a person to repeat per theme:
+
+```markdown
+### N · A name that is a claim, not a category
+**N findings · the consequence spread · the kinds**
+
+Why we think it is a theme: the evidence for the grouping itself, stated so a reader can argue with it.
+
+<!-- theme:ids -->
+<!-- The ids under this theme. Repeat this whole block, heading included, per theme. -->
+<!-- /theme:ids -->
+```
+
+`N` is left as a letter rather than a number on purpose: `bin/cycle.sh` counts a theme by its numbered heading, so an unfilled skeleton reports no themes instead of reporting one that nobody wrote.
 
 **A folded theme is still a theme.** Low-value items get grouped and explicitly marked folded, with the reason. Folded is not dropped — the rows remain in the source, and a later cycle may make one matter.
+
+**A theme's ids are declared and not yet enforced, and the requirement predates the structure.** This contract has said *"from the next cycle, each theme lists its own ids"* since 2026-10-03, and until now nothing produced a block to write them in — so a requirement came into force against a skeleton that could not meet it, which is how a contract quietly becomes a thing people cannot comply with. The scaffold now carries the block. Nothing reads it: `validate-define.sh` still compares one accounting block against the source, and a finding moved between themes still leaves that set unchanged. **What would make gating it right:** one cycle that actually carries per-theme blocks. The check then has something to generalise from — whether every id appears in exactly one theme block or the outliers, and whether those blocks reconcile with the accounting block and with each theme's stated count. Written against a shape no artifact carries, that check would be three guesses about formatting, and the accounting block was declared as an example for exactly that reason and could not be scaffolded for a month.
 
 ### Outliers — surfaced because they fit nothing
 
@@ -159,6 +188,15 @@ Two checks remain deferred, because they do depend on shape and one cycle cannot
 - no decision language — a second cycle is needed to know the vocabulary
 
 **Those two remain asserted, not enforced**, and should be described that way.
+
+Two further parts of a cycle are **declared and not yet enforced**, which is a different state from deferred: the field exists, the scaffold produces it, and no gate reads it.
+
+| Declared | Read by | What would make gating it right |
+|---|---|---|
+| `pass took` | `bin/next.sh` scaffolds it, `bin/cycle.sh` reports it | two cycles carrying a duration a reader can compare — the decision that asked for it commits to exactly two |
+| a theme's own ids | `bin/next.sh` scaffolds the block | one cycle carrying the blocks, so the check is written against a shape an artifact had rather than one this contract invented |
+
+A reporting tool is not a gate. `bin/cycle.sh` printing a duration means a reader can see it; nothing refuses a cycle that leaves it out, and the report says so in those words rather than printing a blank.
 
 ### The problem gate
 
