@@ -186,4 +186,140 @@ ncyc="$(ls "$ROOT"/process/03-define/cycles/*.md 2>/dev/null | grep -c .)"
 assert_contains "$out" "$ncyc file(s) within the contract" \
   "it checked every cycle file in the directory (found $ncyc)"
 
+# --- a problem is checked too -------------------------------------------------
+# No gate read a problem or an option at all. `rests on:` is the only thing
+# carrying the Discover-to-Define edge, and nothing resolved it: `cycle.sh`
+# reported `classifier-models` as referenced by no problem and that was the whole
+# of the enforcement. The invariant is that a problem names a Discover topic that
+# exists, or says in band that it ran without one.
+PROBLEM_REL="process/03-define/problems/producing-themes.md"
+pgate() { bash "$ROOT/process/03-define/validate-define.sh" "$1/$PROBLEM_REL" 2>&1; }
+
+t="$(fresh_tree problem)"
+out="$(pgate "$t")"; rc=$?
+assert_status 0 "$rc" "the shipped problem is within the contract"
+
+t="$(fresh_tree problem2)"
+out="$(bash "$ROOT/process/03-define/validate-define.sh" \
+  "$t/process/03-define/problems/agent-pr-approval.md" 2>&1)"; rc=$?
+assert_status 0 "$rc" "and so is the other shipped problem"
+
+t="$(fresh_tree norests)"
+perl -0pi -e 's/^rests on: .*\n//m' "$t/$PROBLEM_REL"
+out="$(pgate "$t")"; rc=$?
+assert_status 1 "$rc" "a problem with no rests on: exits 1"
+assert_contains "$out" "refuse[no-rests-on]" "the refusal is no-rests-on"
+assert_contains "$out" "a declared skip" "the message says why a skip has to be declared"
+
+# `none` with a reason is the declared way to record a problem stated without
+# discovery. Bare `none` cannot be told from the field being forgotten, which is
+# the same reasoning as `amends: none` and an empty outlier list.
+t="$(fresh_tree bare_none)"
+perl -0pi -e 's/^rests on: .*/rests on: none/m' "$t/$PROBLEM_REL"
+out="$(pgate "$t")"; rc=$?
+assert_status 1 "$rc" "a bare rests on: none exits 1"
+assert_contains "$out" "refuse[bare-none-rests-on]" "the refusal is bare-none-rests-on"
+
+t="$(fresh_tree real_none)"
+perl -0pi -e 's/^rests on: .*/rests on: none — the cycle stated this question specifically enough to define from/m' \
+  "$t/$PROBLEM_REL"
+out="$(pgate "$t")"; rc=$?
+assert_status 0 "$rc" "rests on: none with a reason is accepted"
+
+# `none` has to be the whole first word. The same prefix defect was found in the
+# Deliver gate, where `amends: nonetheless, ...` was read as a declaration that
+# nothing changed.
+for sneaky in \
+  'nonetheless, we read around the question first' \
+  'nonexistent, there was no topic to point at'
+do
+  t="$(fresh_tree "sneaky$(printf '%s' "$sneaky" | cksum | cut -d' ' -f1)")"
+  perl -0pi -e "s/^rests on: .*/rests on: $sneaky/m" "$t/$PROBLEM_REL"
+  out="$(pgate "$t")"; rc=$?
+  assert_status 1 "$rc" "refuses a rests on: starting with none but not meaning it: ${sneaky%%,*}"
+done
+
+t="$(fresh_tree unlinked)"
+perl -0pi -e 's/^rests on: .*/rests on: the classifier discovery/m' "$t/$PROBLEM_REL"
+out="$(pgate "$t")"
+assert_contains "$out" "refuse[rests-on-not-linked]" "a topic named but not linked is refused"
+
+t="$(fresh_tree topicgone)"
+rm -f "$t/process/02-discover/topics/classifier-models.md"
+out="$(pgate "$t")"
+assert_contains "$out" "refuse[rests-on-unresolved]" "a topic link that does not resolve is refused"
+
+# Resolving is not enough: it has to resolve to a DISCOVER TOPIC. A link to any
+# file that happens to exist would satisfy "the topic exists" while establishing
+# nothing about the edge.
+t="$(fresh_tree nottopic)"
+perl -0pi -e 's|^rests on: .*|rests on: [`../cycles/2026-09-29.md`](../cycles/2026-09-29.md)|m' "$t/$PROBLEM_REL"
+out="$(pgate "$t")"
+assert_contains "$out" "refuse[rests-on-not-a-topic]" "a link to something that is not a Discover topic is refused"
+
+# A field shown as an EXAMPLE is not the field. Found by attacking this check
+# after writing it: a fenced `rests on: none — ...` ahead of the real field was
+# read as the field's value, so the real link was never looked at and the gate
+# reported the problem within the contract. Same class as the example row in
+# DECIDERS.md that would have authorized everyone it named.
+t="$(fresh_tree fenced)"
+perl -0pi -e 's|^# Problem|# Problem\n\n```\nrests on: none — what the skip form looks like\n```\n|' "$t/$PROBLEM_REL"
+perl -0pi -e 's|^rests on: \[|rests on: [|m' "$t/$PROBLEM_REL"
+out="$(pgate "$t")"; rc=$?
+assert_status 0 "$rc" "a fenced example does not stop the real rests on: being read"
+
+t="$(fresh_tree fenced2)"
+perl -0pi -e 's|^rests on: .*\n||m' "$t/$PROBLEM_REL"
+perl -0pi -e 's|^# Problem|# Problem\n\n```\nrests on: none — what the skip form looks like\n```\n|' "$t/$PROBLEM_REL"
+out="$(pgate "$t")"; rc=$?
+assert_status 1 "$rc" "and a fenced example on its own does not satisfy the field"
+assert_contains "$out" "refuse[no-rests-on]" "the refusal is no-rests-on"
+
+# No Discover topics directory at all. Reachable only when the link resolves and
+# the directory does not, because an unresolvable link returns before this. Found
+# by tests/mutate-sweep.sh: deleting this refusal left every suite green, so the
+# branch that says "nothing can establish the edge" was itself unestablished.
+t="$(fresh_tree notopicsdir)"
+perl -0pi -e 's|^rests on: .*|rests on: [`c`](../cycles/2026-09-29.md)|m' "$t/$PROBLEM_REL"
+rm -rf "$t/process/02-discover/topics"
+out="$(pgate "$t")"; rc=$?
+assert_status 1 "$rc" "a tree with no Discover topics directory exits 1"
+assert_contains "$out" "refuse[rests-on-not-a-topic]" "the refusal is rests-on-not-a-topic"
+assert_contains "$out" "no Discover topics directory" "the message says the directory is missing"
+
+# And problems are in the denominator of a bare run, not only of an explicit one.
+# A check nobody invokes is not a control, and CI invokes this with no arguments.
+t="$(fresh_tree bare_run)"
+perl -0pi -e 's/^rests on: .*\n//m' "$t/$PROBLEM_REL"
+out="$(DEFINE_CYCLES_DIR="$t/process/03-define/cycles" \
+       DEFINE_PROBLEMS_DIR="$t/process/03-define/problems" \
+       bash "$ROOT/process/03-define/validate-define.sh" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a run with no arguments reads problems as well as cycles"
+assert_contains "$out" "refuse[no-rests-on]" "and refuses the problem it found"
+
+# --- and the problem denominator is printed, like the cycle one ----------------
+# The same reasoning the empty-input sweep applied to cycles, pointed at problems:
+# a count nobody prints is a count nobody can check. Both of these were found by
+# tests/mutate-sweep.sh, which made each comparison always true and saw nothing go
+# red. Derived from the directory rather than written out, so adding a problem does
+# not make the assertion stale.
+out="$(cd "$ROOT" && bash process/03-define/validate-define.sh 2>&1)"; rc=$?
+assert_status 0 "$rc" "the bare run over the real tree passes"
+nprob="$(ls "$ROOT"/process/03-define/problems/*.md 2>/dev/null | grep -c .)"
+assert_contains "$out" "$nprob problem(s) checked" \
+  "it says how many problems it checked (found $nprob)"
+
+# An explicit run reports what was named and nothing else. The problem line belongs
+# to the directory walk, so naming one file must not make the gate talk about a
+# phase it did not read.
+out="$(cd "$ROOT" && bash process/03-define/validate-define.sh "$CYCLE_REL" 2>&1)"; rc=$?
+assert_status 0 "$rc" "naming one cycle file passes"
+assert_not_contains "$out" "problem(s) checked" \
+  "and does not claim to have checked problems it did not walk"
+# Both halves of that block, because the empty half is the one a loosened guard
+# reaches: with `$# -eq 0` always true, an explicit run falls into "no problem files"
+# rather than into the count, and an assertion on the count alone sees nothing.
+assert_eq "1" "$(printf '%s\n' "$out" | grep -c .)" \
+  "an explicit run prints one summary line and nothing about a phase it did not walk"
+
 assert_done

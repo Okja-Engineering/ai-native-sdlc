@@ -133,6 +133,16 @@ Two checks remain deferred, because they do depend on shape and one cycle cannot
 
 **Those two remain asserted, not enforced**, and should be described that way.
 
+### The problem gate
+
+`validate-define.sh` reads problems as well as cycles, and enforces one check on a problem — the Discover-to-Define edge:
+
+- **`rests on` is declared, it resolves, and it resolves to a Discover topic** — or it says `none` with the reason no discovery was needed. Refusals: `no-rests-on`, `bare-none-rests-on`, `rests-on-not-linked`, `rests-on-unresolved`, `rests-on-not-a-topic`, each asserted by its message in `tests/test_validate_define.sh`.
+
+Resolving alone would not have been enough. A link to any file that happens to exist satisfies *"the topic exists"* and establishes nothing about the Discover step, so the allowed location is enumerated — the Discover topics directory — rather than inferred.
+
+**A problem's `from:` is declared above and is still unread.** Stated here rather than left implicit: a required field nothing reads is the defect this repository has found twice already, once in `problem:` on a decision record and once in `rests on:` here. It is recorded as an open gap in `CONTROLS.md` under CTRL-10 rather than closed in the same change, because no artifact has shown it failing.
+
 ## Open
 
 1. **Whether a small model produces the same themes.** The first cycle was themed by reading. That is the interesting test and it is now cheap, because the source artifact and the hand-made themes both exist to compare against.

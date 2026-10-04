@@ -275,6 +275,35 @@ This control enforces by exit status rather than by refusal codes, so it has no 
 
 ---
 
+## CTRL-10 · A problem names the discovery it was stated from
+
+**What it prevents.** A problem that asserts what is true about a theme with no discovery behind it, and a discovery that no problem ever used. Define is the convergent step, so a problem is where an outside fact enters the chain; if the link is missing, a reader cannot tell a question that was researched from one that was assumed.
+
+**Enforced by** `process/03-define/validate-define.sh`.
+
+| Refusal | Condition |
+|---|---|
+| `no-rests-on` | a problem declares no `rests on:` field |
+| `bare-none-rests-on` | `rests on: none` with no reason — indistinguishable from the field being forgotten |
+| `rests-on-not-linked` | names a discovery without linking it |
+| `rests-on-unresolved` | links a topic this repository does not have |
+| `rests-on-not-a-topic` | links something that resolves but is not in `process/02-discover/topics` |
+
+**Evidence.** The `rests on:` field on each problem, and the Discover topic it resolves to. Both shipped problems carry one. `bin/cycle.sh` prints the resulting linkage per topic, so a topic no problem names is visible in the status report as well as refused at the gate.
+
+**Evidence note.** A field shown as an **example** is not the field. Attacking the new check found that a fenced `rests on: none — ...` ahead of the real field was read as the field's value, so the real link was never looked at. The field reader in this gate now skips fenced blocks, which also closes the same hole for a cycle's `method:` and `from:`. The same class is in `process/05-deliver/validate-decision.sh` and `process/02-discover/validate-discovery.sh`, which share the field-reader shape and have not been changed here.
+
+**Evidence note.** No gate read a problem or an option at all until 2026-10-04, and `rests on:` was declared nowhere — `define-contract.md` listed the **cycle's** fields only. `bin/next.sh` scaffolded a problem from that list, so a scaffolded problem got `method:` and never got `rests on:`. The only thing that noticed the missing edge was `bin/cycle.sh` printing *"classifier-models referenced by no problem"* in a status report nothing fails on. And the repository had read that absence the wrong way round: `producing-themes` drew every figure in its cost argument from that topic, so the discovery had run and the record did not say so.
+
+**What it does not cover.**
+
+- **Whether it is the right topic.** The check establishes that `rests on:` names a Discover topic that exists. It does not read either document, so a problem linking an unrelated topic passes. The same limit as CTRL-3's: the links agree, the content is a reader's job.
+- **Whether the reason for `none` is true.** `rests on: none` plus a reason is accepted on its word. A problem can declare no discovery was needed when one was.
+- **A problem's `from:`.** Declared by the contract and read by nothing — see *What is not controlled*, item 14.
+- **Options.** `process/04-develop/options/` is still in no gate. That is item 5, unchanged and still disclosed.
+
+---
+
 ## Refusals and gates no control covers
 
 Every refusal any gate in this repository emits is either cited by a control above or listed here with a reason, and so is every gate no control names. `bin/validate-controls.sh` refuses if something is in neither place, so this table cannot be quietly short.
@@ -381,3 +410,4 @@ What was found, and what each one does now:
 - **Fixing a fail-open does not make a hook enforcement.** The never-publish guard and the secret scan still exist only as hooks, and a push from a machine that never ran `git config core.hooksPath .githooks` is unguarded by either. CTRL-9 says this already and it stays true: a guard that fails closed locally is still bypassable by not installing it at all.
 - **There is no mechanical check for the shape.** The sweep was a person reading every gate and both hooks and running each one with its input taken away. Nothing refuses a new gate written with the same shape, and the only thing that would is a convention nobody can enforce from inside a shell script.
 - **One mutant is known to be uncaught.** Replacing the discovery gate's variable with a `mktemp` whose write is not checked re-opens the fail-open, and no suite catches it, because it only fails when the temp area itself is broken. Recorded in `tests/test_validate_discovery.sh` at the site, with the reason the obvious test for it does not work.
+**14. A problem's `from:`.** CTRL-10 reads a problem's `rests on:` and not its `from:`, which the Define contract also declares as required. So a problem can name a cycle that does not exist, or name one without linking it, and the gate reports it within the contract. This is the same shape as two defects this repository has already found — `problem:` on a decision record, and `rests on:` itself — and it is left open rather than closed in the same change for a stated reason: no artifact has shown it failing, and the two it would check are both correct today. It is written down here so the next reader does not have to rediscover it.

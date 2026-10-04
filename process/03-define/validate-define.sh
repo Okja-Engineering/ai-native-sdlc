@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
-# The Define checks that do not depend on a cycle's shape.
+# The Define checks that do not depend on an artifact's shape.
 #
 # usage: process/03-define/validate-define.sh [file ...]
-#        process/03-define/validate-define.sh          # every cycle file
+#        process/03-define/validate-define.sh          # every cycle and problem
 #
-# define-contract.md names five checks and defers them until a second cycle
-# shows which parts are shape and which are this cycle's accidents. Three of
-# them do not depend on shape at all and are built here:
+# Define produces two artifacts and this read only one of them. A problem was in
+# no gate at all, so the Discover-to-Define edge had nothing behind it: the only
+# thing that noticed `producing-themes` not naming the topic its whole cost
+# argument came from was `bin/cycle.sh` printing "referenced by no problem" in a
+# status report nothing fails on. What a problem's check establishes is below,
+# at check_problem.
+#
+# For a CYCLE, define-contract.md names five checks and defers them until a
+# second cycle shows which parts are shape and which are this cycle's accidents.
+# Three of them do not depend on shape at all and are built here:
 #
 #   1. every item in the source artifact is accounted for, compared as a SET of
 #      declared ids rather than as a total. This caught a real defect by hand
@@ -22,6 +29,15 @@
 # count and a why" (theme formatting may differ by cycle) and "no decision
 # language" (needs a second cycle to know the vocabulary).
 #
+# For a PROBLEM, one check, which is the Discover-to-Define edge:
+#
+#   4. `rests on` is declared, resolves, and resolves to a Discover topic — or
+#      says `none` with the reason no discovery was needed.
+#
+# A problem's `from:` is declared by the contract and is still unread here. Said
+# rather than left implicit, and disclosed under CTRL-10, because a required field
+# nothing reads is the defect this repository has now found twice.
+#
 # exit 0  every file checked is within the contract
 # exit 1  at least one refusal
 # exit 2  the gate could not run
@@ -30,11 +46,34 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CYCLES="${DEFINE_CYCLES_DIR:-$SCRIPT_DIR/cycles}"
+PROBLEMS="${DEFINE_PROBLEMS_DIR:-$SCRIPT_DIR/problems}"
 
 refusals=0
 
 refuse() { printf '%s:%s: refuse[%s]: %s\n' "$1" "$2" "$3" "$4" >&2; refusals=$((refusals + 1)); }
-field()  { sed -n "s/^$2:[[:space:]]*//p" "$1" 2>/dev/null | head -1 | sed 's/[[:space:]]*$//'; }
+# field <file> <key> -> the first value outside a fenced block, trimmed
+#
+# A FENCED BLOCK is skipped. This was `sed -n "s/^$2:...//p" | head -1`, so a
+# document showing what a field looks like donated the example as the field's
+# value: a fenced `rests on: none — ...` ahead of the real field satisfied the
+# check and the real link was never read. Found by attacking the problem check
+# after writing it, and the same class this repository has already paid for once —
+# an example row in a fenced block in `DECIDERS.md` would have authorized everyone
+# it named, which is why the deciders list skips fences.
+#
+# `index` rather than a regex, because a key can contain a space (`rests on`) and
+# a key is not a pattern.
+field() {
+  awk -v key="$2" '
+    /^[ \t]*(```|~~~)/ { fence = !fence; next }
+    fence { next }
+    index($0, key ":") == 1 {
+      v = substr($0, length(key) + 2)
+      sub(/^[ \t]+/, "", v); sub(/[ \t]+$/, "", v)
+      print v; exit
+    }
+  ' "$1" 2>/dev/null
+}
 
 check_cycle() {
   local f="$1" src src_path resolved outliers declared src_ids uniq_declared missing extra dupes themes_sum accounted_n
@@ -114,12 +153,94 @@ check_cycle() {
   fi
 }
 
+# A problem is the OTHER artifact Define produces, and nothing read one.
+#
+# What this establishes: a problem declares the Discover topic it was stated from,
+# that link resolves, and it resolves to something in the Discover topics
+# directory rather than to any file that happens to exist. An omitted `rests on:`
+# and a problem deliberately stated without discovery look identical otherwise,
+# which is the reasoning behind `amends: none` in Deliver and behind an empty
+# outlier list having to say it is empty.
+#
+# What it does not establish is in CONTROLS.md under CTRL-10. In particular the
+# topic has to be a topic and does not have to be the RIGHT topic, and a problem's
+# `from:` is still unread.
+check_problem() {
+  local f="$1" rests first rest path resolved topics_dir
+
+  rests="$(field "$f" 'rests on')"
+  if [ -z "$rests" ]; then
+    refuse "$f" "-" "no-rests-on" \
+      "no 'rests on:' field: a problem names the Discover topic it was stated from, or 'none' with the reason no discovery was needed. An omitted field and a declared skip look identical, and only one of them a reader can check"
+    return
+  fi
+
+  # `none` has to be the WHOLE first word, followed by a reason. The Deliver gate
+  # had the prefix version of this defect: `amends: nonetheless, we decided not to
+  # say where this lands` was read as a declaration that nothing changed.
+  first="$(printf '%s' "$rests" | awk '{print tolower($1)}' | tr -d '.,;:')"
+  if [ "$first" = none ]; then
+    rest="$(printf '%s' "$rests" | sed -e 's/^[Nn]one//' -e 's/^[[:punct:][:space:]]*//')"
+    if [ "${#rest}" -lt 10 ]; then
+      refuse "$f" "-" "bare-none-rests-on" \
+        "'rests on: none' needs the reason no discovery was needed, otherwise it cannot be told apart from the field being forgotten"
+    fi
+    return
+  fi
+
+  path="$(printf '%s' "$rests" | sed -n 's/.*](\([^)#]*\)[^)]*).*/\1/p')"
+  if [ -z "$path" ]; then
+    refuse "$f" "-" "rests-on-not-linked" \
+      "'rests on:' names something but does not link it, so the discovery the problem rests on cannot be read from the problem"
+    return
+  fi
+
+  resolved="$(cd "$(dirname "$f")" && cd "$(dirname "$path")" 2>/dev/null && pwd)/$(basename "$path")"
+  if [ ! -f "$resolved" ]; then
+    refuse "$f" "-" "rests-on-unresolved" "the declared discovery does not resolve: $path"
+    return
+  fi
+
+  # Resolving is not enough. A link to any file that happens to exist would
+  # satisfy "the topic exists" and establish nothing about the Discover edge, so
+  # the allowed location is enumerated rather than inferred: the Discover topics
+  # directory beside this problem's own phase.
+  topics_dir="$(cd "$(dirname "$f")/../../02-discover/topics" 2>/dev/null && pwd)"
+  if [ -z "$topics_dir" ]; then
+    refuse "$f" "-" "rests-on-not-a-topic" \
+      "there is no Discover topics directory beside this problem, so nothing can establish that 'rests on:' names a topic"
+  elif [ "$(dirname "$resolved")" != "$topics_dir" ]; then
+    refuse "$f" "-" "rests-on-not-a-topic" \
+      "'rests on:' resolves to $path, which is not in process/02-discover/topics: a problem rests on a discovery, and a link to another artifact says nothing about the Discover step"
+  fi
+}
+
+# A cycle and a problem are different artifacts with different checks, told apart
+# by the directory the contract already puts them in. Sniffing their contents
+# would be guessing at which one a file is meant to be.
+check_file() {
+  case "$1" in
+    */problems/*) check_problem "$1" ;;
+    *)            check_cycle "$1" ;;
+  esac
+}
+
+# The two artifacts are counted and reported SEPARATELY, not added together.
+#
+# One merged denominator would make the claim unreadable: "3 file(s) within the
+# contract" over one cycle and two problems says nothing about whether either
+# phase was read, and an empty cycles directory would still print a conformance
+# claim because the problems made the total non-zero. That is the shape the
+# empty-input sweep had just closed for cycles, pointed at problems instead.
+#
+# So a cycle count is a cycle count, and the problem line says what it read
+# without claiming conformance for the phase it says nothing about.
 main() {
-  local files=0
+  local files=0 problems=0
   if [ "$#" -gt 0 ]; then
     for f in "$@"; do
       [ -f "$f" ] || { printf 'validate-define: no such file: %s\n' "$f" >&2; exit 2; }
-      files=$((files + 1)); check_cycle "$f"
+      files=$((files + 1)); check_file "$f"
     done
   else
     [ -d "$CYCLES" ] || { printf 'validate-define: no cycles directory: %s\n' "$CYCLES" >&2; exit 2; }
@@ -127,12 +248,34 @@ main() {
       [ -f "$f" ] || continue
       files=$((files + 1)); check_cycle "$f"
     done
+    # A problems directory that is absent is a refusal to run rather than a clean
+    # report over nothing. The repository's own lesson: a gate that evaluates an
+    # empty set and exits 0 reads exactly like a gate that passed.
+    [ -d "$PROBLEMS" ] || { printf 'validate-define: no problems directory: %s\n' "$PROBLEMS" >&2; exit 2; }
+    for f in "$PROBLEMS"/*.md; do
+      [ -f "$f" ] || continue
+      problems=$((problems + 1)); check_problem "$f"
+    done
   fi
 
   if [ "$refusals" -gt 0 ]; then
-    printf 'validate-define: %s refusal(s) across %s file(s)\n' "$refusals" "$files" >&2
+    printf 'validate-define: %s refusal(s) across %s file(s)\n' \
+      "$refusals" "$((files + problems))" >&2
     exit 1
   fi
+
+  # The problem phase, said before the cycle claim so neither reads as the other.
+  # Deliberately NOT phrased as "within the contract": a problem is checked for one
+  # thing, the Discover edge, and the phrase this gate uses for a cycle means every
+  # check the contract names has run.
+  if [ "$#" -eq 0 ]; then
+    if [ "$problems" -eq 0 ]; then
+      printf 'validate-define: no problem files in %s, so no problem was checked\n' "$PROBLEMS"
+    else
+      printf 'validate-define: %s problem(s) checked for the Discover edge, no refusals\n' "$problems"
+    fi
+  fi
+
   # A run that read no artifact does not get to report conformance. This printed
   # "0 file(s) within the contract" over an empty cycles directory, and CI runs this
   # gate with no arguments. Still exit 0: an empty phase is a real state, as the scan
