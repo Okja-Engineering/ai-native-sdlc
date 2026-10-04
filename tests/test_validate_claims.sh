@@ -120,4 +120,53 @@ clear_claim
 src="$(cat "$ROOT/bin/validate-claims.sh")"
 assert_contains "$src" "not enforcement of the rule" "the gate says it is a tripwire, not enforcement"
 
+
+# --- the percentage and multiplier clauses, on their own -----------------------
+# Found by tests/mutate-sweep.sh, by dropping one alternative of the pattern at a
+# time. Two clauses — PCT and the line carrying MULT and PCT together — could be
+# removed with every case above still passing, because each of those cases is caught
+# by a different clause. `Our lead time dropped 40%` is the RATE clause, not PCT;
+# `A 40% velocity improvement` is RATE as well, because PCT wants "improvement in
+# velocity" and not "velocity improvement".
+#
+# Same rule as the block above, one clause further down: a guard that never fires on
+# its own cannot be told from one that does not work.
+for c in \
+  'Reviews are 50% faster.' \
+  'The loop is 30% quicker.' \
+  'Engineers are 25% more productive.' \
+  'We measured a 20% improvement in throughput.' \
+  'We measured a 15% improvement in velocity.'
+do
+  out="$(claim "$c")"; rc=$?
+  assert_status 1 "$rc" "refuses the percentage form: $c"
+done
+clear_claim
+
+for c in \
+  'It is 3x faster.' \
+  'A 2.5x quicker loop.' \
+  'Teams are 4x more effective.' \
+  'We saw 10x productivity.'
+do
+  out="$(claim "$c")"; rc=$?
+  assert_status 1 "$rc" "refuses the multiplier form: $c"
+done
+clear_claim
+
+# A third clause nothing reached: the verb-then-rate form. Every case above that
+# names a rate word puts it FIRST — "lead time dropped", "throughput is up" — and
+# this clause is the other word order. It could be dropped with every case above
+# still passing.
+for c in \
+  'We improved our velocity.' \
+  'That increased throughput.' \
+  'We reduced lead time.' \
+  'It cut cycle time.'
+do
+  out="$(claim "$c")"; rc=$?
+  assert_status 1 "$rc" "refuses the verb-then-rate form: $c"
+done
+clear_claim
+
 assert_done
