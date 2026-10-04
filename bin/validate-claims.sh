@@ -96,12 +96,31 @@ PATTERN="((makes?|made|making) ${OWN}(us|it|them|teams?|everyone|delivery|work|e
 #
 # That is the same silent-failure shape as the `\?` in sed and the missing `-i`
 # elsewhere in this repository: the check looked like it ran.
-out="$(git grep -nIiE "$PATTERN" \
-  -- '*.md' \
+# AND A PATHSPEC THAT MATCHES NOTHING MUST NOT READ AS "NOTHING FOUND" EITHER.
+#
+# That was the other half of the same hole. `git grep` exits 1 both for "no match"
+# and for "the pathspec matched no files", so a clean report meant either. Measured
+# in a throwaway clone: with every markdown file dropped from the index this printed
+# the same line and exited 0, over 32 documents and over none. The excludes below are
+# edited whenever a directory of recorded claims appears, and one over-broad entry
+# turns the gate off silently.
+#
+# The pathspec is set ONCE, in the positional parameters, and both commands read it.
+# Written twice it would be the duplicated rule this repository keeps being burnt by:
+# a count taken over a different set than the scan is not a denominator.
+set -- '*.md' \
   ':(exclude)process/*/findings/*' \
   ':(exclude)process/*/topics/*' \
   ':(exclude)bin/validate-claims.sh' \
-  ':(exclude)tests/*' 2>&1)"
+  ':(exclude)tests/*'
+
+scanned="$(git ls-files -- "$@" 2>/dev/null | grep -c .)"
+if [ "$scanned" -eq 0 ]; then
+  printf 'validate-claims: the pathspec matched no tracked document, so nothing was checked\n' >&2
+  exit 2
+fi
+
+out="$(git grep -nIiE "$PATTERN" -- "$@" 2>&1)"
 status=$?
 
 if [ "$status" -gt 1 ]; then
@@ -118,4 +137,4 @@ if [ "$status" -eq 0 ]; then
   exit 1
 fi
 
-printf 'validate-claims: no speed claims in tracked documents\n'
+printf 'validate-claims: no speed claims in %s tracked document(s)\n' "$scanned"

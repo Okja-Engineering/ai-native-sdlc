@@ -38,6 +38,21 @@ assert_status 1 "$rc" "the real history refuses"
 assert_contains "$out" "refuse[" "it names a cause"
 assert_contains "$out" "not yet enforced" "it points at where the gap is recorded"
 
+# --- a range that does not exist is not an empty range -------------------------
+# The optional argument becomes `$SINCE..HEAD`, and the `git log` reading it sent
+# stderr to /dev/null and kept going with an empty commit list. So on the same
+# history that refuses four times above, a typo in the argument printed
+# "0 decision-setting commit(s), each attributable to a declared decider" and
+# exited 0. The gate is turned off by misspelling a ref.
+#
+# Asserted against the same checkout as the run above, so the only difference
+# between a refusal and a clean report is the argument.
+out="$(bash "$GATE" nosuchref 2>&1)"; rc=$?
+assert_status 2 "$rc" "a range naming a ref that does not exist cannot run"
+assert_contains "$out" "nothing was checked" "and the gate says nothing was checked"
+assert_not_contains "$out" "each attributable" \
+  "and does not report every commit attributable when it read none"
+
 # --- a clean fixture must be ACCEPTED ----------------------------------------
 # Built from scratch so the identities are genuinely separate. If the gate
 # refused this too, every refusal above would be meaningless.

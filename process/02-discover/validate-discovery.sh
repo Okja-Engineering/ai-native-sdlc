@@ -372,6 +372,17 @@ main() {
     printf 'validate-discovery: %s refusal(s) across %s file(s)\n' "$refusals" "$files" >&2
     exit 1
   fi
+  # A run that read no artifact does not get to report conformance. This printed
+  # "0 file(s) within the contract" over an empty topics directory — every artifact
+  # it never read, declared within the contract — and CI runs this gate with no
+  # arguments, so emptying or moving the directory left a clean log.
+  #
+  # Still exit 0: a phase with no artifact is a real state, and the scan gate
+  # already settled that by calling it a first run. What changes is the claim.
+  if [ "$files" -eq 0 ]; then
+    printf 'validate-discovery: no topic files in %s, so nothing was checked\n' "$TOPICS"
+    return 0
+  fi
   printf 'validate-discovery: %s file(s) within the contract\n' "$files"
 }
 

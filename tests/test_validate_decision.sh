@@ -73,6 +73,18 @@ out="$(bash "$GATE" "$(record pending '' '')" 2>&1)"; rc=$?
 assert_status 0 "$rc" "a pending record with nobody named exits 0"
 assert_contains "$out" "within the contract" "pending is reported as within the contract"
 
+# --- a run that read nothing does not report conformance -----------------------
+# Over an empty decisions directory this said "0 file(s) within the contract" and
+# exited 0: no record was read, and the gate reported every one of them within the
+# contract. CI runs this gate with no arguments. An empty phase stays exit 0, as the
+# scan gate already settled; the claim is what changes.
+mkdir -p "$TMP/no-decisions"
+out="$(DECISIONS_DIR="$TMP/no-decisions" bash "$GATE" 2>&1)"; rc=$?
+assert_status 0 "$rc" "an empty decisions directory is not a refusal"
+assert_contains "$out" "nothing was checked" "but the gate says it read nothing"
+assert_not_contains "$out" "within the contract" \
+  "and does not report files within the contract when it read none"
+
 # --- the gate the contract named ---------------------------------------------
 out="$(bash "$GATE" "$(record A '' 2026-10-01)" 2>&1)"; rc=$?
 assert_status 1 "$rc" "chosen without a decider exits 1"
