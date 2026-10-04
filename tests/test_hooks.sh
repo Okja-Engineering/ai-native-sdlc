@@ -47,6 +47,12 @@ mkdir -p "$R"
   git config user.name 'A Person'
   git config user.email 'person@example.invalid'
   git remote add origin "$TMP/remote"
+  # A never-publish list, because pre-push now refuses a push from a tree that has
+  # no policy for it to apply. This fixture had none and every push from it went
+  # through, which is the fail-open this suite could not assert against until #57 —
+  # the suite's own baseline repository was silently unguarded.
+  mkdir -p .githooks
+  printf '%s\n' '# a fixture list' '.scuba/*' > .githooks/never-publish
   printf 'one\n' > a.txt && git add -A && git commit -q -m 'feat: add a'
   git branch -M main
   git push -q origin main
@@ -376,17 +382,112 @@ done
 out="$(push2 origin main)"; rc=$?
 assert_status 0 "$rc" "an ordinary file is not called a secret"
 
-# --- what is NOT asserted here -----------------------------------------------
-# The never-publish guard FAILS OPEN when the list is missing or unreadable:
-# check_publish wraps everything in `[ -r "$never_publish" ]` and returns 0
-# otherwise, so a push from a tree with no list is unguarded. That is a defect and
-# it belongs to issue #57, which owns the two fail-open guards.
+# --- pre-push: the guard refuses when it has no policy ------------------------
+# This is the assertion the section above used to say could not land. The guard
+# FAILED OPEN when its list was missing: `check_publish` wrapped everything in
+# `[ -r "$never_publish" ]` with no else, `hits` stayed 0, and the push went
+# through with the disclosure printed as if nothing had changed. The quietest way
+# to turn off the only control on the local-to-remote boundary was to rename one
+# file. Reproduced before the fix: with the list moved away, a commit touching
+# `.scuba/state.md` pushed with exit 0.
 #
-# The assertion that would pin it — "with no never-publish list, a push touching a
-# never-publish path is still refused" — is RED against the hook as it stands, so it
-# cannot be added here without also making the fix. It is left to #57 rather than
-# half-done in two places. Everything above runs with the list PRESENT, and stays
-# true either way.
+# The rule this now holds is the one the repository already states elsewhere —
+# `validate-findings.sh`: "the list is empty or missing, so the gate would pass
+# everything — refusing to run". A guard with no policy cannot pass.
+#
+# The cases below are the three ways the policy can be absent, and they are
+# separate because a condition can be loosened past any one of them: the file
+# gone, the file present but unreadable, and the file present with no patterns in
+# it. `-e` instead of `-r` passes the second; a count comparison that is never
+# zero passes the third.
+#
+# Each case asserts the REASON and not only the exit status, which is the part
+# that turned out to matter. Mutating the hook showed that deleting the
+# missing-list precondition leaves the push refused anyway — the pattern count is
+# zero, because a failed redirect means the loop never ran — so an assertion on
+# the exit status alone cannot tell the precondition from its absence. What
+# changes is what the operator is told: "declares no patterns" sends them to read
+# a file that is not there. The two reasons are therefore two assertions.
+#
+# Each one also ends by RESTORING the list and pushing the same commit again. That
+# is what makes the refusal attributable to the missing policy rather than to the
+# commit — without it, a hook that refused every push would pass all three.
+never_publish_list() { printf '%s\n' '# a fixture list' '.scuba/*' > "$R2/.githooks/never-publish"; }
+
+# 1 · the list is gone. The hook reads it from the working tree, so the rename
+# does not even have to be committed — which is why `git ls-files` still finding
+# it, asserted at the top of this section, is not the same question.
+(
+  cd "$R2" || exit 2
+  printf 'ordinary\n' > h.txt
+  git add h.txt && git commit -q -m 'docs: add an ordinary file'
+) >/dev/null 2>&1
+mv "$R2/.githooks/never-publish" "$TMP/stashed-list"
+out="$(push2 origin main)"; rc=$?
+assert_status 1 "$rc" "with no never-publish list, a push is refused"
+assert_contains "$out" "NEVER-PUBLISH" "and the refusal names the guard"
+assert_contains "$out" "no policy" "and says the guard has no policy, rather than passing"
+assert_contains "$out" "missing or unreadable" "and gives the reason as the list, not its contents"
+
+# The same push, with the policy back. Nothing about the commit was the problem.
+never_publish_list
+out="$(push2 origin main)"; rc=$?
+assert_status 0 "$rc" "the same push is accepted once the list is restored"
+
+# 2 · the list is there and cannot be read. Skipped when the chmod does not take,
+# because a test that silently stops testing is worse than one that says so.
+(
+  cd "$R2" || exit 2
+  printf 'ordinary too\n' > i.txt
+  git add i.txt && git commit -q -m 'docs: add another ordinary file'
+) >/dev/null 2>&1
+chmod 000 "$R2/.githooks/never-publish"
+if [ -r "$R2/.githooks/never-publish" ]; then
+  printf '# SKIPPED: an unreadable file is still readable here (running as root?)\n'
+else
+  out="$(push2 origin main)"; rc=$?
+  assert_status 1 "$rc" "with an unreadable never-publish list, a push is refused"
+  assert_contains "$out" "no policy" "and the refusal says the guard has no policy"
+  assert_contains "$out" "missing or unreadable" \
+    "and the reason is the list, not its contents — a present file it cannot read"
+fi
+chmod 644 "$R2/.githooks/never-publish"
+out="$(push2 origin main)"; rc=$?
+assert_status 0 "$rc" "the same push is accepted once the list is readable again"
+
+# 3 · the list is there, readable, and declares no patterns. Commenting out the
+# entries leaves a file that passes `-r` and protects nothing, so the guard has to
+# read what is in it rather than that it exists. The push below touches a
+# never-publish path, so the only reason it could be allowed is the commented-out
+# pattern.
+(
+  cd "$R2" || exit 2
+  mkdir -p .scuba && printf 'state again\n' > .scuba/state.md
+  git add .scuba/state.md && git commit -q -m 'chore: add orchestration state again'
+) >/dev/null 2>&1
+printf '%s\n' '# everything below is commented out' '# .scuba/*' '' \
+  > "$R2/.githooks/never-publish"
+out="$(push2 origin main)"; rc=$?
+assert_status 1 "$rc" "a never-publish list declaring no patterns is refused"
+assert_contains "$out" "no policy" "and the refusal says the guard has no policy"
+assert_contains "$out" "declares no patterns" \
+  "and gives the reason as the contents, not a missing file"
+never_publish_list
+out="$(push2 origin main)"; rc=$?
+assert_status 1 "$rc" "and with the pattern uncommented the same push is refused by the guard"
+assert_contains "$out" "NEVER-PUBLISH: .scuba/state.md" "naming the path, not the policy"
+
+# 4 · the last pattern in the list carries no trailing newline. `read` returns
+# non-zero with the line already in the variable and the loop body is skipped, so
+# the pattern is silently dropped. Written with two patterns, because a list with
+# one would be caught by the no-patterns case above and this is the narrower bug:
+# the policy is read, just not all of it.
+printf '%s\n%s' '.devin/eval/*' '.scuba/*' > "$R2/.githooks/never-publish"
+out="$(push2 origin main)"; rc=$?
+assert_status 1 "$rc" "a list whose last pattern has no trailing newline still refuses"
+assert_contains "$out" "matches '.scuba/*'" "the last pattern is read, not dropped"
+never_publish_list
+( cd "$R2" && git reset -q --hard origin/main ) >/dev/null 2>&1
 
 
 # --- the conventional prefix has to START the subject ---------------------------
