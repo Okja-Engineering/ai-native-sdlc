@@ -31,13 +31,7 @@ Every item from the source artifact appears under a theme or in the outlier list
 
 **A total cannot establish that nothing was dropped.** The first version of this check added theme counts to outlier counts and compared the result to a row count. An external audit broke it two ways: lowercasing a finding's first letter removed it from the denominator (the counter was `grep -cE '^\| [A-Z]'`), and two theme counts could be adjusted in opposite directions with the total still reconciling.
 
-So a cycle declares the ids it accounted for, in a fenced block, and `validate-define.sh` compares it to the source as a **set**:
-
-```markdown
-<!-- accounting:ids -->
-F01 F02 F03 ...
-<!-- /accounting:ids -->
-```
+So a cycle declares the ids it accounted for, in a fenced block, and `validate-define.sh` compares it to the source as a **set**. The shape of that block is declared once, under *Required sections* below, in the form `bin/next.sh` scaffolds — **this section declared it as a worked example instead, until 2026-10-04, and that was the whole reason the scaffold could not produce it.** An example is for a reader; the scaffold reads fields and sections. A scaffolded cycle therefore carried no accounting block at all, and the gate refused its own skeleton with `no-accounting` — the one input it depends on most.
 
 | Refusal | Condition |
 |---|---|
@@ -122,6 +116,20 @@ The most valuable finding in a period is often the one that clusters with nothin
 So an item that fits no theme is surfaced **because** it fits no theme, not despite it. On the first run this section immediately carried the finding most directly useful to how work gets shaped.
 
 An empty outlier list is permitted but must say so explicitly, because an empty one and an omitted one look identical.
+
+### Accounting
+
+**The gate's most load-bearing input, so it is declared here and not as an example.** Every id the source records, in one fenced block, which `validate-define.sh` compares against the source as a set.
+
+```markdown
+<!-- accounting:ids -->
+<!-- scaffold:source-ids -->
+<!-- /accounting:ids -->
+```
+
+`bin/next.sh` emits this block verbatim and replaces `<!-- scaffold:source-ids -->` with the ids the source records, read through `process/01-scan/findings-ids.sh` — the same harvester the gate reads, so the two cannot disagree about which findings exist. Any required section in any contract may declare a skeleton this way; `next.sh` writes *To be written.* for the ones that do not.
+
+**What the scaffold enumerating these does and does not mean.** It is the denominator, not the claim. Transcribing sixty-four ids by hand is the kind of task that produces the error the control exists to catch, and the scaffold knows them exactly. What a person still has to do is put every one of them under a theme or in the outliers, and declare which — and from the next cycle that per-theme declaration is what the set is checked against, not this block.
 
 ### Where this stops
 
