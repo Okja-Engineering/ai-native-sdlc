@@ -80,18 +80,43 @@
 #   process/01-scan/validate-findings.sh 148   a separator row is a row of nothing but
 #     dashes, colons and spaces between pipes. No findings row can be read as one.
 #
-# A REAL HOLE, not closed here. Nineteen sites across four gates, each one a detection
+# A REAL HOLE, not closed here. Fifteen sites across three gates, each one a detection
 # that would accept a mention of the thing instead of the thing: register ids and rows
 # in bin/validate-standards.sh (73, 82, 213), section and heading detection in the scan
-# gate (168, 231, 236, 345), referent and coverage-part detection in the discovery gate
-# (99, 141, 145, 213, 214, 215, 250, 268), and outliers, id harvesting and theme counts
-# in the define gate (49, 53, 85, 109). Three plus four plus eight plus four.
+# gate (168, 231, 236, 345), and referent and coverage-part detection in the discovery
+# gate (99, 141, 145, 213, 214, 215, 250, 268). Three plus four plus eight.
 #
 # That is a body of work comparable to the change that produced this script, across
 # gates it does not otherwise touch, so it is not bundled in here. It is recorded as
-# issue #79: nineteen anchored expressions with no test, each of which would accept a
+# issue #79: fifteen anchored expressions with no test, each of which would accept a
 # mention of the thing instead of the thing — which a clone cannot read, hence the
 # sentence rather than the number alone.
+#
+# The define gate's four are closed. Line numbers rather than identities, because they have
+# moved twice already: this listed them as 49, 53, 85 and 109, the problem gate's change
+# reported the three still bare as 88, 124 and 148, and in the tree you are reading them
+# they are 128, 129 and 235. What each one is, is the stable part:
+#
+#   the outlier section's existence         `grep -q '^## Outliers'`
+#   the outlier count                       `grep -cE '^- \*\*'`, one copy now, two before
+#   the theme counts that are summed        `grep -oE '^\*\*[0-9]+ findings'`
+#   the source's id harvest                 `grep -oE '^\| F[0-9]+ \|'`
+#
+# The first three are covered by `tests/test_validate_define.sh`, against a fixture built
+# by `tests/lib/define-fixture.sh` rather than against the shipped record, and this sweep
+# reports 3 of 3 caught for that target. The fourth no longer exists here: it moved into
+# `process/01-scan/findings-ids.sh`, where it also became scoped to the source's
+# `## Findings` section, and `tests/test_findings_ids.sh` covers it.
+#
+# **That file is outside the denominator below**, which enumerates `validate-*.sh`,
+# `bin/list-refusals.sh` and the two hooks. It is a gate's input rather than a gate, it
+# refuses nothing by code, and the D, T, X and E operators have nothing to act on in it
+# — but operator A does, and a sweep that cannot reach it is a denominator with a hole
+# in it. Whether to widen the surface is a decision about what this script enumerates,
+# which is why it is stated here rather than changed in passing. Its anchors were
+# loosened by hand instead: scoped to unscoped, whole-cell to substring, id cell to any
+# cell, contract-read column to a hardcoded one, and the section exit removed. All five
+# go red.
 # Re-run `tests/mutate-sweep.sh --operator A` to get the current list.
 #
 # exit 0  every mutation was caught
