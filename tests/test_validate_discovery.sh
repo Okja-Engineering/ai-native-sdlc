@@ -320,6 +320,99 @@ printf '\nSee [the problem](../../03-define/problems/agent-pr-approval.md).\n' >
 out="$(gate "$t" "$NEW")"; rc=$?
 assert_status 0 "$rc" "a local link that resolves is accepted"
 
+# --- the verdict comes from the artifact, not from scratch state ----------------
+# The link check used to collect its results in `/tmp/_vd_bad.$$` — the only temp
+# path in the repository not from `mktemp` — and then ask `[ -s ]` about the file.
+# Two ways that reads the wrong thing, both reproduced before this was written:
+#
+#   an unwritable FILE already at the path   the redirect fails, the `while` body
+#                                            never runs, `[ -s ]` is false, and a
+#                                            broken link PASSES. Exit 0.
+#   a DIRECTORY already at the path          `[ -s ]` is true of a directory, so
+#                                            the gate refuses an artifact with no
+#                                            broken link at all, with an empty
+#                                            refusal list. Exit 1. `rm -f` cannot
+#                                            clear it, so it stays for every run.
+#
+# A gate whose answer can be changed by something outside the artifact is not a
+# gate. Both directions are asserted, because a fix that only closed the false
+# pass would leave the false refusal, and the false refusal is the one an operator
+# cannot clear.
+#
+# THE PID IS NOT PREDICTED. `bash -c` gets its own PID, creates the blocker at
+# that PID, and then `exec`s the gate — which keeps the PID, so `$$` inside the
+# gate is exactly the PID the blocker was made for. No guessing and no retry, so
+# this cannot pass by missing. `$BASHPID` would be the direct way to read a
+# subshell's PID and arrived in bash 4.0; /bin/bash on macOS is 3.2.
+#
+# The blocker is created under /tmp because that is where the defect lived. It is
+# removed after every run, and the name carries the PID, so two suites running at
+# once cannot collide.
+BLOCKED_PID_FILE="$TMP/blocked-pid"
+blocked_clean() {
+  local p
+  p="$(cat "$BLOCKED_PID_FILE" 2>/dev/null)"
+  case "$p" in ''|*[!0-9]*) return 0 ;; esac
+  chmod 700 "/tmp/_vd_bad.$p" 2>/dev/null
+  rm -rf "/tmp/_vd_bad.$p"
+}
+trap 'blocked_clean; rm -rf "$TMP"' EXIT
+
+# gate_blocked <file|dir> <tree> <topic>
+gate_blocked() {
+  /bin/bash -c '
+    echo $$ > "$4"
+    case "$1" in
+      file) : > "/tmp/_vd_bad.$$"; chmod 000 "/tmp/_vd_bad.$$" ;;
+      dir)  mkdir -p "/tmp/_vd_bad.$$" ;;
+    esac
+    exec /bin/bash "$2" "$3"
+  ' blocked "$1" "$GATE" "$2/process/02-discover/$3" "$BLOCKED_PID_FILE" 2>&1
+}
+
+# A broken link is still refused with the path taken by a file it cannot write.
+t="$(fresh blockedfile)"
+printf '\nSee [the problem](./nope-does-not-exist.md).\n' >> "$t/process/02-discover/$NEW"
+out="$(gate_blocked file "$t" "$NEW")"; rc=$?
+blocked_clean
+assert_status 1 "$rc" "a broken link is refused even with the old scratch path unwritable"
+assert_contains "$out" "refuse[link-unresolved]" "and the refusal is still the link check"
+assert_contains "$out" "nope-does-not-exist.md" "and still names the link"
+
+# And a sound artifact is not refused with a directory at the same path. This is
+# the false-refusal half: nothing is wrong with this file.
+t="$(fresh blockeddir)"
+out="$(gate_blocked dir "$t" "$NEW")"; rc=$?
+blocked_clean
+assert_status 0 "$rc" "a sound artifact is accepted with a directory at the old scratch path"
+assert_not_contains "$out" "link-unresolved" "and no refusal is invented from the scratch state"
+
+# Both at once: a directory at the path and a genuinely broken link. The refusal
+# has to name the link rather than arrive empty.
+t="$(fresh blockeddirbad)"
+printf '\nSee [the problem](./nope-does-not-exist.md).\n' >> "$t/process/02-discover/$NEW"
+out="$(gate_blocked dir "$t" "$NEW")"; rc=$?
+blocked_clean
+assert_status 1 "$rc" "a broken link is refused with a directory at the old scratch path"
+assert_contains "$out" "nope-does-not-exist.md" "and the refusal names the link, not nothing"
+
+# WHAT IS NOT ASSERTED HERE, and why it is not
+#
+# The obvious wrong repair is a temp file from `mktemp` with the write left
+# unchecked: that closes the predictable-path half and leaves the fail-open. It was
+# written as a mutant and this suite stayed green over all three blocked cases,
+# because the mutant only fails open when the temp area itself is broken.
+#
+# The way to break it would be an unwritable TMPDIR, and that does not work here: a
+# bare `mktemp` on macOS takes its directory from the system rather than from
+# TMPDIR, so `TMPDIR=<unwritable> mktemp` succeeds. A pair of assertions on TMPDIR
+# was written, measured not to catch the mutant, and removed rather than shipped —
+# it would have read as coverage of exactly the case it does not cover.
+#
+# So that mutant is recorded as uncaught instead of papered over. What the three
+# cases above do pin is the property the defect actually violated: nothing outside
+# the artifact can change the verdict.
+
 # --- the gate must not pretend to check what it cannot ------------------------
 # The contract named four checks. Two are not mechanisable without a claim
 # convention the artifacts do not have, and one is deliberately omitted. If a
