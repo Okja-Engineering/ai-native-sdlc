@@ -279,21 +279,19 @@ The sentence below was run against the repaired gate on 2026-10-03 and **passes*
 
 Both names resolve, so the part names things, and the sentence denies checking them. Nothing mechanical closes that, which is why the repaired gate is written as *names a referent* rather than as *was verified*. A reader is still the only check on whether a coverage part is true. What has changed is narrower and worth stating exactly: a part naming nothing at all is now refused however it is punctuated, where before two commas were enough.
 
-**12. A gate refuses on the authority of a document nobody accepted.** [`bin/validate-claims.sh`](bin/validate-claims.sh) enforces the rule against speed and velocity claims and names [`intent.md`](intent.md) as the authority when it refuses. `intent.md` is marked *draft, unaccepted*, and six other tracked files cite it as binding; its status line now lists all seven. So a reviewer asking what authorized a refusal is told the root document is a draft nobody accepted.
+**12. Whether the documents are true.** This is the limit of the two checks added on 2026-10-03, and it is worth stating exactly because the checks are easy to read as more than they are.
 
-Stated rather than closed, for one reason: accepting `intent.md` is a decision by a named decider under [`DECIDERS.md`](DECIDERS.md), and an agent writing "accepted" into a status line would be item 10's defect wearing different clothes — a document asserting a state nothing produced. The check that would close it is *no gate names a document that declares itself unaccepted*. It cannot pass until the decider acts, which is the same position `bin/validate-authorship.sh` is in, so it is written down here and not added.
-
-**13. Whether the documents are true.** This is the limit of the two checks added on 2026-10-03, and it is worth stating exactly because the checks are easy to read as more than they are.
-
-`tests/test_doc_claims.sh` and `tests/test_controls.sh` catch **two specific mechanical contradictions** between a document and the repository:
+`tests/test_doc_claims.sh` and `tests/test_controls.sh` catch **three specific mechanical contradictions** between a document and the repository:
 
 - a line asserting that a path or a **phase** this repository has does not exist, and a transcribed git measurement with no command above it to reproduce it
 - a sentence in `CONTROLS.md` or `SOURCES.md` claiming a named gate refuses something, where the refusal it names is not one that gate emits
+- a document a gate cites as authority whose own status line declares it unaccepted, which would leave a refusal resting on nothing
 
-That is the whole of it. **The documents are not otherwise verified, and nothing mechanical does that.** Three known gaps in the two checks, each probed deliberately rather than assumed:
+That is the whole of it. **The documents are not otherwise verified, and nothing mechanical does that.** Four known gaps, each probed deliberately rather than assumed:
 
 - **An absence claim with a long qualifier escapes.** The phase has to sit within about forty characters of the claim, because that window is what distinguishes the subject of a sentence from a mention elsewhere in it. *"Define, the convergent half of the first diamond that groups every finding, does not exist"* passes. Widening the window brings four true sentences back in as false positives, including this document's own note about the Update stage that was genuinely never built.
 - **An absence claim that does not name the phase escapes.** *"the next stage ... does not exist yet"* and *"the phase that owns that decision does not exist yet"* were two of the three survivors, and neither names what it means. Both are corrected by hand. A check for an unnamed referent would fire on honest prose about something that really is not built.
 - **A true-looking claim that cites a real refusal for the wrong condition escapes.** The check establishes that a named refusal is one the gate emits, not that the gate emits it for the reason the sentence gives.
+- **A document with no status line at all is not checked for acceptance.** The check reads a declaration and refuses one that says *unaccepted*; a document that never declares a state has nothing to contradict. So it establishes that a gate's authority does not call itself a draft, not that anybody accepted it.
 
 Everything else a document asserts — that a number is right, that a description matches what a script does, that a limitation bounds a claim the way it says — is a reader's job and is not covered.
