@@ -361,11 +361,63 @@ assert_eq "9 before 10 " "$(out_of_order "$TMP/jumbled.md")" \
 printf '## What is not controlled\n\n**1. One.**\n\n**1b. One b.**\n\n**2. Two.**\n' > "$TMP/subitem.md"
 assert_eq "" "$(out_of_order "$TMP/subitem.md")" "a lettered sub-item is not read as out of order"
 
+# --- the document claims only what the check proves ---------------------------
+# The smaller half of the drift repair and the more important one. `CONTROLS.md:3`
+# tells an assessor to start here, and the paragraph at the top is what invites them
+# to trust the rest. It said a control "cannot drift from its enforcement" while the
+# check behind it was a substring search over every gate at once, which is the
+# sentence an assessor would have used to shortcut the audit.
+#
+# Wording rather than structure, and deliberately so: there is no mechanical check
+# for "this paragraph describes what the script does", which is the same gap item 13
+# records about every Condition column in the document.
+doc="$(cat "$DOC")"
+assert_not_contains "$doc" "a control cannot drift from its enforcement" \
+  "it no longer claims a control cannot drift from its enforcement"
+assert_contains "$doc" "It checks the wiring, not the claim" \
+  "it says what the check establishes and what it does not"
+for d in Forward Backward Sideways; do
+  assert_contains "$doc" "- **$d.**" "it states the $d direction the gate checks"
+done
+assert_contains "$doc" "## Refusals and gates no control covers" \
+  "the deliberate exceptions are a visible section, not a silent skip"
+
+# The limits are in the section an assessor is told to read first, not only at the top.
+# The item that already owned the limit of the document checks is where they go, rather
+# than a parallel item nobody would find.
+#
+# Found by its HEADING, not by its number. The first version of this block read
+# `sed -n '/^\*\*13\./,/^\*\*14\./p'` and went stale the same day, when another change
+# deleted an earlier item and renumbered this one from 13 to 12. That is the defect this
+# suite already records one section down: an assertion pinned to a position rather than
+# to the thing it is about.
+item_body() { # <document> <heading text> -> the item's lines
+  awk -v h="$2" '
+    /^\*\*[0-9]+[a-z]?\./ { on = (index($0, h) > 0) }
+    on { print }
+  ' "$1"
+}
+limits="$(item_body "$DOC" "Whether the documents are true")"
+[ -n "$limits" ] && found=yes || found=no
+assert_eq "yes" "$found" "the not-controlled section carries the item about the document checks"
+assert_contains "$limits" "Condition column" \
+  "it says the check does not read the condition behind a code"
+assert_contains "$limits" "naming several scripts is satisfied by any one" \
+  "it records that a multi-script control is satisfied by one of them"
+assert_contains "$limits" "including ones added later" \
+  "it records how broad a gate-level exception is"
+assert_contains "$limits" "not detectable" \
+  "it records that a fabricated code in prose cannot be caught"
+
+# And the extraction has to bound. An item's body must not run into the next item, or
+# every assertion above passes against text belonging to something else.
+assert_not_contains "$limits" "Why any individual engineering change was made" \
+  "the item body stops at the next item"
+
 # --- it must not claim compliance ---------------------------------------------
 # The one assertion here that is about wording rather than structure. A control
 # document that drifts into claiming an audit it has not had is the specific
 # dishonesty worth guarding, and it is cheap to catch the direct forms.
-doc="$(cat "$DOC")"
 assert_not_contains "$doc" "SOC 2 compliant" "it does not claim SOC 2 compliance"
 assert_not_contains "$doc" "SOC 2 certified" "it does not claim SOC 2 certification"
 assert_not_contains "$doc" "fully audited" "it does not claim to be audited"
