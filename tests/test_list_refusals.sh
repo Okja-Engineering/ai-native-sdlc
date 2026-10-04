@@ -3,7 +3,7 @@
 #
 # Two things depend on that answer and have to get the same one:
 # bin/validate-controls.sh, which binds a cited code to the gate its control
-# names, and tests/mutate-sweep.sh, which mutates every site by line number. When
+# names, and a mutation sweep that mutates every site by line number. When
 # they disagree, a guard can be invisible to both at once — which is how the `id`
 # refusal in the scan gate reached production with no test.
 #
