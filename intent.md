@@ -1,8 +1,8 @@
 # Intent
 
-**Status:** draft, unaccepted — **and that no longer matches how this document is used.** Accepting it is a decision, which under [`DECIDERS.md`](DECIDERS.md) belongs to a named person and is not an agent's to make. So this records the discrepancy instead of resolving it.
+**Status:** accepted 2026-10-03 by Matthew Van Dusen.
 
-Seven tracked files cite this document as the authority for a rule they enforce or a choice they justify:
+**What rests on this.** Seven tracked files cite this document as the authority for a rule they enforce or a choice they justify, and one of them is a gate:
 
 | Citing it | What it takes from here |
 |---|---|
@@ -13,10 +13,6 @@ Seven tracked files cite this document as the authority for a rule they enforce 
 | [`process/04-develop/options/producing-themes.md`](process/04-develop/options/producing-themes.md) | the failure where a cycle quietly stops being run and leaves no trace |
 | [`process/05-deliver/decisions/producing-themes.md`](process/05-deliver/decisions/producing-themes.md) | that same failure, and the classifier rule as a reason to reject one option |
 | [`process/05-deliver/decisions/agent-pr-approval.md`](process/05-deliver/decisions/agent-pr-approval.md) | that no throughput claim appears here, as why one option's usual cost does not apply |
-
-[`spec.md`](spec.md) carried this same framing — *"draft, unaccepted. Nothing downstream of this is authorized."* — and its status line records that it **stopped being true**. It was replaced for `spec.md` and not here. The case here is stronger, because a gate refuses on this document's authority.
-
-**Two ways to resolve it, both the decider's.** Accept it, which means a status line saying so with a date and the name of whoever accepted it. Or stop citing it as authority, which means moving the rules above into documents that are accepted. Writing "accepted" here without anyone having accepted it would be the same defect as the git identity column in `DECIDERS.md`: a document asserting a state nothing produced.
 
 ## Why this exists
 

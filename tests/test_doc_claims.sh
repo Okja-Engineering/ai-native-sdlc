@@ -299,6 +299,97 @@ printf '| Name | git identity |\n| Ada | `Ada <ada@example.invalid>` |\n' > "$TM
 assert_eq "" "$(grep -E "$TALLY" "$TMP/table.md" || true)" \
   "a markdown table row naming an address is not read as a tally"
 
+# --- a document a gate cites as authority does not declare itself unaccepted ---
+# A gate that refuses names the document whose rule it is enforcing, so a reader
+# asking what authorized the refusal is sent there. If that document's own status
+# line says nobody accepted it, the refusal rests on nothing and the reader is
+# told so by the document itself. This was `CONTROLS.md` item 12 until the owner
+# accepted `intent.md`, and that item named this as the check that closes it.
+#
+# Scoped to the documents the gates actually name. Every other file in the
+# repository is free to be a draft; what a gate points at is not.
+gate_scripts="$(ls bin/validate-*.sh process/*/validate-*.sh 2>/dev/null)"
+
+# The documents those gates name, resolved to real paths. A gate writes a
+# document three ways — repo-relative, relative to itself, or through a variable
+# — so each token is tried as a path from the root and as one from the gate's own
+# directory. A variable prefix such as `$ROOT/` or `$SCRIPT_DIR/` survives the
+# token pattern as an upper-case first component and is not part of the path.
+#
+# `\n` in a refusal message is glued to the filename after it, which is how
+# `bin/validate-claims.sh` names its authority: `printf '\nintent.md: ...'`. The
+# escape is separated before tokens are read, or the one citation this check
+# exists for reads as `nintent.md` and resolves to nothing.
+#
+# A token that resolves to no file is dropped rather than reported. Whether every
+# path a gate mentions exists is a different check and the suite already has it.
+gate_documents() {
+  local g gdir t p
+  for g in $gate_scripts; do
+    gdir="$(dirname "$g")"
+    for t in $(sed 's/\\n/ /g' "$g" \
+               | grep -oE '[A-Za-z0-9_./-]+\.md' \
+               | sed -E 's|^[A-Z][A-Z_]*/||' | sort -u); do
+      for p in "$t" "$gdir/$t"; do
+        [ -f "$p" ] && { printf '%s\n' "$p"; break; }
+      done
+    done
+  done | sort -u
+}
+
+# The forms that declare a document unaccepted. Narrow on purpose, like the
+# absence phrases above: a status line is a short declaration, not free prose.
+UNACCEPTED='unaccepted|not accepted|nobody accepted|awaiting acceptance'
+
+# One predicate, used for the sweep and for the fixtures, so a fixture proves the
+# decision the sweep makes rather than a second copy of it.
+#
+# A quoted span is dropped before matching. Quoting a superseded status in order
+# to retire it is not declaring it, and `spec.md` does exactly that: its status
+# line carries *"draft, unaccepted. Nothing downstream of this is authorized."*
+# and then says that stopped being true. Same shape as the Annotated exemption.
+#
+# Only the status line is read. A document that discusses acceptance in its body
+# is describing something; the status line is where it declares its own state.
+declares_itself_unaccepted() { # <document> -> 0 when it does
+  grep -m1 -E '^\*\*Status:\*\*' "$1" 2>/dev/null \
+    | sed 's/"[^"]*"//g' | grep -qiE "$UNACCEPTED"
+}
+
+unaccepted_authorities=""
+for d in $(gate_documents); do
+  declares_itself_unaccepted "$d" && unaccepted_authorities="$unaccepted_authorities $d"
+done
+assert_eq "" "${unaccepted_authorities# }" \
+  "no document a gate cites as authority declares itself unaccepted"
+
+# --- the check must be able to fail ------------------------------------------
+printf '# D\n\n**Status:** draft, unaccepted. Nothing downstream is authorized.\n' \
+  > "$TMP/unaccepted.md"
+declares_itself_unaccepted "$TMP/unaccepted.md" && fires=yes || fires=no
+assert_eq "yes" "$fires" "the detection fires on a status line declaring itself unaccepted"
+
+printf '# D\n\n**Status:** accepted 2026-10-03 by Someone Named.\n' > "$TMP/accepted.md"
+declares_itself_unaccepted "$TMP/accepted.md" && fires=yes || fires=no
+assert_eq "no" "$fires" "an accepted status line passes"
+
+# The quoting exemption is load-bearing, so prove it bounds in both directions.
+printf '# D\n\n**Status:** this said "draft, unaccepted" once. That stopped being true.\n' \
+  > "$TMP/quoted.md"
+declares_itself_unaccepted "$TMP/quoted.md" && fires=yes || fires=no
+assert_eq "no" "$fires" "a status line quoting a superseded declaration is not making one"
+
+printf '# D\n\n**Status:** "derived from one artifact", and unaccepted.\n' \
+  > "$TMP/quoted-and-declared.md"
+declares_itself_unaccepted "$TMP/quoted-and-declared.md" && fires=yes || fires=no
+assert_eq "yes" "$fires" "a quote elsewhere on the line does not exempt a declaration"
+
+# --- and the enumeration is not empty ----------------------------------------
+# If no document resolved, the sweep above would pass without looking at one.
+nd="$(gate_documents | grep -c .)"
+[ "$nd" -ge 5 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "the gates resolve to documents to check (found $nd)"
+
 # --- the paths list is not empty ---------------------------------------------
 # If the enumeration returned nothing the loop above would pass everything.
 np="$(printf '%s\n' "$paths" | grep -c .)"
