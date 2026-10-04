@@ -117,6 +117,7 @@
 | `silent-empty-outliers` | the section lists nothing and does not say it is empty |
 | `no-source` | the record links no source artifact |
 | `source-unresolved` | the declared source does not resolve |
+| `source-is-example` | the declared source is marked `example: yes`, so it is not a real scan |
 
 **Evidence.** The counts reconcile against the source artifact, which is linked and resolvable. This control caught a real defect before it was mechanised: a draft that grouped 54 of 64 findings and reported three wrong counts, where the ten strays included a pattern nobody had named.
 
@@ -127,6 +128,7 @@
 **What it does not cover.**
 
 - **What the scan was supposed to contain.** This is the honest limit of the whole control, and it is worth stating plainly rather than leaving in the shape of the refusal list. **The denominator is anchored to what the scan recorded. Nothing anchors it to the world.** A scan that never saw a thing cannot be shown to have missed it, and `findings-contract.md` already carries that limit for stage 1. What the declared count adds is narrower and real: dropping a finding now takes a coordinated edit to two dated records instead of one, because the count the Define cycle declares is in a different file from the table it counts. A tamperer who edits both still reconciles, and the gate passes. Nothing mechanical closes that.
+- **A findings file marked as an example before anything reads it.** `source-is-example` fires on the contradiction between the marker and a cycle that depends on the file, which is the case an external audit used to erase a month's record. A file marked before any cycle reads it leaves nothing to contradict, and the scan's anchor — which skips examples — is an instruction a person follows rather than code, so there is no gate to put a refusal in.
 - **A finding moved between themes.** Moving a count from one theme to another leaves the set unchanged and still reconciles. That is a count-accuracy defect rather than a dropping defect, and closing it needs per-theme ids — required by `define-contract.md` from the next cycle. Cycle `2026-09-29` predates ids and recorded counts only, so its membership is not recoverable and its artifact says so rather than reconstructing a mapping nobody made.
 - **Whether the grouping is useful.** Accounting for every item says nothing about whether the themes are the right themes.
 

@@ -129,8 +129,21 @@ main() {
     cycle_report "$c"
   done
 
+  # Announcing the skip was the previous repair and it is not enough on its own.
+  # What a reader was told is that a file is an example; what actually happened is
+  # that a cycle's themes, its problems and its two decisions left the report. So
+  # the Define cycles reading the file are named, because that is the
+  # contradiction: a worked example cannot be a real cycle's source.
+  # process/03-define/validate-define.sh refuses it. This says it.
   for s in $skipped; do
     printf '\n%s\n%sskipped     marked `example: yes`, so not reported as a cycle\n' "$s" "$no"
+    local deps=""
+    for d in process/03-define/cycles/*.md; do
+      [ -f "$d" ] || continue
+      grep -q "findings/$s\.md" "$d" 2>/dev/null && deps="$deps $(basename "$d" .md)"
+    done
+    [ -z "$deps" ] || printf '%s   define    cycle(s)%s reads it — a worked example cannot be a real source\n' \
+      "$miss" "$deps"
   done
 
   if [ -n "$want" ] && [ "$found" -eq 0 ]; then
