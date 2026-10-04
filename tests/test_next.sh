@@ -358,5 +358,28 @@ assert_eq "<!-- theme:ids -->" "$marker" \
 assert_eq "yes" "$any" "and the marker was read from the contract, not assumed"
 assert_contains "$(cat "$made")" "$marker" \
   "and a scaffolded cycle carries it"
+# --- a decision carries an expiry --------------------------------------------
+# The only open decision in the repository expires on a date that lived in one
+# prose sentence. Six required fields and none of them was an expiry or a review
+# date, so nothing could read the condition the decision set for itself.
+#
+# The field name is read OUT OF the Deliver contract rather than written twice.
+# What this asserts is the chain: the contract declares it, the scaffold produces
+# it, and bin/next.sh needed no edit for either.
+deliver="$ROOT/process/05-deliver/deliver-contract.md"
+exp="$(sed -n '/^## Required fields$/,/^## /p' "$deliver" \
+  | sed -n 's/^| `\([a-z_ ]*\)` *|.*when this decision expires.*/\1/p' | head -1)"
+assert_eq "expires" "$exp" "a decision's field table declares when the decision expires"
+[ -n "$exp" ] && any=yes || any=no
+assert_eq "yes" "$any" "and the field name was read from the contract, not assumed"
+
+t="$(fresh expiry)"
+rm -f "$t/process/05-deliver/decisions/producing-themes.md"
+out="$(run "$t" 2026-09-29 producing-themes)"; rc=$?
+assert_status 0 "$rc" "scaffolding a decision exits 0"
+made="$t/process/05-deliver/decisions/producing-themes.md"
+assert_file_exists "$made" "the decision skeleton exists"
+assert_contains "$(cat "$made")" "$exp:" \
+  "and it carries the expiry field, so a decision has somewhere to set its own tripwire"
 
 assert_done
