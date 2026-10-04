@@ -426,6 +426,16 @@ if [ "$refusals" -ne 0 ]; then
   exit 1
 fi
 
+# A run that read no file does not get to report conformance. This printed the
+# first-run note AND "0 files within the contract" on the same run, and the second
+# line declares every file it never read to be within the contract. The note is the
+# honest half and stays; the claim goes. The other three process gates made the
+# same claim with no note at all.
+if [ "$checked" -eq 0 ]; then
+  printf 'validate-findings: nothing was checked\n'
+  exit 0
+fi
+
 printf 'validate-findings: %d %s within the contract\n' \
   "$checked" "$(plural "$checked" file files)"
 exit 0

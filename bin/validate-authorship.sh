@@ -75,7 +75,24 @@ fi
 range="HEAD"
 [ -n "$SINCE" ] && range="$SINCE..HEAD"
 
-commits="$(git log --format='%H' "$range" -- 'process/05-deliver/decisions/*.md' 2>/dev/null)"
+# A FAILED `git log` MUST NOT READ AS "NO COMMITS".
+#
+# `2>/dev/null` here swallowed the difference between "this range holds no decision
+# commit" and "this range does not exist". Measured against the real history, which
+# this gate refuses four times when asked properly:
+#
+#   bin/validate-authorship.sh nosuchref
+#     -> validate-authorship: 0 decision-setting commit(s), each attributable to a
+#        declared decider                                              exit 0
+#
+# A typo in the argument turned the gate off and reported the thing it exists to
+# refuse. Same shape as validate-claims.sh reading a pattern that would not compile
+# as a clean tree, which this repository already fixed once and wrote down.
+if ! commits="$(git log --format='%H' "$range" -- 'process/05-deliver/decisions/*.md' 2>/dev/null)"; then
+  printf 'validate-authorship: could not read the history for %s, so nothing was checked — is %s a ref in this repository?\n' \
+    "$range" "${SINCE:-HEAD}" >&2
+  exit 2
+fi
 checked=0
 
 for c in $commits; do

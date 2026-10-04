@@ -73,6 +73,18 @@ out="$(bash "$GATE" "$(record pending '' '')" 2>&1)"; rc=$?
 assert_status 0 "$rc" "a pending record with nobody named exits 0"
 assert_contains "$out" "within the contract" "pending is reported as within the contract"
 
+# --- a run that read nothing does not report conformance -----------------------
+# Over an empty decisions directory this said "0 file(s) within the contract" and
+# exited 0: no record was read, and the gate reported every one of them within the
+# contract. CI runs this gate with no arguments. An empty phase stays exit 0, as the
+# scan gate already settled; the claim is what changes.
+mkdir -p "$TMP/no-decisions"
+out="$(DECISIONS_DIR="$TMP/no-decisions" bash "$GATE" 2>&1)"; rc=$?
+assert_status 0 "$rc" "an empty decisions directory is not a refusal"
+assert_contains "$out" "nothing was checked" "but the gate says it read nothing"
+assert_not_contains "$out" "within the contract" \
+  "and does not report files within the contract when it read none"
+
 # --- the gate the contract named ---------------------------------------------
 out="$(bash "$GATE" "$(record A '' 2026-10-01)" 2>&1)"; rc=$?
 assert_status 1 "$rc" "chosen without a decider exits 1"
@@ -268,6 +280,220 @@ cp "$TMP/STANDARD.bak" "$TMP/STANDARD.md"
 out="$(bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01)" 2>&1)"; rc=$?
 assert_status 0 "$rc" "a reciprocated link is accepted once restored"
 
+# --- one document, amended more than once ------------------------------------
+# STANDARDS.md is THE document decisions amend, and it already carried one
+# amendment. The back-link was read with `head -1`, so the SECOND correctly
+# formed amendment was refused — with a message accusing a correct pair of
+# disagreeing — and no further decision could ever land on that document.
+#
+# The invariant is that reciprocity holds between a decision and the claim its
+# `amends:` names. Nothing below says how the gate finds the back-link, so a
+# rewrite using a different mechanism has to pass these too.
+MANY="$TMP/MANY.md"
+
+# amendment <n> [anchor] -> a record amending claim <n> of MANY.md, path on stdout
+#
+# The anchor defaults to the claim the record is about. Pass another one to point
+# the record at a different claim, or NONE for a link carrying no anchor at all.
+amendment() {
+  local anchor="${2-claim-$1}" link
+  case "$anchor" in
+    NONE) link="../../../MANY.md" ;;
+    *)    link="../../../MANY.md#$anchor" ;;
+  esac
+  cat > "$TMP/process/05-deliver/decisions/d$1.md" <<EOF
+# Decision — d$1
+
+problem: [p](../../03-define/problems/thing.md)
+options: [o](../../04-develop/options/thing.md)
+chosen: A
+decided_by: Ada Lovelace
+dated: 2026-10-01
+amends: [\`MANY.md\` claim $1]($link)
+EOF
+  printf '%s' "$TMP/process/05-deliver/decisions/d$1.md"
+}
+
+# many_doc <n>... -> MANY.md carrying claim <n> and its back-link, in the order given
+many_doc() {
+  printf '# Many claims\n' > "$MANY"
+  for n in "$@"; do
+    printf '\n## Claim %s\n\nSomething.\n\ndecided: [d%s](process/05-deliver/decisions/d%s.md)\n' \
+      "$n" "$n" "$n" >> "$MANY"
+  done
+}
+
+many_doc 1 2
+out="$(bash "$GATE" "$(amendment 1)" "$(amendment 2)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "two decisions amending one document both pass"
+assert_not_contains "$out" "amends-not-reciprocated" "neither correct pair is accused of disagreeing"
+
+# Order must not decide it. This is the half `head -1` got right by accident.
+many_doc 2 1
+out="$(bash "$GATE" "$(amendment 1)" "$(amendment 2)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "and both pass with the back-links in the other order"
+
+many_doc 1 2 3
+out="$(bash "$GATE" "$(amendment 1)" "$(amendment 2)" "$(amendment 3)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "a third amendment on the same document passes as well"
+
+# Reading every back-link must not become "any back-link will do". Claim 3 is
+# present and carries a link to a different record, so the record under test is
+# named by nothing.
+many_doc 1 2
+printf '\n## Claim 3\n\nSomething.\n\ndecided: [d1](process/05-deliver/decisions/d1.md)\n' >> "$MANY"
+out="$(bash "$GATE" "$(amendment 3)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a record that no back-link names is still refused"
+assert_contains "$out" "refuse[amends-not-reciprocated]" "the refusal is amends-not-reciprocated"
+
+# --- reciprocity holds on the claim, not merely on the file -------------------
+# `amends:` names a claim through its #anchor, and the anchor was stripped before
+# the comparison. So deleting a claim's back-link and re-inserting the identical
+# `decided:` line in a different claim — while `amends:` still named the first —
+# passed. The gate established that two documents pointed at each other, not that
+# they pointed at the same claim.
+#
+# The invariant: the back-link has to sit inside the claim `amends:` names.
+cat > "$MANY" <<'DOC'
+# Many claims
+
+## Claim 1
+
+Something.
+
+## Claim 2
+
+Something else.
+
+decided: [d1](process/05-deliver/decisions/d1.md)
+DOC
+out="$(bash "$GATE" "$(amendment 1)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a back-link in a different claim than amends: names is refused"
+assert_contains "$out" "refuse[amends-not-reciprocated]" "the refusal is amends-not-reciprocated"
+assert_contains "$out" "not inside the claim" "the message says the back-link is in the wrong claim"
+
+# The same file, the same pair, the back-link moved into the claim that was
+# amended. Nothing else differs, so this is the one fact under test.
+cat > "$MANY" <<'DOC'
+# Many claims
+
+## Claim 1
+
+Something.
+
+decided: [d1](process/05-deliver/decisions/d1.md)
+
+## Claim 2
+
+Something else.
+DOC
+out="$(bash "$GATE" "$(amendment 1)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "and the same pair passes once the back-link sits in that claim"
+
+# A claim includes its subsections. A back-link under a deeper heading inside the
+# claim has not left it, and refusing that would push authors into flattening a
+# document to satisfy a gate.
+cat > "$MANY" <<'DOC'
+# Many claims
+
+## Claim 1
+
+Something.
+
+### Why this changed
+
+decided: [d1](process/05-deliver/decisions/d1.md)
+
+## Claim 2
+
+Something else.
+DOC
+out="$(bash "$GATE" "$(amendment 1)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "a back-link under a subsection of the named claim reciprocates"
+
+# An anchor the document carries no heading for. `amends:` then names a claim
+# that does not exist, which is a refusal and not an empty section to search.
+many_doc 1 2
+out="$(bash "$GATE" "$(amendment 1 claim-9)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "an anchor no heading in the document carries is refused"
+assert_contains "$out" "refuse[amends-claim-unresolved]" "the refusal is amends-claim-unresolved"
+
+# An anchor present in neither half: the record names it and the document has no
+# such heading, so there is nothing for the pair to agree about.
+out="$(bash "$GATE" "$(amendment 1 'a-claim-nobody-wrote')" 2>&1)"; rc=$?
+assert_status 1 "$rc" "an anchor in neither document is refused"
+assert_contains "$out" "refuse[amends-claim-unresolved]" "and it is the same refusal"
+
+# No anchor at all. Without one the record names a document rather than a claim,
+# and the section-level check could be switched off by leaving the anchor out —
+# which is the denylist shape: a control an author disables by omission.
+out="$(bash "$GATE" "$(amendment 1 NONE)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "amends: naming a document and no claim within it is refused"
+assert_contains "$out" "refuse[amends-no-claim]" "the refusal is amends-no-claim"
+
+# The anchor is matched against the headings the document actually has, so a
+# heading whose text differs only in punctuation and case still resolves. These
+# are the forms a forge generates and an author pastes.
+cat > "$MANY" <<'DOC'
+# Many claims
+
+## 7. Learning has to improve the generating system
+
+Something.
+
+decided: [d1](process/05-deliver/decisions/d1.md)
+DOC
+out="$(bash "$GATE" "$(amendment 1 '7-learning-has-to-improve-the-generating-system')" 2>&1)"; rc=$?
+assert_status 0 "$rc" "a numbered heading with punctuation resolves to its forge anchor"
+
+# A back-link shown as an EXAMPLE does not reciprocate. Found by attacking this
+# check after it was written. The same class has already cost this repository
+# once: an example row in a fenced block in DECIDERS.md would have authorized
+# everyone it named, which is why the deciders list skips fences.
+cat > "$MANY" <<'DOC'
+# Many claims
+
+## Claim 1
+
+This is what a back-link looks like:
+
+```
+decided: [d1](process/05-deliver/decisions/d1.md)
+```
+DOC
+out="$(bash "$GATE" "$(amendment 1)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a back-link inside a fenced example does not reciprocate"
+assert_contains "$out" "refuse[amends-not-reciprocated]" "the refusal is amends-not-reciprocated"
+
+# A heading inside a fence is not a heading, so an anchor cannot resolve to one.
+cat > "$MANY" <<'DOC'
+# Many claims
+
+Example of a claim:
+
+```
+## Claim 1
+
+decided: [d1](process/05-deliver/decisions/d1.md)
+```
+DOC
+out="$(bash "$GATE" "$(amendment 1)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "an anchor cannot resolve to a heading inside a fenced example"
+assert_contains "$out" "refuse[amends-claim-unresolved]" "the refusal is amends-claim-unresolved"
+
+# Two decisions amending the SAME claim. The claim then carries two back-links and
+# each record has to find its own.
+cat > "$MANY" <<'DOC'
+# Many claims
+
+## Claim 1
+
+decided: [d1](process/05-deliver/decisions/d1.md)
+decided: [d2](process/05-deliver/decisions/d2.md)
+DOC
+out="$(bash "$GATE" "$(amendment 1)" "$(amendment 2 claim-1)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "two decisions amending one claim both pass"
+
 # --- the stated problem must be linked ---------------------------------------
 # `problem:` was a required field in the contract and nothing read it. Deleting
 # the line left the gate reporting the record within the contract, so the
@@ -316,5 +542,140 @@ assert_status 0 "$rc" "the record that amends STANDARDS.md is within the contrac
 assert_contains "$(cat "$ROOT/DECIDERS.md")" \
   "$(sed -n 's/^decided_by:[[:space:]]*//p' "$ROOT/process/05-deliver/decisions/agent-pr-approval.md" | head -1)" \
   "the real decider list names the person the real record names"
+
+
+# --- a missing option set is named once, not twice -----------------------------
+# Found by tests/mutate-sweep.sh, by loosening `-eq 1` to `-ge 0` on the guard that
+# skips resolution when there is nothing to resolve. The gate then tried to resolve
+# an empty path and added `options-unresolved` on top of `no-options-link`: two
+# refusals naming two different problems where the record has one. The existing
+# assertion on `no-options-link` passes either way, which is why nothing caught it.
+#
+# This gate's own sibling already records what that costs a reader. The scan gate's
+# header describes an index shifted by one producing "four confident refusals that
+# each named the wrong problem".
+{
+  printf '%s\n\n' '# Decision — thing'
+  printf '%s\n' 'problem: [p](../../03-define/problems/thing.md)'
+  printf 'chosen: %s\n' 'A'
+  printf 'decided_by: %s\n' 'Ada Lovelace'
+  printf 'dated: %s\n' '2026-10-01'
+  printf 'amends: %s\n' '[s](../../../STANDARD.md#a-standard)'
+} > "$TMP/process/05-deliver/decisions/thing.md"
+assert_eq "0" "$(grep -c '^options:' "$TMP/process/05-deliver/decisions/thing.md")" \
+  "the fixture declares no option set"
+out="$(bash "$GATE" "$TMP/process/05-deliver/decisions/thing.md" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a decided record declaring no option set exits 1"
+assert_contains "$out" "refuse[no-options-link]" "and the refusal is no-options-link"
+assert_not_contains "$out" "refuse[options-unresolved]" \
+  "and the gate does not also refuse an option set it was never given"
+
+# --- the gate with no arguments reads the decisions directory ------------------
+# Found by tests/mutate-sweep.sh, by loosening `-gt 0` to `-ge 0` on the argument
+# count. The gate then took the "files were named" branch with nothing named, looped
+# over nothing, and reported "0 file(s) within the contract" and exit 0. CI runs this
+# gate with no arguments, so that is the gate this repository says guards the one
+# thing that cannot be reconstructed afterwards, reporting clean having read nothing.
+#
+# DECIDERS_FILE is unset for this call. The rest of the suite supplies its own decider
+# list on purpose, and here the point is the real records against the real list.
+out="$(cd "$ROOT" && unset DECIDERS_FILE && bash process/05-deliver/validate-decision.sh 2>&1)"
+rc=$?
+assert_status 0 "$rc" "the gate with no arguments passes over the real decision records"
+assert_not_contains "$out" "0 file(s)" "and does not report having checked nothing"
+nrec="$(ls "$ROOT"/process/05-deliver/decisions/*.md 2>/dev/null | grep -c .)"
+assert_contains "$out" "$nrec file(s)" "it checked every decision record (found $nrec)"
+
+
+# --- a missing option set is named once, not twice -----------------------------
+# Found by tests/mutate-sweep.sh, by loosening `-eq 1` to `-ge 0` on the guard that
+# skips resolution when there is nothing to resolve. The gate then tried to resolve
+# an empty path and added `options-unresolved` on top of `no-options-link`: two
+# refusals naming two different problems where the record has one. The existing
+# assertion on `no-options-link` passes either way, which is why nothing caught it.
+#
+# This gate's own sibling already records what that costs a reader. The scan gate's
+# header describes an index shifted by one producing "four confident refusals that
+# each named the wrong problem".
+{
+  printf '%s\n\n' '# Decision — thing'
+  printf '%s\n' 'problem: [p](../../03-define/problems/thing.md)'
+  printf 'chosen: %s\n' 'A'
+  printf 'decided_by: %s\n' 'Ada Lovelace'
+  printf 'dated: %s\n' '2026-10-01'
+  printf 'amends: %s\n' '[s](../../../STANDARD.md#a-standard)'
+} > "$TMP/process/05-deliver/decisions/thing.md"
+assert_eq "0" "$(grep -c '^options:' "$TMP/process/05-deliver/decisions/thing.md")" \
+  "the fixture declares no option set"
+out="$(bash "$GATE" "$TMP/process/05-deliver/decisions/thing.md" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a decided record declaring no option set exits 1"
+assert_contains "$out" "refuse[no-options-link]" "and the refusal is no-options-link"
+assert_not_contains "$out" "refuse[options-unresolved]" \
+  "and the gate does not also refuse an option set it was never given"
+
+# --- the gate with no arguments reads the decisions directory ------------------
+# Found by tests/mutate-sweep.sh, by loosening `-gt 0` to `-ge 0` on the argument
+# count. The gate then took the "files were named" branch with nothing named, looped
+# over nothing, and reported "0 file(s) within the contract" and exit 0. CI runs this
+# gate with no arguments, so that is the gate this repository says guards the one
+# thing that cannot be reconstructed afterwards, reporting clean having read nothing.
+#
+# DECIDERS_FILE is unset for this call. The rest of the suite supplies its own decider
+# list on purpose, and here the point is the real records against the real list.
+out="$(cd "$ROOT" && unset DECIDERS_FILE && bash process/05-deliver/validate-decision.sh 2>&1)"
+rc=$?
+assert_status 0 "$rc" "the gate with no arguments passes over the real decision records"
+assert_not_contains "$out" "0 file(s)" "and does not report having checked nothing"
+nrec="$(ls "$ROOT"/process/05-deliver/decisions/*.md 2>/dev/null | grep -c .)"
+assert_contains "$out" "$nrec file(s)" "it checked every decision record (found $nrec)"
+
+# --- chosen: has to be a field, and the option has to be a heading --------------
+# Found by tests/mutate-sweep.sh, by dropping the `^` from `grep -q '^chosen:'` and
+# from `grep -qE "^## $chosen · "`.
+#
+# Unanchored, a record with no `chosen:` field passes as long as some line mentions
+# the word, and an option set passes as long as it mentions the chosen option
+# somewhere rather than declaring it as a heading. CTRL-1 cites the first refusal and
+# CTRL-2 the second, so both are controls a reader is invited to trust.
+#
+# Every case above either has a real `chosen:` field or has nothing resembling one,
+# which is why nothing could see the difference.
+{
+  printf '%s\n\n' '# Decision — thing'
+  printf '%s\n' 'problem: [p](../../03-define/problems/thing.md)'
+  printf '%s\n' 'options: [o](../../04-develop/options/thing.md)'
+  printf '%s\n' 'A note: chosen: is the field this record is missing.'
+  printf 'decided_by: %s\n' 'Ada Lovelace'
+  printf 'dated: %s\n' '2026-10-01'
+  printf 'amends: %s\n' '[s](../../../STANDARD.md#a-standard)'
+} > "$TMP/process/05-deliver/decisions/thing.md"
+out="$(bash "$GATE" "$TMP/process/05-deliver/decisions/thing.md" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a record that mentions chosen: without declaring it is refused"
+assert_contains "$out" "refuse[no-chosen-field]" "and the refusal is no-chosen-field"
+
+# The chosen option named in prose rather than declared as a heading. Paired against
+# the real option set in the same breath, so a gate refusing every option set would
+# fail the first of the two rather than passing the second.
+cat > "$TMP/process/04-develop/options/thing.md" <<'OPTS'
+# Develop — thing
+## A · First way
+## B · Second way
+OPTS
+out="$(bash "$GATE" "$(record A 'Ada Lovelace' 2026-10-01 OMIT)" 2>&1)"
+assert_not_contains "$out" "refuse[chosen-not-an-option]" \
+  "an option declared as a heading resolves"
+
+# The option's heading QUOTED mid-line rather than written as a heading. A sentence
+# with no locator in it is refused either way, so the fixture has to carry the exact
+# text the gate looks for, somewhere other than the start of a line.
+cat > "$TMP/process/04-develop/options/thing.md" <<'OPTS'
+# Develop — thing
+
+Two ways were weighed. The first was going to be written up as ## A · First way and
+never was, and the second as ## B · Second way.
+OPTS
+out="$(bash "$GATE" "$(record A 'Ada Lovelace' 2026-10-01 OMIT)" 2>&1)"
+assert_contains "$out" "refuse[chosen-not-an-option]" \
+  "an option heading quoted mid-line is not a declared option"
 
 assert_done
