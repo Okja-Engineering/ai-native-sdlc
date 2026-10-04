@@ -36,6 +36,19 @@ out="$(gate "$t")"; rc=$?
 assert_status 0 "$rc" "the shipped cycle file is within the contract"
 assert_contains "$out" "within the contract" "it says so"
 
+# --- a run that read nothing does not report conformance -----------------------
+# Over an empty cycles directory this said "0 file(s) within the contract" and
+# exited 0: nothing was read, and the gate reported it all within the contract. CI
+# runs this gate with no arguments, so emptying the directory left the log claiming
+# a clean phase. An empty phase stays exit 0, as the scan gate already settled; the
+# claim is what changes.
+mkdir -p "$TMP/no-cycles"
+out="$(DEFINE_CYCLES_DIR="$TMP/no-cycles" bash "$ROOT/process/03-define/validate-define.sh" 2>&1)"; rc=$?
+assert_status 0 "$rc" "an empty cycles directory is not a refusal"
+assert_contains "$out" "nothing was checked" "but the gate says it read nothing"
+assert_not_contains "$out" "within the contract" \
+  "and does not report files within the contract when it read none"
+
 # --- accounting, as a set -----------------------------------------------------
 # This was arithmetic comparing two totals. An external audit broke it two ways:
 # lowercasing a finding's first letter removed it from the denominator, and two

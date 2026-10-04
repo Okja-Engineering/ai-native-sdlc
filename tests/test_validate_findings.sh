@@ -69,6 +69,12 @@ OUT="$(FINDINGS_DIR="$TMP/empty-findings" bash "$GATE" 2>&1)"
 STATUS=$?
 assert_status 0 "$STATUS" "an empty findings directory exits 0"
 assert_contains "$OUT" "first run" "an empty findings directory reports a first run"
+# It said "first run" AND "0 files within the contract" on the same run. The second
+# line reports conformance for files it never read, which is the claim the other
+# three process gates made with no note at all. The note stays and the claim goes.
+assert_not_contains "$OUT" "within the contract" \
+  "and does not also report files within the contract when it read none"
+assert_contains "$OUT" "nothing was checked" "and says nothing was checked"
 
 # --- every finding carries an id Define can account for -----------------------
 # This refusal had no test at all. Replacing its condition with `if false` left

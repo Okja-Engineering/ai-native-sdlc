@@ -44,6 +44,23 @@ out="$(bash "$GATE" 2>&1)"; rc=$?
 assert_status 0 "$rc" "both shipped topics pass when the gate runs over the directory"
 assert_contains "$out" "2 file(s) within the contract" "it reports how many it checked"
 
+# --- a run that read nothing does not report conformance -----------------------
+# Over an empty topics directory this said "0 file(s) within the contract" and
+# exited 0: no artifact was read, and the gate reported every one of them within
+# the contract. CI runs this gate with no arguments, so emptying or moving the
+# directory left the log claiming a clean phase.
+#
+# A phase with no artifact is a real state and is still exit 0 — the scan gate
+# already settled that, calling it a first run — so what changes is the claim, not
+# the status. "nothing was checked" is the phrase the controls gate and the claims
+# gate already use for the same thing.
+mkdir -p "$TMP/no-topics"
+out="$(DISCOVER_TOPICS_DIR="$TMP/no-topics" bash "$GATE" 2>&1)"; rc=$?
+assert_status 0 "$rc" "an empty topics directory is not a refusal"
+assert_contains "$out" "nothing was checked" "but the gate says it read nothing"
+assert_not_contains "$out" "within the contract" \
+  "and does not report files within the contract when it read none"
+
 # --- fields -------------------------------------------------------------------
 t="$(fresh dated)"; perl -0pi -e 's/^dated: .*\n//m' "$t/process/02-discover/$NEW"
 assert_contains "$(gate "$t" "$NEW")" "refuse[undated]" "an undated artifact is refused"

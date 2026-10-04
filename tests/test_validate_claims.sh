@@ -41,6 +41,33 @@ clear_claim() { rm -f "$SB/claim.md"; ( cd "$SB" && git add -A >/dev/null 2>&1 )
 out="$(cd "$SB" && bash bin/validate-claims.sh 2>&1)"; rc=$?
 assert_status 0 "$rc" "the shipped tree carries no speed claim"
 assert_contains "$out" "no speed claims" "it says so"
+# And it says how many documents that was over. The gate's own header already holds
+# the rule that a check which evaluated nothing must not read as "nothing found" —
+# it fixed the >1 exit from a pattern that would not compile, and left this half:
+# `git grep` exits 1 both for "no match" and for "the pathspec matched no files".
+# Pinned as a NUMBER and not as the words "tracked document", which the old message
+# already contained — the first version of this assertion passed against the unfixed
+# gate for exactly that reason. Not pinned to a literal count either, because that
+# grows with the repository and would make the suite a staleness alarm.
+scanned_n="$(printf '%s' "$out" | sed -n 's/.* in \([0-9][0-9]*\) tracked document.*/\1/p')"
+counted=no
+[ -n "$scanned_n" ] && [ "$scanned_n" -gt 1 ] && counted=yes
+assert_eq "yes" "$counted" "the clean report names how many documents it read"
+
+# --- a pathspec that matches nothing is not a clean tree -----------------------
+# Measured in a throwaway clone: with every markdown file dropped from the index
+# this printed the same "no speed claims in tracked documents" line and exited 0,
+# over 32 documents and over none. One over-broad `:(exclude)` does it, and the
+# excludes are edited whenever a new directory of recorded claims appears.
+#
+# Driven by emptying the index rather than by editing the pathspec, so the
+# assertion is about the gate's answer and not about the spelling of one exclude.
+( cd "$SB" && git rm -q --cached $(git ls-files -- '*.md') ) >/dev/null 2>&1
+out="$(cd "$SB" && bash bin/validate-claims.sh 2>&1)"; rc=$?
+assert_status 2 "$rc" "a pathspec matching no tracked document cannot run"
+assert_contains "$out" "nothing was checked" "and the gate says nothing was checked"
+assert_not_contains "$out" "no speed claims" "and does not report the tree clean"
+( cd "$SB" && git reset -q HEAD -- . ) >/dev/null 2>&1
 
 # --- the six forms the audit used --------------------------------------------
 # Each is asserted separately. The audit's document contained all six at once, so
