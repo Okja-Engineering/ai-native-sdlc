@@ -2,7 +2,7 @@
 
 **Status:** derived from one artifact. `cycles/2026-09-29.md` was written first; this describes the shape it turned out to need.
 
-**Three checks are enforced; two remain deferred.** See *The gate* at the end.
+**Four checks are enforced; two remain deferred.** See *The gate* at the end.
 
 ## What Define is for
 
@@ -46,6 +46,24 @@ F01 F02 F03 ...
 | `invented-accounting` | an id in the block that is not in the source |
 | `duplicate-accounting` | an id listed twice |
 | `counts-disagree` | theme counts plus outliers do not sum to the ids accounted for |
+| `source-unreadable` | the ids of the declared source could not be read at all |
+
+### The denominator is the count `from:` declares
+
+The set comparison establishes that the ids accounted for are the ids the source **currently** carries. It establishes nothing about what the source was supposed to carry, and that gap was open until 2026-10-04: a finding was deleted from the findings table, its id dropped from the accounting block, and one theme count decremented — and both gates reported the files within the contract, while `from: ..., 64 findings` stood above a 63-row table and the cycle's own prose read *"every one of the 64 rows."* Nothing read either number.
+
+So `from:` carries the count, and the gate compares it to the number of findings the source records.
+
+| Refusal | Condition |
+|---|---|
+| `no-declared-count` | `from:` links a source and states no item count |
+| `declared-count` | the count `from:` declares is not the number of findings the source records |
+
+Together with the set comparison this gives a three-way agreement — the declared count, the source's rows, and the ids accounted for. Each disagreement keeps its own refusal, because a single message naming three numbers names no cause.
+
+**What it does not establish.** Editing the declared count as well makes the record internally consistent again and the gate passes. The denominator is anchored to what the scan recorded, not to what happened: closing a one-file edit into a two-file edit across two dated records is the whole of the improvement, and `CONTROLS.md` CTRL-4 states it in the same words.
+
+**Where the count comes from.** `process/01-scan/findings-ids.sh`, which is also what `bin/next.sh` and `bin/cycle.sh` read. A finding is a row inside the source's `## Findings` section whose `id` cell is exactly `F` plus a number, with the cell's position read from `findings-contract.md`. Three counters existed before that and none agreed with the others; the gate will not run if the harvester is missing, because a gate with no denominator reports a clean tree having evaluated nothing.
 
 **From the next cycle, each theme lists its own ids.** The set check closes dropping. It cannot detect a finding *moved* between themes, because moving one leaves the set unchanged — that is a count-accuracy defect rather than a dropping defect. Cycle `2026-09-29` predates ids and recorded counts only, so its membership is not recoverable; its artifact says so rather than reconstructing a mapping nobody made.
 
@@ -58,7 +76,7 @@ Define produces two artifacts and they do not have the same shape. These are **a
 | Field | |
 |---|---|
 | `dated` | when Define was run |
-| `from` | the source artifact, linked, with its item count |
+| `from` | the source artifact, linked, with its item count. The count is checked against the source, not decoration |
 | `method` | how the themes were produced — by hand, by model, by classifier. **Not optional**: a reader must know what produced the grouping before trusting it |
 | `status` | `defined, not decided` |
 
@@ -118,9 +136,10 @@ What the human now decides, and what cannot yet be recorded. Define names the ga
 
 ## The gate
 
-`validate-define.sh` enforces the three checks that do not depend on a cycle's shape:
+`validate-define.sh` enforces the four checks that do not depend on a cycle's shape:
 
 - **every item in the source artifact is accounted for** — under a theme or in the outliers. This one caught a real defect by hand before it was mechanised: the first draft of cycle `2026-09-29` themed 54 of 64 and reported three wrong counts, and the ten strays included a pattern nobody had named
+- **the count `from:` declares is the number of findings the source records** — the check above compares the accounting to the source, and until this one existed nothing said what the source was supposed to contain
 - **the outlier section exists, and says so explicitly when empty** — an empty list and an omitted one look identical otherwise
 - **`method` is declared**
 

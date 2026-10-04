@@ -110,6 +110,9 @@
 | `invented-accounting` | an id accounted for that is not in the source |
 | `duplicate-accounting` | an id listed twice |
 | `counts-disagree` | theme counts plus outliers do not sum to the ids accounted for |
+| `no-declared-count` | `from:` links a source and states no item count |
+| `declared-count` | the count `from:` declares is not the number of findings the source records |
+| `source-unreadable` | the ids of the declared source could not be read |
 | `no-outlier-section` | no outlier section at all |
 | `silent-empty-outliers` | the section lists nothing and does not say it is empty |
 | `no-source` | the record links no source artifact |
@@ -119,8 +122,11 @@
 
 **Evidence note.** The accounting is a **set comparison by id**, not arithmetic. It was a total until 2026-10-03, when an external audit broke it two ways — lowercasing a finding's first letter removed it from the denominator, and two theme counts could move in opposite directions with the total reconciling.
 
+**Evidence note, the denominator.** The set comparison establishes that the ids accounted for are the ids the source **currently** carries, and says nothing about what the source was supposed to carry. Until 2026-10-04 a finding could be deleted from the findings table, its id dropped from the accounting block and one theme count decremented, and both gates reported the files within the contract — while the record's `from:` line declared 64 findings over a 63-row table and nothing read it. The declared count is now compared to the source's rows, so the three numbers — declared, recorded, accounted — have to agree.
+
 **What it does not cover.**
 
+- **What the scan was supposed to contain.** This is the honest limit of the whole control, and it is worth stating plainly rather than leaving in the shape of the refusal list. **The denominator is anchored to what the scan recorded. Nothing anchors it to the world.** A scan that never saw a thing cannot be shown to have missed it, and `findings-contract.md` already carries that limit for stage 1. What the declared count adds is narrower and real: dropping a finding now takes a coordinated edit to two dated records instead of one, because the count the Define cycle declares is in a different file from the table it counts. A tamperer who edits both still reconciles, and the gate passes. Nothing mechanical closes that.
 - **A finding moved between themes.** Moving a count from one theme to another leaves the set unchanged and still reconciles. That is a count-accuracy defect rather than a dropping defect, and closing it needs per-theme ids — required by `define-contract.md` from the next cycle. Cycle `2026-09-29` predates ids and recorded counts only, so its membership is not recoverable and its artifact says so rather than reconstructing a mapping nobody made.
 - **Whether the grouping is useful.** Accounting for every item says nothing about whether the themes are the right themes.
 
