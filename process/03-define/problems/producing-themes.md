@@ -2,6 +2,7 @@
 
 dated: 2026-09-30
 from: [`../cycles/2026-09-29.md`](../cycles/2026-09-29.md) — its own stated open question
+rests on: [`../../02-discover/topics/classifier-models.md`](../../02-discover/topics/classifier-models.md)
 status: defined, not solved
 
 **What this is.** The convergence of one theme into a stated problem, which is what Develop needs as input. The cycle file names *what the month was about*; this names *what that leaves us needing to decide*.

@@ -17,7 +17,7 @@ It is the convergent half of the first diamond.
 | Themes | the **Scan's** findings file | a cycle file grouping every finding |
 | A problem | a theme, plus any **Discover** topic that was run on it | one stated problem |
 
-So the real order is Scan → Define(themes) → *human picks a theme* → Discover(topic), where the theme needs one → Define(problem) → Develop → Deliver. Discover is conditional: `agent-pr-approval` ran it and its problem file carries `rests on:`, `producing-themes` did not and carries only `from:`.
+So the real order is Scan → Define(themes) → *human picks a theme* → Discover(topic), where the theme needs one → Define(problem) → Develop → Deliver. Discover is conditional in the contract and has run for **both** shipped problems. This said `producing-themes` did not run it, read off that problem's missing `rests on:` field; the discovery it rests on was [the classifier topic](../02-discover/topics/classifier-models.md) all along. See *`rests on`, and what a problem with no Discover step means*.
 
 `bin/cycle.sh` prints the per-cycle steps in that order. It lists Discover topics in a separate block after them rather than inside the cycle, because a topic hangs off a problem and not off a cycle — this contract said the script "already prints it that way" until 2026-10-03, which overstated what the output shows. The order the script agrees with is the one above; where it differs is that Discover has no in-cycle position to print.
 
@@ -53,6 +53,8 @@ The problem Define exists for is that **reading** is the wall. Sixty-four rows i
 
 ## Required fields
 
+Define produces two artifacts and they do not have the same shape. These are **a cycle's** fields; a problem declares its own, in the section below.
+
 | Field | |
 |---|---|
 | `dated` | when Define was run |
@@ -60,7 +62,28 @@ The problem Define exists for is that **reading** is the wall. Sixty-four rows i
 | `method` | how the themes were produced — by hand, by model, by classifier. **Not optional**: a reader must know what produced the grouping before trusting it |
 | `status` | `defined, not decided` |
 
+## Required fields — a problem
+
+Declared after the second problem, and after finding that the first two disagreed about whether the Discover edge existed at all. One table served both artifacts until 2026-10-04, so `bin/next.sh` scaffolded a problem from the **cycle's** list: a problem got `method:`, which says nothing about a problem, and never got `rests on:`, which is the only thing that carries the Discover-to-Define edge.
+
+| Field | |
+|---|---|
+| `dated` | when the problem was stated |
+| `from` | the cycle and the theme within it, linked |
+| `rests on` | the Discover topic the problem was stated from, **linked** — or `none` with the reason no discovery was needed |
+| `status` | `defined, not solved` |
+
+### `rests on`, and what a problem with no Discover step means
+
+**A problem that skips Discover is legitimate, and it has to say so.** Discover establishes what is true about a theme when a theme needs that; it is not a toll gate on every item. But an omitted `rests on:` and a deliberate skip look identical, which is the same reasoning the Deliver contract uses for `amends: none` and this contract uses for an empty outlier section. So `rests on: none` plus the reason is the declared form, and a bare `none` says nothing a reader can check.
+
+**Neither shipped problem took that route, and the repository said one of them had.** `agent-pr-approval` carried `rests on:` from the start. `producing-themes` carried only `from:`, and this contract, `README.md` and `bin/cycle.sh` all read that absence as a problem stated without discovery. It was not. The problem's third load-bearing argument is *"The cheap option carries measured problems"*, and every figure in it — 27.8% of decisions flipped on option reordering, 25.0% on rewording, ~90% claimed confidence against ~64% accuracy out of domain, calibration that does not transfer — comes from [the classifier topic](../02-discover/topics/classifier-models.md), which is dated the day before the problem. The discovery had run; the record did not say so, and `cycle.sh` reported the topic as referenced by no problem. The field is now present and names it.
+
+So the conditional route is declared and has **no worked example**. That is worth stating plainly rather than letting a missing field stand in for one.
+
 ## Required sections
+
+These are a cycle's sections. A problem's are **not yet declared**, and `bin/next.sh` emits a cycle's into a problem skeleton for want of anything else to read — so a scaffolded problem arrives with a Themes heading it does not want. Two problems is enough to declare a problem's fields and is not obviously enough to declare its sections; the two shipped ones share a shape but neither was written against a declaration. Named here rather than invented, and carried in *Open* below.
 
 ### Themes
 
@@ -115,3 +138,4 @@ Two checks remain deferred, because they do depend on shape and one cycle cannot
 1. **Whether a small model produces the same themes.** The first cycle was themed by reading. That is the interesting test and it is now cheap, because the source artifact and the hand-made themes both exist to compare against.
 2. **Whether themes should be stable across cycles** — "the software factory" recurring next month as the same theme, or re-derived each time. Re-deriving is honest and loses continuity; carrying them forward gains continuity and risks seeing last month's pattern in this month's data.
 3. **Where the human's per-theme decision is recorded.** Not invented here.
+4. **A problem's required sections.** Its fields are declared above; its sections are not. `bin/next.sh` therefore emits a cycle's sections into a problem skeleton. Declaring them from the two problems that exist would encode whatever those two happen to share.
