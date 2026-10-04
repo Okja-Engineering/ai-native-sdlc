@@ -147,6 +147,24 @@ check_cycle() {
     return
   fi
 
+  # --- the source is a real scan ------------------------------------------
+  # `example: yes` means "not a real scan". Two words inserted into the only real
+  # findings file made bin/cycle.sh collapse to a skipped line and both gates
+  # report the files within the contract, while this cycle's `from:` went on
+  # resolving to it — so the record of a month's work rested on a file declaring
+  # itself a worked example, and nothing said so. findings-contract.md disclosed
+  # the inverse case, an example that forgets its marker, and this direction
+  # nowhere.
+  #
+  # The marker is not what is refused. An example read by nothing is a legitimate
+  # file and findings/2026-09-01.md is one. The contradiction between the marker
+  # and a cycle that depends on the file is what is refused, and it is refused
+  # here because this is where the dependency is written down.
+  if [ "$(field "$resolved" example)" = "yes" ]; then
+    refuse "$f" "-" "source-is-example" \
+      "the declared source is marked \`example: yes\`, so it is not a real scan: $src_path — a cycle cannot rest on a worked example, and the anchor the next scan reads skips it"
+  fi
+
   src_ids="$(bash "$IDS" "$resolved")"
   if [ "$?" -ne 0 ]; then
     refuse "$f" "-" "source-unreadable" \

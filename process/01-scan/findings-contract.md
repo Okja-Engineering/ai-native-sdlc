@@ -200,5 +200,9 @@ Boundaries that matter here but that nothing refuses. Written down as claims abo
 - **`what` is neutral and one sentence.** Length and tone are not checked.
 - **`dated` is the date of the thing, not of the scan.** Nothing can tell these apart.
 - **A worked example is marked `example: yes`.** Nothing refuses a real cycle that reuses an example's placeholder sources, or an example that forgets the marker.
+
+  **The opposite direction is now refused, and it was disclosed nowhere until 2026-10-04.** An external audit inserted `example: yes` into the only real findings file. `bin/cycle.sh` collapsed to a skipped line, both gates reported the files within the contract, and the Define cycle's `from:` went on resolving to the file — so a month's record rested on a file declaring itself not a real scan. `process/03-define/validate-define.sh` refuses `source-is-example` when a cycle's source carries the marker, and `bin/cycle.sh` names the cycles reading a skipped file. The marker itself is not refused: an example read by nothing is a legitimate file, and `findings/2026-09-01.md` is one.
 - **A judgment written in unlisted words.** The tripwire catches the listed phrases only.
 - **The anchor skips examples.** `since` resolves to the most recent file in `findings/` that is *not* marked `example: yes`, so a worked example cannot become the window a real cycle measures from. The gate checks the form of `since`, never that the right file was chosen.
+
+  **Marking a real file as an example therefore moves the next cycle's window, and nothing mechanical catches that.** Nothing runs the anchor — it is an instruction in [`scan.md`](scan.md) that a person follows — so there is no gate to put a refusal in. What exists is the Define refusal above, which fires as soon as a cycle depends on the file; a file marked before any cycle reads it leaves nothing to contradict.
