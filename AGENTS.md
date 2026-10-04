@@ -41,7 +41,12 @@ Together they give an auditable chain: the issue states the intended change and 
 
 ### Two chains, and only one of them is in git
 
-This said *"All of it in git."* It is not, and an external audit caught it.
+This said *"All of it in git."* It is not, and an external audit caught it. <!-- corrected-overclaim: all of it in git — this sentence is the correction, so it has to quote what it corrects -->
+
+<!-- The declaration above is read by tests/test_doc_claims.sh. It exempts that one
+     phrase on that one line, and nothing else. It replaced a rule that discarded
+     any line carrying the word "claimed", which let the overclaim back in. -->
+
 
 | | Where it lives | Readable from a clone? |
 |---|---|---|
