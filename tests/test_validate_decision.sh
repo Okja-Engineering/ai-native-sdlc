@@ -434,6 +434,54 @@ DOC
 out="$(bash "$GATE" "$(amendment 1 '7-learning-has-to-improve-the-generating-system')" 2>&1)"; rc=$?
 assert_status 0 "$rc" "a numbered heading with punctuation resolves to its forge anchor"
 
+# A back-link shown as an EXAMPLE does not reciprocate. Found by attacking this
+# check after it was written. The same class has already cost this repository
+# once: an example row in a fenced block in DECIDERS.md would have authorized
+# everyone it named, which is why the deciders list skips fences.
+cat > "$MANY" <<'DOC'
+# Many claims
+
+## Claim 1
+
+This is what a back-link looks like:
+
+```
+decided: [d1](process/05-deliver/decisions/d1.md)
+```
+DOC
+out="$(bash "$GATE" "$(amendment 1)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a back-link inside a fenced example does not reciprocate"
+assert_contains "$out" "refuse[amends-not-reciprocated]" "the refusal is amends-not-reciprocated"
+
+# A heading inside a fence is not a heading, so an anchor cannot resolve to one.
+cat > "$MANY" <<'DOC'
+# Many claims
+
+Example of a claim:
+
+```
+## Claim 1
+
+decided: [d1](process/05-deliver/decisions/d1.md)
+```
+DOC
+out="$(bash "$GATE" "$(amendment 1)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "an anchor cannot resolve to a heading inside a fenced example"
+assert_contains "$out" "refuse[amends-claim-unresolved]" "the refusal is amends-claim-unresolved"
+
+# Two decisions amending the SAME claim. The claim then carries two back-links and
+# each record has to find its own.
+cat > "$MANY" <<'DOC'
+# Many claims
+
+## Claim 1
+
+decided: [d1](process/05-deliver/decisions/d1.md)
+decided: [d2](process/05-deliver/decisions/d2.md)
+DOC
+out="$(bash "$GATE" "$(amendment 1)" "$(amendment 2 claim-1)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "two decisions amending one claim both pass"
+
 # --- the stated problem must be linked ---------------------------------------
 # `problem:` was a required field in the contract and nothing read it. Deleting
 # the line left the gate reporting the record within the contract, so the

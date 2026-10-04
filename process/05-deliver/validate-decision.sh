@@ -231,12 +231,21 @@ check_record() {
 # left it, and refusing that would push an author into flattening a document to
 # satisfy a gate.
 #
+# A FENCED BLOCK is not part of the claim. Found by attacking this check once it
+# was written: a document showing what a back-link looks like, inside a fenced
+# example, reciprocated the real thing. This repository has already been burnt by
+# that class — an example row in a fenced block in `DECIDERS.md` would have
+# authorized everyone it named — so the deciders list skips fences for the same
+# reason. A heading inside a fence is not a heading either.
+#
 # exit 3  no heading in the document slugs to that anchor
 claim_lines() { # document anchor
   LC_ALL=C awk -v want="$2" '
     function slug(s) {
       s = tolower(s); gsub(/[^a-z0-9 _-]/, "", s); gsub(/ /, "-", s); return s
     }
+    /^[ \t]*(```|~~~)/ { fence = !fence; next }
+    fence { next }
     /^#+[ \t]/ {
       match($0, /^#+/); lvl = RLENGTH
       h = substr($0, lvl + 1); sub(/^[ \t]+/, "", h); sub(/[ \t]+$/, "", h)
