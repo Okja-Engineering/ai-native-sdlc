@@ -21,6 +21,8 @@ trap 'rm -rf "$TMP"' EXIT
 cat > "$TMP/DECIDERS.md" <<'DEC'
 # Authorized deciders
 
+<!-- deciders-table: the authorized list -->
+
 | Name | Since |
 |---|---|
 | Matt Van Dusen | 2026-01-01 |
@@ -144,6 +146,8 @@ assert_status 1 "$rc" "a missing decider list refuses rather than passing everyt
 cat > "$TMP/DECIDERS-busy.md" <<'DEC'
 # Authorized deciders
 
+<!-- deciders-table: the authorized list -->
+
 | Name | Since |
 |---|---|
 | Ada Lovelace | 2026-01-01 |
@@ -180,6 +184,151 @@ Nobody is currently authorized to decide.
 DEC
 out="$(DECIDERS_FILE="$TMP/DECIDERS-empty.md" bash "$GATE" "$(record A 'Matt Van Dusen' 2026-10-01)" 2>&1)"; rc=$?
 assert_status 1 "$rc" "a decider file listing nobody authorizes nobody"
+
+# --- only the table the file DESIGNATES as the list authorizes -----------------
+# A second table with a `Name` column authorized everybody in it. The harvest was
+# keyed on the column HEADING, so every table declaring one contributed, and three
+# documents said that could not happen: DECIDERS.md's own rule, CONTROLS.md's
+# evidence note, and this gate's own comment naming a second table as the defect it
+# had fixed. No test exercised a second table, which is how the comment stayed
+# wrong for a cycle.
+#
+# The invariant under test is not "the first table" and not "the table under a
+# particular heading" — a heading is what already failed. It is that the file
+# DESIGNATES one table as the list, in band, and nothing else in the file
+# authorizes anybody whatever its columns are called or where it sits.
+cat > "$TMP/DECIDERS-two-tables.md" <<'DEC'
+# Authorized deciders
+
+<!-- deciders-table: the authorized list -->
+
+| Name | Since |
+|---|---|
+| Ada Lovelace | 2026-01-01 |
+
+## People who have asked to be added
+
+| Name | Since |
+|---|---|
+| Hacker McBot | 2026-01-01 |
+DEC
+out="$(DECIDERS_FILE="$TMP/DECIDERS-two-tables.md" bash "$GATE" "$(record A 'Hacker McBot' 2026-10-01)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a second table with a Name column authorizes nobody in it"
+assert_contains "$out" "refuse[not-a-person]" "and the refusal is not-a-person"
+assert_contains "$out" "People who have asked to be added" \
+  "and the refusal names the table it ignored, so the author is not left guessing"
+out="$(DECIDERS_FILE="$TMP/DECIDERS-two-tables.md" bash "$GATE" "$(record A 'Ada Lovelace' 2026-10-01)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "and the designated table still authorizes the person on it"
+
+# Position is not the rule either: a second table BEFORE the designated one.
+cat > "$TMP/DECIDERS-before.md" <<'DEC'
+# Authorized deciders
+
+## People who have asked to be added
+
+| Name | Since |
+|---|---|
+| Hacker McBot | 2026-01-01 |
+
+<!-- deciders-table: the authorized list -->
+
+| Name | Since |
+|---|---|
+| Ada Lovelace | 2026-01-01 |
+DEC
+out="$(DECIDERS_FILE="$TMP/DECIDERS-before.md" bash "$GATE" "$(record A 'Hacker McBot' 2026-10-01)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a second table before the designated one authorizes nobody either"
+out="$(DECIDERS_FILE="$TMP/DECIDERS-before.md" bash "$GATE" "$(record A 'Ada Lovelace' 2026-10-01)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "and the designated table authorizes wherever it sits in the file"
+
+# A file that designates nothing authorizes nobody — the same choice as a missing
+# file and as a file with no Name column. An allowlist whose designation can be
+# left out is a control an author switches off by omission.
+cat > "$TMP/DECIDERS-unmarked.md" <<'DEC'
+# Authorized deciders
+
+| Name | Since |
+|---|---|
+| Ada Lovelace | 2026-01-01 |
+DEC
+out="$(DECIDERS_FILE="$TMP/DECIDERS-unmarked.md" bash "$GATE" "$(record A 'Ada Lovelace' 2026-10-01)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a file that designates no authorizing table authorizes nobody"
+assert_contains "$out" "designates no authorizing table" "and says that is why"
+
+# A declaration carrying no reason is not a declaration, the same two checks the
+# `declared-empty`, `not-a-claim` and `dead-pointer` forms get.
+cat > "$TMP/DECIDERS-no-reason.md" <<'DEC'
+# Authorized deciders
+
+<!-- deciders-table: -->
+
+| Name | Since |
+|---|---|
+| Ada Lovelace | 2026-01-01 |
+DEC
+out="$(DECIDERS_FILE="$TMP/DECIDERS-no-reason.md" bash "$GATE" "$(record A 'Ada Lovelace' 2026-10-01)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a designation with no reason designates nothing"
+
+# Two tables both claiming to be the list is ambiguous, and ambiguity in an
+# allowlist has to fail closed: neither authorizes.
+cat > "$TMP/DECIDERS-both-marked.md" <<'DEC'
+# Authorized deciders
+
+<!-- deciders-table: the authorized list -->
+
+| Name | Since |
+|---|---|
+| Ada Lovelace | 2026-01-01 |
+
+<!-- deciders-table: also the authorized list -->
+
+| Name | Since |
+|---|---|
+| Hacker McBot | 2026-01-01 |
+DEC
+for who in 'Ada Lovelace' 'Hacker McBot'; do
+  out="$(DECIDERS_FILE="$TMP/DECIDERS-both-marked.md" bash "$GATE" "$(record A "$who" 2026-10-01)" 2>&1)"; rc=$?
+  assert_status 1 "$rc" "two tables both designated authorizes nobody: $who"
+done
+assert_contains "$out" "designates 2 tables" "and the refusal says the designation is ambiguous"
+
+# A commented-out copy of the list is not the list. Without this the designation
+# binds to the table inside the comment — which renders as nothing at all — and the
+# real table below it becomes the undesignated one. Same class as the fenced
+# example row that would have authorized everyone it named.
+cat > "$TMP/DECIDERS-commented.md" <<'DEC'
+# Authorized deciders
+
+<!-- deciders-table: the authorized list -->
+
+<!--
+| Name | Since |
+|---|---|
+| Hacker McBot | 2026-01-01 |
+-->
+
+| Name | Since |
+|---|---|
+| Ada Lovelace | 2026-01-01 |
+DEC
+out="$(DECIDERS_FILE="$TMP/DECIDERS-commented.md" bash "$GATE" "$(record A 'Hacker McBot' 2026-10-01)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a table inside an HTML comment authorizes nobody"
+out="$(DECIDERS_FILE="$TMP/DECIDERS-commented.md" bash "$GATE" "$(record A 'Ada Lovelace' 2026-10-01)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "and the designation binds to the table a reader can see"
+
+# A designated table that declares no Name column donates nobody, rather than
+# falling back to a column position.
+cat > "$TMP/DECIDERS-no-name-col.md" <<'DEC'
+# Authorized deciders
+
+<!-- deciders-table: the authorized list -->
+
+| Candidate | Since |
+|---|---|
+| Ada Lovelace | 2026-01-01 |
+DEC
+out="$(DECIDERS_FILE="$TMP/DECIDERS-no-name-col.md" bash "$GATE" "$(record A 'Ada Lovelace' 2026-10-01)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a designated table with no Name column donates nobody"
 
 # --- companion checks, equally shape-independent ------------------------------
 out="$(bash "$GATE" "$(record A 'Matt Van Dusen' '')" 2>&1)"
@@ -542,6 +691,13 @@ assert_status 0 "$rc" "the record that amends STANDARDS.md is within the contrac
 assert_contains "$(cat "$ROOT/DECIDERS.md")" \
   "$(sed -n 's/^decided_by:[[:space:]]*//p' "$ROOT/process/05-deliver/decisions/agent-pr-approval.md" | head -1)" \
   "the real decider list names the person the real record names"
+
+# And the real file designates exactly one table as the list. Zero would authorize
+# nobody and two would be ambiguous, and both of those fail closed — so without
+# this assertion the shipped file could lose its designation and every case above
+# would still pass against its own fixtures.
+assert_eq "1" "$(grep -c '<!--[[:space:]]*deciders-table:' "$ROOT/DECIDERS.md")" \
+  "the shipped DECIDERS.md designates exactly one authorizing table"
 
 
 # --- a missing option set is named once, not twice -----------------------------
