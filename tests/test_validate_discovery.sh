@@ -394,6 +394,23 @@ out="$(bash "$GATE" "$(topic 'Everything in scope was established. [O]' grade)" 
 assert_contains "$out" "refuse[silent-empty-open]" \
   "an [O] in prose is not an item, so the section is still silently empty"
 
+# And the other half of the same rule: a line in an item's MARKUP that carries no
+# grade is not an item either. Both shipped topics write every item with its `[O]`,
+# which is what this contract asks for, so the grade is part of what an item is.
+#
+# Found by loosening rather than by deleting, per AGENTS.md: dropping the grade from
+# the item pattern broke no test, which meant the suite pinned that the check was
+# reachable and not that it was sufficient. Without this case an author can empty the
+# section and open it with any bold sentence.
+out="$(bash "$GATE" "$(topic '**Everything was established.** No gaps remain.' bold)" 2>&1)"
+assert_contains "$out" "refuse[silent-empty-open]" \
+  "a bold lead-in carrying no grade is not an open item"
+
+# The converse, so the rule is pinned in both directions and not just as a refusal:
+# a bulleted item carrying its grade is accepted even when its text is short.
+out="$(bash "$GATE" "$(topic '- **Whether JevBench seals its slice. [O]**' bolditem)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "a bulleted item carrying its [O] grade is accepted"
+
 # An empty section that DECLARES it, with a reason, is accepted — the repair must
 # not be "always refuse an empty section". A phase that genuinely left nothing open
 # is a real state and a legitimate one.
