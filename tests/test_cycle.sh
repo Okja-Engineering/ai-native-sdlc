@@ -167,6 +167,82 @@ assert_not_contains "$out" "topics" "naming a cycle reports that cycle only"
 out="$(run 2099-01-01)"; rc=$?
 assert_status 1 "$rc" "an unknown cycle exits 1"
 
+# --- what the convergence pass cost -------------------------------------------
+# Decision F commits to recording the pass duration across two more cycles, and
+# the report named everything about a cycle except that. The field is declared in
+# define-contract.md and read by no gate, so this report is the only place a
+# person sees it.
+#
+# The field name is read out of the contract rather than written here, so the test
+# is about the chain from the declaration to the report.
+dur_field="$(sed -n '/^## Required fields$/,/^## /p' "$ROOT/process/03-define/define-contract.md" \
+  | sed -n 's/^| `\([a-z_ ]*\)` *|.*convergence pass took.*/\1/p' | head -1)"
+[ -n "$dur_field" ] && any=yes || any=no
+assert_eq "yes" "$any" "the contract declares a field for the pass duration"
+
+sed 's/2026-09-29/2026-11-03/g' "$SB/process/01-scan/findings/2026-09-29.md" \
+  > "$SB/process/01-scan/findings/2026-11-03.md"
+sed -e 's|findings/2026-09-29|findings/2026-11-03|g' \
+    -e "s|^method: .*|method: read by hand, not by classifier\n$dur_field: about two hours, in one sitting|" \
+  "$SB/process/03-define/cycles/2026-09-29.md" > "$SB/process/03-define/cycles/2026-11-03.md"
+assert_contains "$(cat "$SB/process/03-define/cycles/2026-11-03.md")" "$dur_field: about two hours" \
+  "the fixture really does carry a duration"
+
+out="$(run 2026-11-03)"
+assert_contains "$out" "about two hours, in one sitting" \
+  "the report names how long the convergence pass took"
+define_line="$(printf '%s\n' "$out" | grep '03 define')"
+assert_contains "$define_line" "about two hours" \
+  "and it says so on the line that reports the rest of the cycle's state"
+rm -f "$SB/process/01-scan/findings/2026-11-03.md" "$SB/process/03-define/cycles/2026-11-03.md"
+
+# A cycle that does not record it must be SAID to not record it. A blank would
+# read as a pass that took no time, and an omitted phrase as a cycle nobody
+# asked. The shipped cycle predates the field, so it is the real case.
+out="$(run 2026-09-29)"
+define_line="$(printf '%s\n' "$out" | grep '03 define')"
+assert_contains "$define_line" "not recorded" \
+  "a cycle that records no duration is reported as not recording one"
+
+# And "not recorded" is only a true sentence while the contract still declares the
+# field the report looks for. A report that hardcodes a field name goes on saying
+# "not recorded" after a rename, about an artifact that records one — so the drift
+# is announced.
+cp "$SB/process/03-define/define-contract.md" "$TMP/define-contract.bak"
+grep -v "^| \`$dur_field\` |" "$TMP/define-contract.bak" > "$SB/process/03-define/define-contract.md"
+assert_eq "0" "$(grep -c "^| \`$dur_field\` |" "$SB/process/03-define/define-contract.md")" \
+  "the fixture really did remove the declaration"
+out="$(run 2026-09-29)"
+assert_contains "$out" "no longer declared" \
+  "the report says so when the contract stops declaring the field it reads"
+cp "$TMP/define-contract.bak" "$SB/process/03-define/define-contract.md"
+out="$(run 2026-09-29)"
+assert_not_contains "$out" "no longer declared" \
+  "and says nothing about drift while the declaration is there"
+
+# --- a cycle with no themes is reported as a cycle with no themes --------------
+# count_themes() was `grep -cE ... || echo 0`. `grep -c` ALREADY prints 0 and
+# exits 1 when it matches nothing, so the fallback printed a second zero and the
+# report read `0\n0 themes, 0\n0 outliers` across four lines. Unreachable while
+# the only cycle in the tree had seven themes; a scaffolded cycle has none, and
+# bin/next.sh now scaffolds one for every new date.
+sed 's/2026-09-29/2026-11-04/g' "$SB/process/01-scan/findings/2026-09-29.md" \
+  > "$SB/process/01-scan/findings/2026-11-04.md"
+{
+  printf '# Define — cycle 2026-11-04\n\n'
+  printf 'dated: 2026-11-04\n'
+  printf 'from: [`process/01-scan/findings/2026-11-04.md`](../../01-scan/findings/2026-11-04.md), 64 findings\n'
+  printf 'method: nothing has been read yet\n'
+  printf 'status: defined, not decided\n\n## Themes\n\n*To be written.*\n'
+} > "$SB/process/03-define/cycles/2026-11-04.md"
+out="$(run 2026-11-04)"
+define_line="$(printf '%s\n' "$out" | grep '03 define')"
+assert_contains "$define_line" "0 themes, 0 outliers" \
+  "an unthemed cycle reports no themes and no outliers on one line"
+assert_eq "0" "$(printf '%s\n' "$out" | grep -cE '^[0-9]+ (themes|outliers)')" \
+  "and no count spills onto a line of its own, which is what a doubled zero did"
+rm -f "$SB/process/01-scan/findings/2026-11-04.md" "$SB/process/03-define/cycles/2026-11-04.md"
+
 # --- it writes nothing --------------------------------------------------------
 # The header says "Reads the tree. Writes nothing." Asserted rather than trusted.
 before="$(git -C "$SB" status --porcelain)"

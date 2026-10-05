@@ -38,9 +38,69 @@ count_rows() {
   ids=$(bash "$IDS" "$1" 2>/dev/null) || { printf '%s\n' '?'; return; }
   printf '%s\n' "$ids" | grep -c .
 }
-count_themes() { grep -cE '^### [0-9]+ · ' "$1" 2>/dev/null || echo 0; }
-count_opts()   { grep -cE '^## [A-F] · ' "$1" 2>/dev/null || echo 0; }
-count_outl()   { sed -n '/## Outliers/,/^---/p' "$1" 2>/dev/null | grep -cE '^- \*\*' || echo 0; }
+# `grep -c` ALREADY prints 0 and exits 1 when nothing matches, so `|| echo 0`
+# printed a SECOND zero and the caller interpolated both: a cycle with no themes
+# reported `0\n0 themes, 0\n0 outliers` across four lines. Unreachable while the
+# only cycle in the tree had seven themes, and reachable the moment bin/next.sh
+# scaffolds a cycle for a new date — which it now does with a Themes skeleton
+# nobody has filled in. The count is grep's, and the default is applied to an
+# unset value rather than printed alongside one.
+count() { local n; n=$(grep -cE "$1" "$2" 2>/dev/null); printf '%s\n' "${n:-0}"; }
+count_themes() { count '^### [0-9]+ · ' "$1"; }
+count_opts()   { count '^## [A-F] · ' "$1"; }
+count_outl()   { local n; n=$(sed -n '/## Outliers/,/^---/p' "$1" 2>/dev/null | grep -cE '^- \*\*'); printf '%s\n' "${n:-0}"; }
+
+# field <file> <key> -> the first value outside a fenced block, trimmed.
+#
+# Fences are skipped for the reason process/03-define/validate-define.sh gives:
+# a document showing what a field looks like donated the example as the value.
+# `index` rather than a regex, because a key can contain a space and a key is not
+# a pattern.
+field() {
+  awk -v key="$2" '
+    /^[ \t]*(```|~~~)/ { fence = !fence; next }
+    fence { next }
+    index($0, key ":") == 1 {
+      v = substr($0, length(key) + 2)
+      sub(/^[ \t]+/, "", v); sub(/[ \t]+$/, "", v)
+      print v; exit
+    }
+  ' "$1" 2>/dev/null
+}
+
+# The field a cycle records its convergence duration in. The `producing-themes`
+# decision commits to recording it over two more cycles and no gate reads it, so
+# this report is the only place a person sees it.
+#
+# The name is written here AND checked against the contract below. A report that
+# hardcodes a field name goes on printing "not recorded" after a rename, which is
+# a false statement about an artifact that does record one — so the drift is made
+# loud rather than left silent.
+DEFINE_CONTRACT="process/03-define/define-contract.md"
+DURATION_FIELD="pass took"
+duration_declared=unknown
+if [ -f "$DEFINE_CONTRACT" ]; then
+  if sed -n '/^## Required fields$/,/^## /p' "$DEFINE_CONTRACT" \
+     | grep -q "^| \`$DURATION_FIELD\` |"; then
+    duration_declared=yes
+  else
+    duration_declared=no
+  fi
+fi
+
+# pass_duration <cycle file> -> what to print about the duration.
+#
+# Three states, and all three are said out loud. A blank would read as a pass
+# that took no time, and an omitted phrase as a cycle nobody asked about.
+pass_duration() {
+  local v
+  v="$(field "$1" "$DURATION_FIELD")"
+  if [ -n "$v" ]; then
+    printf '%s %s\n' "$DURATION_FIELD" "$v"
+  else
+    printf '%s — not recorded\n' "$DURATION_FIELD"
+  fi
+}
 
 cycle_report() {
   local c="$1" f d dv dl n t o
@@ -57,7 +117,7 @@ cycle_report() {
   d="process/03-define/cycles/$c.md"
   if [ -f "$d" ]; then
     t=$(count_themes "$d"); o=$(count_outl "$d")
-    printf '%s03 define    %s themes, %s outliers\n' "$ok" "$t" "$o"
+    printf '%s03 define    %s themes, %s outliers, %s\n' "$ok" "$t" "$o" "$(pass_duration "$d")"
   else
     printf '%s03 define    not converged — %s findings unread\n' "$miss" "$n"
     return
@@ -109,6 +169,16 @@ cycle_report() {
 
 main() {
   local want="${1:-}" found=0
+
+  # Said once, and said at all. The duration line below reads "not recorded" for
+  # a cycle that omits the field, and that sentence is only true while the
+  # contract still declares the field this looks for.
+  case "$duration_declared" in
+    no) printf '%s%s is no longer declared in %s, so the duration below is read from a field nothing requires\n' \
+          "$miss" "$DURATION_FIELD" "$DEFINE_CONTRACT" ;;
+    unknown) printf '%sno %s, so the duration field could not be checked against its declaration\n' \
+          "$miss" "$DEFINE_CONTRACT" ;;
+  esac
 
   # An example file is not reported as a cycle, but the skip is ANNOUNCED. The
   # first version skipped silently, and an external audit inserted `example: yes`
