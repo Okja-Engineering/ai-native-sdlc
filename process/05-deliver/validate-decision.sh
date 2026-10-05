@@ -64,51 +64,162 @@ line_of() { grep -n "^$2:" "$1" 2>/dev/null | head -1 | cut -d: -f1; }
 DECIDERS="${DECIDERS_FILE:-$ROOT/DECIDERS.md}"
 OBVIOUSLY_NOT_A_PERSON='(^|[^a-z])(team|group|everyone|owner|reviewer|maintainer|claude|gpt|codex|copilot|agent|bot|assistant|automation|llm|model)([^a-z]|$)'
 
-# deciders_listed -> one authorized name per line
+# deciders_scan -> a tab-separated description of DECIDERS.md, one fact per line:
 #
-# The allowlist is the `Name` column of whichever tables in DECIDERS.md declare
-# one, DATA ROWS ONLY.
+#   MARK <line> <note>   a table the file DESIGNATES as the authorizing list
+#   SKIP <line> <label>  a table declaring a Name column that is NOT designated
+#   AUTH <name>          a Name cell in a data row of the designated table
 #
-# It used to be `grep -oE '^\| [^|]+ \|'` — the first cell of every row in the
-# file. That harvested the table HEADER, so `decided_by: Name` was an authorized
-# decider. It also meant anything else in the file shaped like a table row
-# donated its first cell: a second table listing people who have asked to be
-# added would have authorized all of them, and so would an example row inside a
-# fenced block.
+# WHICH TABLE IS THE LIST, AND WHY THAT IS A DECLARATION
 #
-# Keyed to the column's declared heading rather than to its position, so adding
-# or reordering columns cannot quietly move the allowlist, and a table that
-# declares no Name column contributes nothing. A file that declares no such
-# column authorizes nobody — the same choice as a missing file, because the point
-# of an allowlist is that an absent name refuses.
-deciders_listed() {
-  awk -F'|' '
+# The allowlist used to be the `Name` column of EVERY table in the file, data rows
+# only. That was keyed on the column's heading text, so a second table declaring a
+# Name column authorized everybody in it:
+#
+#   ## People who have asked to be added
+#   | Name | Since |
+#   |---|---|
+#   | Hacker McBot | 2026-01-01 |   ->  decided_by: Hacker McBot was accepted
+#
+# Three documents said that could not happen — DECIDERS.md's own rule, CONTROLS.md's
+# evidence note, and the comment above this function, which named a second table as
+# the defect it had fixed. All three were wrong, for a cycle, because no test
+# exercised a second table.
+#
+# So the file now says which table is the list, in band, immediately above it:
+#
+#   <!-- deciders-table: reason -->
+#
+# Checked for the same two things as `declared-empty`, `not-a-claim` and
+# `dead-pointer`: the declaration is present and it carries a reason. The
+# alternatives were both weaker. Keying on the column heading is what just failed.
+# Keying on a heading above the table failed before that. Keying on position — "the
+# first table" — cannot say which table the author meant, so inserting one above the
+# list silently moves the allowlist.
+#
+# Three things fail CLOSED, because an allowlist whose designation can be left out
+# or made ambiguous is a control an author switches off by omission:
+#
+#   * no designated table              -> nobody is authorized
+#   * more than one designated table   -> nobody is authorized
+#   * a designated table with no Name  -> nobody is authorized
+#
+# A FENCED BLOCK is not content, because an example row in one would otherwise
+# authorize everyone it named. Neither is an HTML COMMENT BLOCK: a commented-out
+# copy of the list renders as nothing, and without this the designation would bind
+# to the invisible table and leave the real one undesignated. The marker itself is a
+# complete comment on one line, so it is read before the block rule.
+#
+# Blank lines between the declaration and the table do not break the pair, because
+# that is how the two read in Markdown. Anything else between them does.
+deciders_scan() {
+  awk -F'|' -v TAB="$(printf '\t')" '
     function clean(s) {
       gsub(/[*_`]/, "", s); sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s
     }
-    /^```/ { fence = !fence; next }
+    function endtable() { head = 0; sep = 0; col = 0; donate = 0 }
+
+    incomment { if ($0 ~ /-->/) incomment = 0; next }
+
+    # A fence BREAKS the designation, unlike a blank line and unlike a comment
+    # block. Found by attacking this check after it was written: put the real list
+    # inside a fenced example and a second table below it, and the designation
+    # skipped the fence and landed on the second table. A fence is content the
+    # author wrote between the two, so it separates them.
+    /^```/ { fence = !fence; endtable(); marked = 0; next }
     fence  { next }
+
+    # The designation. A reason is required, so `<!-- deciders-table: -->` declares
+    # nothing — the same shape the other in-band declarations in this repository use.
+    /<!--[ \t]*deciders-table:[^>]*[A-Za-z][^>]*-->/ {
+      endtable(); marked = 1; next
+    }
+
+    # An HTML comment block is not content, so it does not break the designation
+    # either — it is invisible, not interposed.
+    /<!--/ && !/-->/ { incomment = 1; endtable(); next }
+
+    /^#+[ \t]/ {
+      label = $0; sub(/^#+[ \t]+/, "", label); endtable(); marked = 0; next
+    }
+
     /^[|]/ {
       if (!head) {                 # the first row of a table is its heading row
-        head = 1; sep = 0; col = 0
+        head = 1; sep = 0; col = 0; donate = 0
         for (i = 2; i < NF; i++) if (tolower(clean($i)) == "name") col = i
+        if (marked) {
+          printf "MARK%s%d%s%s\n", TAB, NR, TAB, \
+            (col ? "with a Name column" : "declaring no Name column")
+          donate = col ? 1 : 0
+        } else if (col) {
+          printf "SKIP%s%d%s%s\n", TAB, NR, TAB, \
+            (label == "" ? "no heading above it" : label)
+        }
+        marked = 0
         next
       }
       if (!sep) {                  # the second has to be the separator
-        if ($0 ~ /^[|][-: |]+[|][ \t]*$/) sep = 1; else { head = 0; col = 0 }
+        if ($0 ~ /^[|][-: |]+[|][ \t]*$/) sep = 1; else { head = 0; col = 0; donate = 0 }
         next
       }
-      if (col) { v = clean($col); if (v != "") print v }
+      if (donate && col) { v = clean($col); if (v != "") printf "AUTH%s%s\n", TAB, v }
       next
     }
-    { head = 0; sep = 0; col = 0 } # a non-table line ends the table
+
+    # A non-table line ends the table. A BLANK one does not end the designation,
+    # because a declaration and the table it designates are separate Markdown
+    # blocks; anything else between them does.
+    {
+      endtable()
+      if ($0 !~ /^[ \t]*$/) marked = 0
+    }
   ' "$DECIDERS" 2>/dev/null
+}
+
+# deciders_listed -> one authorized name per line
+#
+# Exactly one designated table, or nobody. Two tables each claiming to be the list
+# cannot both be it, and an allowlist has no safe way to guess which — so it reads
+# as no list at all, the same as a file that designates none and the same as a
+# missing file.
+deciders_listed() {
+  local tab scan
+  tab="$(printf '\t')"
+  scan="$(deciders_scan)"
+  [ "$(printf '%s\n' "$scan" | awk -F"$tab" '$1 == "MARK"' | grep -c .)" -eq 1 ] || return 0
+  printf '%s\n' "$scan" | awk -F"$tab" '$1 == "AUTH" { print $2 }'
 }
 
 # authorized <name> -> 0 if the name is a listed decider
 authorized() {
   [ -f "$DECIDERS" ] || return 1
   deciders_listed | grep -qxF -- "$1"
+}
+
+# deciders_note -> what the gate ignored in DECIDERS.md, as a suffix for a refusal
+#
+# A refusal that says only "not listed" sends an author who added a second table and
+# a name to it looking in the right file for the wrong thing. The expensive case is
+# the silent one: a name sitting in a table that looks like the list and is not.
+deciders_note() {
+  local scan marks tab
+  tab="$(printf '\t')"
+  [ -f "$DECIDERS" ] || { printf '%s' ". There is no decider list at $DECIDERS"; return 0; }
+  scan="$(deciders_scan)"
+  marks="$(printf '%s\n' "$scan" | awk -F"$tab" '$1 == "MARK"' | grep -c .)"
+
+  if [ "$marks" -eq 0 ]; then
+    printf '%s' ". $(basename "$DECIDERS") designates no authorizing table, so it authorizes nobody: the list is the table carrying <!-- deciders-table: reason --> immediately above it"
+    return 0
+  fi
+  if [ "$marks" -gt 1 ]; then
+    printf '%s' ". $(basename "$DECIDERS") designates $marks tables as the authorizing list, which is ambiguous, so none of them authorizes anybody"
+    return 0
+  fi
+
+  printf '%s\n' "$scan" | awk -F"$tab" -v f="$(basename "$DECIDERS")" '
+    $1 == "SKIP" { n++; where = where (n > 1 ? ", " : "") "line " $2 " (" $3 ")" }
+    END { if (n) printf ". %s declares a Name column in %d table(s) it does not designate as the list — %s — and an undesignated table donates nobody", f, n, where }'
 }
 
 check_record() {
@@ -142,12 +253,17 @@ check_record() {
     # Two messages for one refusal code, because the fix differs. A role or a
     # model name is wrong and needs replacing; a real person's name just is not
     # on the list yet, and adding them is a reviewable change to DECIDERS.md.
+    #
+    # Both carry the same suffix: what the gate read the list from, and what in that
+    # file it ignored. "Not listed" alone is true and unhelpful when the name IS in
+    # the file, in a table that is not the list.
+    local note; note="$(deciders_note)"
     if printf '%s' "$decided" | tr 'A-Z' 'a-z' | grep -Eq "$OBVIOUSLY_NOT_A_PERSON"; then
       refuse "$f" "${ln:--}" "not-a-person" \
-        "decided_by is \"$decided\", which is a role or a machine, not a named person. A decision is made by someone listed in DECIDERS.md"
+        "decided_by is \"$decided\", which is a role or a machine, not a named person. A decision is made by someone listed in DECIDERS.md$note"
     else
       refuse "$f" "${ln:--}" "not-a-person" \
-        "decided_by is \"$decided\", who is not listed in DECIDERS.md: if that is a real person authorized to decide, add them there — the list is the control, and adding to it is meant to be an explicit change"
+        "decided_by is \"$decided\", who is not listed in DECIDERS.md: if that is a real person authorized to decide, add them there — the list is the control, and adding to it is meant to be an explicit change$note"
     fi
   fi
 

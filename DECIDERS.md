@@ -2,7 +2,21 @@
 
 A decision record's `decided_by:` must name someone on this list. `process/05-deliver/validate-decision.sh` refuses one that does not.
 
-**The list is the `Name` column of the table below, data rows only.** Nothing else in this file authorizes anybody: not the column heading, not an example in a code block, and not a second table added later. Until 2026-10-03 the gate read the first cell of every row in the file, which made `decided_by: Name` — the heading — an authorized decider.
+**The list is the `Name` column of the one table this file designates, data rows only.** The designation is an HTML comment immediately above that table, carrying a reason:
+
+```
+<!-- deciders-table: reason -->
+```
+
+It is written here inside a fenced block on purpose. Inside a fence it declares nothing, so showing the reader the form does not designate a second table — the same rule `<!-- declared-empty: … -->` already follows, and the reason an example row in a fenced block authorizes nobody.
+
+Nothing else in this file authorizes anybody: not the column heading, not an example in a code block, not a table inside an HTML comment, and not a second table added later.
+
+**Three things authorize nobody at all, deliberately:** a file that designates no table, a file that designates more than one, and a designated table with no `Name` column. An allowlist an author can switch off by leaving a line out is not an allowlist.
+
+Two earlier versions of this rule were wrong. Until 2026-10-03 the gate read the first cell of every row in the file, which made `decided_by: Name` — the heading — an authorized decider. From then until 2026-10-04 it read the `Name` column of *every* table, so a second table authorized everybody in it; this file, `CONTROLS.md` and the gate's own comment all said it could not, and no test exercised a second table.
+
+<!-- deciders-table: the authorized list — the Name column of the data rows below is what validate-decision.sh reads -->
 
 | Name | Since | git identity |
 |---|---|---|
