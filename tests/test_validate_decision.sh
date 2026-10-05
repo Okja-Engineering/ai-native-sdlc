@@ -7,6 +7,8 @@
 set -u
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$TEST_DIR/lib/assert.sh"
+# A mutation that matched nothing is a suite failure in its own right, named as one.
+. "$TEST_DIR/lib/mutate.sh"
 
 ROOT="$(cd "$TEST_DIR/.." && pwd)"
 GATE="$ROOT/process/05-deliver/validate-decision.sh"
@@ -329,6 +331,53 @@ cat > "$TMP/DECIDERS-no-name-col.md" <<'DEC'
 DEC
 out="$(DECIDERS_FILE="$TMP/DECIDERS-no-name-col.md" bash "$GATE" "$(record A 'Ada Lovelace' 2026-10-01)" 2>&1)"; rc=$?
 assert_status 1 "$rc" "a designated table with no Name column donates nobody"
+
+# Two attacks on the repaired check rather than on the original defect, and the
+# first one got through.
+#
+# A fenced block between the declaration and a table. Blank lines do not break the
+# pair and a comment block does not either, so the first version skipped the fence
+# too — which meant putting the real list inside a fenced example and a second
+# table under it moved the designation onto the second table. A fence is content
+# the author wrote between the two.
+cat > "$TMP/DECIDERS-fence-between.md" <<'DEC'
+# Authorized deciders
+
+<!-- deciders-table: the authorized list -->
+
+```
+| Name | Since |
+|---|---|
+| Ada Lovelace | 2026-01-01 |
+```
+
+| Name | Since |
+|---|---|
+| Hacker McBot | 2026-01-01 |
+DEC
+out="$(DECIDERS_FILE="$TMP/DECIDERS-fence-between.md" bash "$GATE" "$(record A 'Hacker McBot' 2026-10-01)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a fenced block between the declaration and a table breaks the pair"
+
+# The declaration written INTO a table heading row, so the row is both the marker
+# and the heading. It designates a table with no Name column, which authorizes
+# nobody, and the file then designates two tables, which also authorizes nobody.
+cat > "$TMP/DECIDERS-marker-inline.md" <<'DEC'
+# Authorized deciders
+
+<!-- deciders-table: the authorized list -->
+
+| Name | Since |
+|---|---|
+| Ada Lovelace | 2026-01-01 |
+
+| Name | Since | <!-- deciders-table: no, this one -->
+|---|---|
+| Hacker McBot | 2026-01-01 |
+DEC
+for who in 'Ada Lovelace' 'Hacker McBot'; do
+  out="$(DECIDERS_FILE="$TMP/DECIDERS-marker-inline.md" bash "$GATE" "$(record A "$who" 2026-10-01)" 2>&1)"; rc=$?
+  assert_status 1 "$rc" "a declaration smuggled into a heading row authorizes nobody: $who"
+done
 
 # --- companion checks, equally shape-independent ------------------------------
 out="$(bash "$GATE" "$(record A 'Matt Van Dusen' '')" 2>&1)"
@@ -692,12 +741,33 @@ assert_contains "$(cat "$ROOT/DECIDERS.md")" \
   "$(sed -n 's/^decided_by:[[:space:]]*//p' "$ROOT/process/05-deliver/decisions/agent-pr-approval.md" | head -1)" \
   "the real decider list names the person the real record names"
 
-# And the real file designates exactly one table as the list. Zero would authorize
-# nobody and two would be ambiguous, and both of those fail closed — so without
-# this assertion the shipped file could lose its designation and every case above
-# would still pass against its own fixtures.
-assert_eq "1" "$(grep -c '<!--[[:space:]]*deciders-table:' "$ROOT/DECIDERS.md")" \
-  "the shipped DECIDERS.md designates exactly one authorizing table"
+# And the real file's designation is load-bearing. Every case above runs against a
+# fixture, so the shipped file could lose its marker and they would all still pass
+# while the gate authorized nobody — or regain the any-table harvest and they would
+# all still pass while it authorized everybody. Both directions are checked here
+# against the file the gate actually reads.
+#
+# Asserted by mutating a copy rather than by grepping for the marker, because a grep
+# would pin the markup and this pins the behaviour: remove the designation and the
+# real record is refused.
+cp "$ROOT/DECIDERS.md" "$TMP/DECIDERS-real.md"
+if mutate "$TMP/DECIDERS-real.md" \
+   's/\n<!-- deciders-table:[^>]*-->\n//' \
+   "the designation is removed from a copy of the real decider list"; then
+  out="$(DECIDERS_FILE="$TMP/DECIDERS-real.md" bash "$GATE" \
+        "$ROOT/process/05-deliver/decisions/agent-pr-approval.md" 2>&1)"; rc=$?
+  assert_status 1 "$rc" "without its designation the real decider list authorizes nobody"
+  assert_contains "$out" "designates no authorizing table" "and says that is why"
+fi
+
+# The illustrative form this file shows the reader sits in a fenced block, and a
+# fenced declaration declares nothing. If it ever stops being fenced the file
+# designates two tables and authorizes nobody, which the line above would catch —
+# but the reason is worth naming, because this repository has been caught three
+# times by a fenced example being read as the real thing.
+assert_eq "0" "$(DECIDERS_FILE="$ROOT/DECIDERS.md" bash "$GATE" \
+  "$ROOT/process/05-deliver/decisions/agent-pr-approval.md" >/dev/null 2>&1; echo $?)" \
+  "the real file shows the declaration form without designating a second table"
 
 
 # --- a missing option set is named once, not twice -----------------------------
@@ -834,4 +904,5 @@ out="$(bash "$GATE" "$(record A 'Ada Lovelace' 2026-10-01 OMIT)" 2>&1)"
 assert_contains "$out" "refuse[chosen-not-an-option]" \
   "an option heading quoted mid-line is not a declared option"
 
+mutate_done 1
 assert_done
