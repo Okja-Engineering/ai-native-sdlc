@@ -39,9 +39,13 @@
 # `validate-decision.sh`'s `no-chosen-field` shipped with neither, along with seven
 # of the scan gate's fifteen.
 #
-# Sideways: every gate script and both hooks are either named by a control or in
-# the exception table. The surface is enumerated from the tree, so a gate the
-# document forgets is refused rather than absent.
+# Sideways: every script whose FILENAME matches `process/*/validate-*.sh` or
+# `bin/validate-*.sh`, and the two hooks named literally below, is either named by
+# a control or in the exception table. The surface is that pattern over the tree,
+# NOT the tree: a gate the document forgets is refused if it is named like one,
+# and a script that refuses things under any other name is read by nothing here.
+# `bin/next.sh` is the standing proof in this repository. CONTROLS.md item 16 holds
+# it; widening the pattern is its own change and is not this one.
 #
 # WHAT THIS DOES NOT CHECK AT ALL
 #
@@ -69,10 +73,16 @@ refusals=0
 refuse() { printf '%s: refuse[%s]: %s\n' "${1#$ROOT/}" "$2" "$3" >&2; refusals=$((refusals + 1)); }
 
 # --- the enforcement surface --------------------------------------------------
-# Enumerated from the tree, not from the document, so a gate the document forgets
-# is still read. The two hooks were missing from CONTROLS.md until an external
-# audit found them, and a check that reads only the document cannot notice an
-# omission.
+# Enumerated from the tree rather than from the document, so a gate the document
+# forgets is still read. The two hooks were missing from CONTROLS.md until an
+# external audit found them, and a check that reads only the document cannot notice
+# an omission.
+#
+# It is enumerated BY FILENAME, which is the limit and is not obvious from reading
+# the line. These two globs and the two literal hooks are the whole surface, so a
+# script that refuses things under any other name is outside all three directions —
+# `bin/next.sh` is in the tree and outside this list today. CONTROLS.md said "the
+# surface comes from the tree" until 2026-10-04 and now says what this does.
 gates="$(cd "$ROOT" && ls process/*/validate-*.sh bin/validate-*.sh 2>/dev/null)"
 hooks=".githooks/commit-msg .githooks/pre-push"
 surface="$gates $hooks"
@@ -285,9 +295,11 @@ excepted_gate() { printf '%s\n' "$exceptions" | awk -F"$TAB" -v g="$1" '$1 == g 
 excepted_code() { printf '%s\n' "$exceptions" | awk -F"$TAB" -v g="$1" -v c="$2" '$1 == g && ($2 == c || $2 == "the gate itself") { f = 1 } END { exit !f }'; }
 
 # --- sideways: every gate and both hooks are named by a control or excepted ----
-# The surface comes from the tree, so a gate the document forgets is refused rather
-# than absent. Both hooks were missing from CONTROLS.md until an external audit
-# found them, and no check that reads only the document could have noticed.
+# The surface is a filename pattern over the tree, so a gate the document forgets is
+# refused rather than absent as long as it is NAMED like a gate. Both hooks were
+# missing from CONTROLS.md until an external audit found them, and no check that
+# reads only the document could have noticed. What this still cannot notice is a
+# script that refuses things under another name: CONTROLS.md item 16.
 for g in $surface; do
   if printf '%s\n' "$parsed" | awk -F"$TAB" -v g="$g" '$1 == "ENF" && $3 == g { f = 1 } END { exit !f }'; then
     continue

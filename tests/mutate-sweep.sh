@@ -177,8 +177,15 @@ while [ "$#" -gt 0 ]; do
 done
 
 # --- the surface --------------------------------------------------------------
-# Enumerated from the tree. A gate added without a suite is in the denominator by
-# existing, which is the property the old pattern-based sweep did not have.
+# Enumerated from the tree rather than from a list in this file, so a gate added
+# without a suite is in the denominator without anybody adding it here.
+#
+# It is still enumerated BY FILENAME, and that is the limit: a gate named outside
+# these two globs is not swept, exactly as it is not checked by
+# bin/validate-controls.sh. The two surfaces also differ — this one carries
+# bin/list-refusals.sh and that one does not — which is the disagreement
+# bin/list-refusals.sh's own header warns about, because a guard invisible to both
+# at once is how an untested refusal shipped. CONTROLS.md item 16 holds both facts.
 targets="$(cd "$ROOT" && ls process/*/validate-*.sh bin/validate-*.sh bin/list-refusals.sh 2>/dev/null) .githooks/commit-msg .githooks/pre-push"
 if [ -n "$only_target" ]; then targets="$only_target"; fi
 

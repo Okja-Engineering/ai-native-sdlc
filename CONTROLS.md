@@ -9,8 +9,8 @@
 **What keeps this document in step with the code.** `bin/validate-controls.sh` checks the wiring between the two in three directions, and `tests/test_controls.sh` drives it against this document and against documents built to break it.
 
 - **Forward.** Every refusal code a control cites is emitted at an **emission site** — a `refuse` call carrying that code as an argument — in a script that control's own **Enforced by** line names. A code in a comment does not satisfy it, and neither does a code some other gate emits.
-- **Backward.** Every refusal code any gate emits is cited by a control that names that gate, or is listed under *Refusals and gates no control covers* with a reason.
-- **Sideways.** Every gate script, and both git hooks, is either named by a control or listed there. The surface comes from the tree, so a gate this document forgets is refused rather than absent.
+- **Backward.** Every refusal code any gate **in that surface** emits is cited by a control that names that gate, or is listed under *Refusals and gates no control covers* with a reason. The surface is the one *Sideways* describes below, so this direction inherits its limit.
+- **Sideways.** Every script whose **filename matches** `process/*/validate-*.sh` or `bin/validate-*.sh`, plus the two git hooks named literally, is either named by a control or listed there. **The surface is that pattern over the tree, not the tree**, so a gate this document forgets is refused *if it is named like one* — and a script that refuses things under any other name is read by nothing in any of the three directions. This said *"the surface comes from the tree"* until 2026-10-04, which is the sentence an adopter adding a script of their own would rely on. The gap is *what is not controlled*, item 16; widening the enumeration is tracked as an open issue and is not done here.
 
 **It checks the wiring, not the claim.** That a control cites `not-a-person` and that `process/05-deliver/validate-decision.sh` emits `not-a-person` says nothing about whether the condition behind that code is the condition the Condition column describes. That is a reader's job, and it is where an assessor's time is now worth spending, because everything mechanical about this document is checked and this is not. *What is not controlled*, item 12, states that and four narrower limits.
 
@@ -478,5 +478,26 @@ What the declared form does change is narrower and worth stating exactly. The em
 Two narrower limits of the same check:
 
 - **What counts as an item is a markup rule.** An open item is a list item carrying its `[O]` grade. A real open item written as unmarked prose is not counted, so an artifact can be refused for a section that does carry content — an actionable refusal rather than a silent pass, but a refusal of honest work all the same. In the other direction, a fabricated item in the right markup — a bullet asserting that nothing was left open, graded `[O]` — is counted as an item and the section is not read any further. That one is a fabricated graded claim rather than an incidental word, which is a higher bar and not a closed door.
-- **Nothing stops a third section being written with a fourth word search.** The two gates hold the declaration separately, because they share no library and adding one would put a load-bearing script outside the enumeration *Sideways* builds from the tree. The form is declared in both contracts and here, and both suites pin the same behaviour; none of that is a mechanism that would refuse a new gate written the old way.
+- **Nothing stops a third section being written with a fourth word search.** The two gates hold the declaration separately, because they share no library and adding one would put a load-bearing script outside the enumeration *Sideways* builds, which is item 16 below. The form is declared in both contracts and here, and both suites pin the same behaviour; none of that is a mechanism that would refuse a new gate written the old way.
+
+**16. Whether a script that refuses things is covered at all, if it is not named like a gate.** This is the limit of *Sideways* at the top of this document, and it is the one an adopter is most likely to walk into: they add a script of their own, it refuses something no control claims, and the build is green.
+
+The surface is `ls process/*/validate-*.sh bin/validate-*.sh` plus two hooks named literally. **The filename is what decides whether a script is asked about**, in all three directions. A reviewer demonstrated it with a script in `bin/` called `check-smuggled.sh`, emitting a refusal no control claims: exit 0, every suite green. The same file renamed to begin `validate-` is refused.
+
+**It is not hypothetical, and the proof is already in the tree.** `bin/next.sh` carries a `refuse` call that `bin/list-refusals.sh` cannot read a code from — a condition this gate refuses on. Nothing refuses, because of the name:
+
+```
+$ bash bin/list-refusals.sh bin/next.sh
+bin/next.sh:149:?
+$ n=validate-next.sh; cp bin/next.sh "bin/$n"
+$ bash bin/validate-controls.sh 2>&1 | sed -n 's/.*\(refuse\[[a-z-]*\]\).*/\1/p'
+refuse[site-unreadable]
+refuse[uncontrolled-gate]
+```
+
+Nothing about the file changed, and the copy is named through a variable above so this document does not claim a path it does not have. Three more tracked scripts sit outside the surface — `bin/cycle.sh`, `bin/list-refusals.sh` and `process/01-scan/findings-ids.sh` — and the last two are load-bearing: `validate-define.sh` exits 2 without the harvester, and this gate exits 2 without the lister. Neither is named by a control or listed in the exception table.
+
+**The two denominators also disagree.** `bin/list-refusals.sh`'s own header says the document check and the mutation sweep have to agree about what a site is, because a guard invisible to both at once is how an untested refusal shipped. The sweep's surface carries `bin/list-refusals.sh` and this gate's does not, so they differ by one script today.
+
+**Both directions are asserted in `tests/test_controls.sh`**, so this is recorded as a gap and cannot be read as coverage: a refusing script outside the pattern is not noticed, the same file inside it is refused, and the refusal lister reads both — which is what shows that the enumeration rather than the lister is what excludes it. Widening the enumeration is a deliberate change tracked as its own open issue and is not done here: a wider surface makes every tracked script something this document has to account for. **Fewer claims honestly enforced is the trade.**
 
