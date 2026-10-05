@@ -936,4 +936,101 @@ np="$(printf '%s\n' "$paths" | grep -c .)"
 [ "$np" -ge 5 ] && ok=yes || ok=no
 assert_eq "yes" "$ok" "the path enumeration found the phases (found $np)"
 
+# --- a transcribed `list-refusals` run agrees with what the command prints -----
+# `CONTROLS.md` item 16 is the one section a reader is invited to verify by running,
+# and its transcript had drifted: it showed `bin/next.sh:149:?` where the command
+# prints `bin/next.sh:163:?`. Line 149 is `wrap_ids "$5"`; 163 is the `refuse` call
+# the item is about. An auditor found it, which is the wrong way round — the same
+# shape as a transcribed git tally nobody re-ran, and this suite already holds that
+# one.
+#
+# So the invariant is the same here: a transcript equals what its own command prints.
+# No output is pinned in this file; the expected value is produced by running the
+# command on every run, so this cannot go stale and cannot be satisfied by editing
+# one literal into agreement with another.
+#
+# ONLY `bash bin/list-refusals.sh` IS RUN. A test that executed whatever a document
+# put after a `$` would be a document deciding what the suite does, so the one
+# command this reads is a read-only enumerator over tracked files. Widening that is
+# its own change.
+TABX="$(printf '\t')"
+
+# refusal_transcript_rows <files...> -> file, line, command, expected (tab separated,
+# expected lines joined by `~`)
+refusal_transcript_rows() {
+  awk -v T="$TABX" '
+    function flush() { if (have) { printf "%s%s%s%s%s%s%s\n", FILENAME, T, ln, T, cmd, T, ex; have = 0 } }
+    FNR == 1 { fence = 0; have = 0 }
+    /^[ \t]*```/ { flush(); fence = !fence; next }
+    !fence { next }
+    /^\$ / {
+      flush()
+      c = substr($0, 3)
+      # A continued command is one command. deliver-contract.md writes one across
+      # two lines, and reading only the first would run a different thing.
+      while (c ~ /\\[ \t]*$/) {
+        sub(/\\[ \t]*$/, "", c)
+        if ((getline nxt) <= 0) break
+        sub(/^[ \t]+/, "", nxt); c = c nxt
+      }
+      if (c ~ /^bash bin\/list-refusals\.sh/) { have = 1; ln = FNR; cmd = c; ex = "" }
+      next
+    }
+    have { ex = ex (ex == "" ? "" : "~") $0 }
+    END { flush() }
+  ' "$@"
+}
+
+# trim each `~`-joined line and drop empties, so a transcript is compared on its
+# content rather than on how the document indents it
+norm() { printf '%s' "$1" | tr '~' '\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -v '^$' | tr '\n' '~' | sed 's/~$//'; }
+
+# refusal_transcripts <files...> -> one line per transcript the command disagrees with
+refusal_transcripts() {
+  local f ln cmd ex got want
+  refusal_transcript_rows "$@" | while IFS="$TABX" read -r f ln cmd ex; do
+    [ -n "${cmd:-}" ] || continue
+    got="$(norm "$(bash -c "$cmd" 2>&1 | tr '\n' '~')")"
+    want="$(norm "$ex")"
+    [ "$got" = "$want" ] && continue
+    printf '%s:%s(%s printed "%s", the document says "%s")\n' "$f" "$ln" "$cmd" "$got" "$want"
+  done
+}
+
+transcript_files="$(git ls-files -- '*.md' 2>/dev/null)"
+ntr="$(refusal_transcript_rows $transcript_files | grep -c .)"
+[ "${ntr:-0}" -ge 2 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "the documents carry list-refusals transcripts to check (found ${ntr:-0})"
+
+assert_eq "" "$(refusal_transcripts $transcript_files)" \
+  "every transcribed list-refusals run prints what its document says it prints"
+
+# And the detection has to be able to fire, or the assertion above is a check that
+# cannot fail. Same shape as the git-tally fixtures: a true transcript passes and a
+# wrong one is reported.
+mkdir -p "$TMP"
+{
+  printf 'A document showing what the lister prints.\n\n'
+  printf '```\n$ bash bin/list-refusals.sh bin/next.sh\n'
+  bash bin/list-refusals.sh bin/next.sh
+  printf '```\n'
+} > "$TMP/tr-true.md"
+assert_eq "" "$(refusal_transcripts "$TMP/tr-true.md")" \
+  "a transcript that agrees with the command passes"
+
+sed 's/:[0-9][0-9]*:?/:149:?/' "$TMP/tr-true.md" > "$TMP/tr-drifted.md"
+assert_eq "1" "$(( $(cksum < "$TMP/tr-true.md" | cut -d' ' -f1) == $(cksum < "$TMP/tr-drifted.md" | cut -d' ' -f1) ? 0 : 1 ))" \
+  "the drifted fixture really differs from the true one"
+case "$(refusal_transcripts "$TMP/tr-drifted.md")" in
+  *tr-drifted.md:*) fires=yes ;;
+  *) fires=no ;;
+esac
+assert_eq "yes" "$fires" "a transcript showing a line number the command does not print is reported"
+
+# A command mentioned in prose is not a transcript, or every sentence naming the
+# lister would be read as a claim about its output.
+printf 'Run `bash bin/list-refusals.sh bin/next.sh` to see the unreadable site.\n' > "$TMP/tr-mention.md"
+assert_eq "" "$(refusal_transcripts "$TMP/tr-mention.md")" \
+  "a command mentioned in prose is not read as a transcript"
+
 assert_done
