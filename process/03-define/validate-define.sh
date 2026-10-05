@@ -167,7 +167,31 @@ check_cycle() {
   # Read once. The count was computed from the same expression three times over,
   # which is three places for the section boundary to be got wrong differently.
   outlier_text="$(outlier_body "$f")"
-  outliers=$(printf '%s\n' "$outlier_text" | grep -cE '^- \*\*')
+  # AN ITEM IS A LIST ITEM: a line beginning, FLUSH LEFT, with `-`, `*`, `+`, `1.`
+  # or `1)` and a space. The rule is stated once, in
+  # process/02-discover/discovery-contract.md under "What could not be
+  # established", and define-contract.md cites it for this section; an outlier is
+  # that shape without a grade, because an outlier is not graded.
+  #
+  # This expression and the one in validate-discovery.sh are that rule in two
+  # places. They are not shared as a library for the reason #104 records — a shared
+  # helper would be a load-bearing script outside the enumeration in CONTROLS.md,
+  # which is #95's decision — so what stops them drifting is
+  # tests/test_item_rule.sh, which drives one candidate line through both gates and
+  # asserts the verdicts are equal. They HAD drifted: the Discover gate accepted a
+  # bullet, a number or any line beginning `**` with the grade anywhere after it,
+  # and this one accepted only `^- \*\*`. The looser one let a bold-led sentence
+  # empty a mandatory disclosure section.
+  #
+  # THIS IS A LOOSENING OF THIS GATE, named as one. It used to require a bold lead,
+  # `^- \*\*`. Nothing ever stated that requirement — not this contract, not the
+  # Discover one — and no sentence can say why two asterisks matter, so keeping it
+  # would have made one artifact's markup the rule for both gates. Against a
+  # deliberate author it bought four characters: `- **nothing clustered oddly**`
+  # counted before and `- nothing clustered oddly` counts now, and both are the
+  # fabricated-item-in-the-right-markup bar CONTROLS.md already discloses. The
+  # shipped cycle's count is unchanged at three.
+  outliers=$(printf '%s\n' "$outlier_text" | grep -cE '^([-*+]|[0-9]+[.)])[[:space:]]')
   if ! grep -q '^## Outliers' "$f"; then
     refuse "$f" "-" "no-outlier-section" \
       "no Outliers section: an empty outlier list and an omitted one look identical, so an empty one must say so"

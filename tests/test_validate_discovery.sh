@@ -13,6 +13,7 @@
 set -u
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$TEST_DIR/lib/assert.sh"
+. "$TEST_DIR/lib/topic-fixture.sh"
 
 ROOT="$(cd "$TEST_DIR/.." && pwd)"
 GATE="$ROOT/process/02-discover/validate-discovery.sh"
@@ -335,41 +336,13 @@ assert_contains "$(gate "$t" "$NEW")" "refuse[no-grade-key]" "a partial key is r
 # shape, per AGENTS.md, and a hollow artifact that was never one of the inputs is
 # the only honest test of a repair derived from the inputs. It carries the trailing
 # `---` every shipped topic has, so every case below is also the separator case.
+#
+# The builder itself lives in tests/lib/topic-fixture.sh, because
+# tests/test_item_rule.sh drives the same section through this gate and the Define
+# gate and asserts they reach the same verdict. Two copies of one fixture builder
+# would drift, and the cross-gate assertion would then compare two artifacts.
 topic() { # <open-section body> <suffix> -> path
-  local p="$TMP/open$2.md"
-  cat > "$p" <<EOF
-# Discovery — whether to turn the thing on
-
-dated: 2026-10-04
-status: discovery complete, not assessed
-
-## The question, in the asker's own words
-
-> should we turn it on
-
-## 2 · Coverage
-
-**Reached:** the GitHub REST API, and the SemIf source at commit 23cf1f3
-**Not reached:** JevBench
-**Verified by hand:** the GitHub REST API
-
-## Claims
-
-The GitHub REST API returned 300 pull requests, and the SemIf source was read at commit 23cf1f3. JevBench was not read at all. [E]
-
-Grades are the STANDARDS.md scheme: [V] vendor, never outcome evidence, [S] standard, [P] practitioner, [O] open.
-
-## What could not be established
-
-$1
-
----
-
-## Where this stops
-
-Here.
-EOF
-  printf '%s' "$p"
+  topic_fixture "$TMP/open$2.md" "$1"
 }
 
 # The control first, so a refusal below cannot be the gate refusing everything.
@@ -410,6 +383,68 @@ assert_contains "$out" "refuse[silent-empty-open]" \
 # a bulleted item carrying its grade is accepted even when its text is short.
 out="$(bash "$GATE" "$(topic '- **Whether JevBench seals its slice. [O]**' bolditem)" 2>&1)"; rc=$?
 assert_status 0 "$rc" "a bulleted item carrying its [O] grade is accepted"
+
+# --- an item is a LIST ITEM, and a bold label is not a list marker -------------
+# The count accepted a third marker — any line beginning `**`, with the `[O]`
+# ANYWHERE after it. So a bold-led sentence of prose was an open item, including one
+# that explicitly denies using the grade. Reproduced on the shipped topic: all seven
+# items deleted, the line below in their place, gate exit 0 and the whole suite
+# green.
+#
+# The contract carried both halves of this in one paragraph — "the marker may be a
+# bullet, a number or a bold label" and "a line of prose carrying an [O] somewhere in
+# it is not one" — and the gate implemented the first. It now says one thing: an item
+# is a list item, meaning a line that starts flush left with a list marker and a
+# space. Emphasis plays no part.
+#
+# The bold-label form is gone rather than repaired. The distinction it needs — a
+# label with the grade inside it, versus a sentence mentioning the grade — can be
+# drawn here and CANNOT be drawn in the Define twin, whose outliers carry no grade to
+# anchor it to. A form only one of the two gates can police is the drift this closes.
+BOLDPROSE='**Nothing remains open.** The two passes answered every question in scope; the grade [O] is not used in this artifact.'
+out="$(bash "$GATE" "$(topic "$BOLDPROSE" boldprose)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a bold-led sentence carrying an [O] is not an open item"
+assert_contains "$out" "refuse[silent-empty-open]" \
+  "so a section emptied that way is still silently empty"
+
+# The form is gone, not narrowed. A bold label that really is a label and really
+# carries its grade is refused too, because the gate cannot tell it from the line
+# above without reading the author's intent.
+out="$(bash "$GATE" "$(topic '**1. Whether JevBench seals its slice. [O]**' boldlabel)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a bold label with no list marker is not an item, whatever it carries"
+assert_contains "$out" 'LIST ITEM' "and the refusal says what an item is instead"
+
+# Three attacks that were not the reproduction. If any of these passed, the rule
+# would still be shaped to the examples it was written from.
+out="$(bash "$GATE" "$(topic '**Nothing remains open** ([O])' paren)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a bold label with the grade in a trailing parenthesis is not an item"
+
+out="$(bash "$GATE" "$(topic '**Nothing remains open.**'$'\n''[O]' nextline)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a bold label whose grade is on the next line is not an item"
+
+out="$(bash "$GATE" "$(topic 'Whether JevBench seals its slice'$'\n'': [O] not resolvable from outside' deflist)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a definition-list form is not an item"
+
+# A marker character with no space after it is not a list marker.
+out="$(bash "$GATE" "$(topic '-Whether JevBench seals its slice. [O]' nospace)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a hyphen with no space after it is not a list marker"
+
+# And the positive half across every marker, so the rule is pinned as a rule and not
+# as the one example it was written from. A fixture in this very suite had already
+# written a plain bullet as an item without anyone thinking twice, which is why the
+# rule does not require emphasis.
+for form in \
+  '- **Whether JevBench seals its slice. [O]**' \
+  '- **Whether JevBench seals its slice.** [O]' \
+  '- Whether JevBench seals its slice. [O]' \
+  '* Whether JevBench seals its slice. [O]' \
+  '+ Whether JevBench seals its slice. [O]' \
+  '1. Whether JevBench seals its slice. [O]' \
+  '1) Whether JevBench seals its slice. [O]'
+do
+  out="$(bash "$GATE" "$(topic "$form" marker)" 2>&1)"; rc=$?
+  assert_status 0 "$rc" "a list item carrying its grade is accepted: $form"
+done
 
 # An empty section that DECLARES it, with a reason, is accepted — the repair must
 # not be "always refuse an empty section". A phase that genuinely left nothing open

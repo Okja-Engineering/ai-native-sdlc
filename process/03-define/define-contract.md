@@ -165,6 +165,14 @@ Same shape as `rests on: none` plus its reason above, and as `<!-- not-a-claim: 
 
 The same declaration is what the Discover contract requires of an empty *what could not be established* section. One form, two sections, declared in both contracts because the two gates share no library.
 
+**What counts as an item is stated once, and not here.** [`process/02-discover/discovery-contract.md`](../02-discover/discovery-contract.md), under *What could not be established*, is the one statement: an item is a list item — a line beginning, flush left, with `-`, `*`, `+`, `1.` or `1)` and a space. An outlier is that shape without the grade, because an outlier is not graded.
+
+This section used to imply its own rule and `validate-define.sh` to implement one that was written nowhere — `^- \*\*`, a bullet with a bold lead — while the Discover gate implemented a looser one. So the two sections that are supposed to share a shape disagreed about it, and the looser gate was the one behind the audit question about where the process says it could not verify something.
+
+**The bold lead is no longer required here, which is a loosening of this gate.** Nothing ever stated it, and no sentence can say why two asterisks matter; keeping it would have made one cycle's markup the rule for two gates. Against an author who wants to fabricate an outlier it bought four characters. Cycle `2026-09-29`'s count is unchanged at three.
+
+`tests/test_item_rule.sh` drives one candidate line through both gates and asserts the verdicts are equal, which is what stops them drifting again while they still hold separate copies of the check.
+
 ### Accounting
 
 **The gate's most load-bearing input, so it is declared here and not as an example.** Every id the source records, in one fenced block, which `validate-define.sh` compares against the source as a set.
