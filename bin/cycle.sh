@@ -102,24 +102,6 @@ pass_duration() {
   fi
 }
 
-# field <file> <key> -> the first value outside a fenced block, trimmed.
-#
-# Fences are skipped for the reason process/03-define/validate-define.sh gives:
-# a document showing what a field looks like donated the example as the value.
-# `index` rather than a regex, because a key can contain a space and a key is not
-# a pattern.
-field() {
-  awk -v key="$2" '
-    /^[ \t]*(```|~~~)/ { fence = !fence; next }
-    fence { next }
-    index($0, key ":") == 1 {
-      v = substr($0, length(key) + 2)
-      sub(/^[ \t]+/, "", v); sub(/[ \t]+$/, "", v)
-      print v; exit
-    }
-  ' "$1" 2>/dev/null
-}
-
 # --- dates --------------------------------------------------------------------
 #
 # PORTABILITY, WHICH IS THE WHOLE DIFFICULTY HERE. `date -d` is a GNU extension
