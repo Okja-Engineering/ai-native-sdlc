@@ -485,4 +485,41 @@ do
   assert_status 0 "$STATUS" "the bare locator is still accepted: $ok_src"
 done
 
+# --- the contract's own worked example is within the contract -------------------
+# findings-contract.md:3 calls itself "the only place the shape of a findings file is
+# declared", and the gate reads its declarations from there rather than carrying a
+# second copy. The example in that same document had SIX columns where the
+# declaration had seven: the `id` column landed and the example was not updated, so a
+# file written from the example drew refuse[columns] twice — once for the header and
+# once for the row.
+#
+# THE EXAMPLE IS THE FIXTURE, extracted at run time rather than copied here. A copy
+# would be a third declaration of the shape and would go stale the same way; reading
+# the document means the assertion is about what a person following it would actually
+# write.
+case_no=$((case_no + 1))
+exdir="$TMP/example$case_no"
+mkdir -p "$exdir"
+awk '/^```markdown$/ { f = 1; next } f && /^```$/ { exit } f { print }' "$CONTRACT" \
+  > "$exdir/2026-10-01.md"
+assert_contains "$(cat "$exdir/2026-10-01.md")" "## Findings" \
+  "the worked example was extracted from the contract"
+ncol="$(sed -n 's/^| what.*/&/p;s/^| id .*/&/p' "$exdir/2026-10-01.md" | head -1 | awk -F'|' '{print NF - 2}')"
+assert_eq "$(sed -n '/<!-- contract:columns -->/,/<!-- \/contract:columns -->/p' "$CONTRACT" | grep -c '^- `')" \
+  "$ncol" "the example's table has as many columns as the contract declares"
+out="$(FINDINGS_DIR="$exdir" bash "$GATE" "$exdir/2026-10-01.md" 2>&1)"
+assert_not_contains "$out" "refuse[columns]" "the example's columns are not refused"
+
+# One substitution, named: the source cell is `<URL or precise citation>`, and a
+# placeholder is not a locator. Every other `<...>` in the example is free text the
+# gate does not read, so the example is run as written apart from this one cell.
+assert_contains "$(cat "$exdir/2026-10-01.md")" '<URL or precise citation>' \
+  "the example's source cell is a placeholder"
+sed 's|<URL or precise citation>|https://example.com/a-source|' "$exdir/2026-10-01.md" \
+  > "$exdir/filled.md" && mv "$exdir/filled.md" "$exdir/2026-10-01.md"
+out="$(FINDINGS_DIR="$exdir" bash "$GATE" "$exdir/2026-10-01.md" 2>&1)"; rc=$?
+assert_status 0 "$rc" "a findings file written from the contract's own example passes its gate"
+assert_eq "" "$(printf '%s' "$out" | grep 'refuse\[' || true)" \
+  "with no refusal of any kind"
+
 assert_done

@@ -47,7 +47,10 @@ flowchart LR
 
 **Discover is conditional, and both shipped problems went through it.** Each problem file carries `rests on:` pointing at its topic. This said `producing-themes` had taken the other route, read off that problem's missing `rests on:` field — but the discovery had run: the problem's argument about what a cheap classifier costs is drawn entirely from [the classifier topic](process/02-discover/topics/classifier-models.md), dated the day before it, and the field was simply absent. `rests on:` is now a declared field of a problem and the link is there. The conditional route is `rests on: none` with the reason, and nothing has taken it yet. Discover establishes what is true about a theme when a theme needs that; it is not a toll gate on every item.
 
-**`bin/cycle.sh` prints the per-cycle steps in that order and lists Discover topics in a separate block after them.** A topic hangs off a problem rather than off a cycle, so there is no single place in a cycle's listing for it to sit. Run it and read the output: the `topics` block is the last thing printed, and it names which problem each topic rests under, or says it rests under none.
+**`bin/cycle.sh` prints the per-cycle steps in that order and lists Discover topics in a separate block after them.** A topic hangs off a problem rather than off a cycle, so there is no single place in a cycle's listing for it to sit. Run it and read the output: the `topics` block names which problem each topic rests under, or says it rests under none, and a `dates` block is the last thing printed — the last scan and the nearest decision expiry.
+
+This said *"the `topics` block is the last thing printed."* It stopped being true when the `dates` block was added after it and nothing noticed, which is the staleness this file claims below was repaired by deleting hand-typed duplicates — back as a claim about output ordering rather than a count. `tests/test_cycle.sh` now pins the block order and refuses any tracked document that names a block as the last one when it is not. <!-- corrected-claim: the topics block is the last thing printed — the correction has to quote the sentence it corrects -->
+
 
 **Deliver is itself the last human gate** — a decision needs a named natural person from [`DECIDERS.md`](DECIDERS.md), and the gate refuses a role, a team or a model name.
 

@@ -379,6 +379,81 @@ out="$( ( cd "$SB" && CYCLE_TODAY=tomorrow bash bin/cycle.sh 2>&1 ) )"; rc=$?
 assert_status 2 "$rc" "an unreadable CYCLE_TODAY exits 2"
 assert_contains "$out" "CYCLE_TODAY" "and says which input it could not read"
 
+# --- the block order is pinned, and the documents agree with it ----------------
+# `README.md` said "the `topics` block is the last thing printed". It had not been
+# true since a `dates` block was added after it, and nothing noticed — the same
+# staleness class `README.md` and `spec.md` both claim was repaired by deleting
+# hand-typed duplicates, back as a claim about output ordering rather than a count.
+#
+# Two things are asserted, and the second is the one that stops this recurring: the
+# order itself, and that no tracked document names a block as the last one unless it
+# IS the last one. So adding a seventh block is a test failure until the sentence
+# describing the output is updated with it.
+blocks="$(run | sed -n 's/^\([a-z][a-z]*\)$/\1/p' | tr '\n' ' ' | sed 's/ $//')"
+assert_eq "topics dates" "$blocks" "the report prints its trailing blocks in a pinned order"
+
+last_block="${blocks##* }"
+assert_eq "dates" "$last_block" "and the last block is the one the documents must name"
+
+# Every tracked document that says a named block is the last thing printed has to
+# name THIS one. The sentence is matched rather than the file, so a second document
+# making the claim is covered without editing a list here.
+#
+# A line that RECORDS a corrected claim is exempt, declared in band with a reason —
+# `<!-- corrected-claim: ... -->`, the form AGENTS.md, CONTROLS.md and DECIDERS.md
+# already use. A correction has to quote the sentence it corrects, so without the
+# exemption this check would refuse the only honest way to record that it was wrong.
+# stale_last_block_claims <files...> -> the files carrying one
+stale_last_block_claims() {
+  local f line out=""
+  for f in "$@"; do
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      case "$line" in
+        # A declaration needs a REASON, the same two checks every other in-band
+        # declaration here is held to. `<!-- corrected-claim: -->` exempts nothing.
+        *'<!-- corrected-claim:'*[A-Za-z]*'-->'*) continue ;;
+        *"\`$last_block\` block is the last thing"*) continue ;;
+        *"the last thing printed"*|*"the last thing it prints"*) out="$out $f" ;;
+      esac
+    done <<CLAIMS
+$(grep -nE 'the last thing (printed|it prints)' "$f" 2>/dev/null)
+CLAIMS
+  done
+  printf '%s' "$out"
+}
+
+tracked_md=""
+for f in $(git -C "$ROOT" ls-files -- '*.md'); do tracked_md="$tracked_md $ROOT/$f"; done
+assert_eq "" "$(stale_last_block_claims $tracked_md)" \
+  "no document names a block as the last thing printed unless it is \`$last_block\`"
+
+# And the check has to be able to fire, three ways, or the line above is a check that
+# cannot fail. The third case is the one found by loosening: broadening the exemption
+# from `corrected-claim` to any HTML comment broke nothing, because no fixture carried
+# a comment that was not a declaration.
+printf 'The `topics` block is the last thing printed.\n' > "$TMP/p1.md"
+case "$(stale_last_block_claims "$TMP/p1.md")" in
+  *p1.md*) ok=yes ;; *) ok=no ;;
+esac
+assert_eq "yes" "$ok" "a document naming the wrong block as last is caught"
+
+printf 'The `topics` block is the last thing printed. <!-- a note about something else -->\n' > "$TMP/p2.md"
+case "$(stale_last_block_claims "$TMP/p2.md")" in
+  *p2.md*) ok=yes ;; *) ok=no ;;
+esac
+assert_eq "yes" "$ok" "a comment that is not a declaration does not exempt the claim"
+
+printf 'The `topics` block is the last thing printed. <!-- corrected-claim: -->\n' > "$TMP/p3.md"
+case "$(stale_last_block_claims "$TMP/p3.md")" in
+  *p3.md*) ok=yes ;; *) ok=no ;;
+esac
+assert_eq "yes" "$ok" "a declaration carrying no reason does not exempt it either"
+
+printf 'This said the `topics` block is the last thing printed. <!-- corrected-claim: it was true until the dates block landed -->\n' > "$TMP/p4.md"
+assert_eq "" "$(stale_last_block_claims "$TMP/p4.md")" \
+  "and a correction quoting the sentence it corrects is allowed to say it"
+
 # --- it writes nothing --------------------------------------------------------
 # The header says "Reads the tree. Writes nothing." Asserted rather than trusted.
 before="$(git -C "$SB" status --porcelain)"
