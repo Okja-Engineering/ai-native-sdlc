@@ -82,7 +82,18 @@ The distinction the paragraph was reaching for is real: a bold label used *as a 
 
 `<!-- declared-empty: every question in scope was answered, and the searches that found nothing are recorded under Coverage -->`
 
-Same shape as `<!-- not-a-claim: … -->` and `<!-- dead-pointer: … -->` in `STANDARDS.md` and `SOURCES.md`, and the same two things are checked: the declaration is present, and it carries a reason. **Inside a fenced block it declares nothing**, so an artifact that shows the reader what the form looks like does not thereby satisfy it. **A sentence is not a declaration**, and that distinction is the whole of why this is written down. Until 2026-10-04 the gate searched the section's prose for one of three short words, so an artifact could delete all seven of its items, write *"the discovery was exhaustive and nothing of consequence remains outstanding"*, and pass on the word "nothing". The declared form cannot be arrived at by accident, which is the only property that makes the section load-bearing.
+Same shape as `<!-- not-a-claim: … -->` and `<!-- dead-pointer: … -->` in `STANDARDS.md` and `SOURCES.md`, and the same two things are checked: the declaration is present, and it carries a reason. **A sentence is not a declaration**, and that distinction is the whole of why this is written down. Until 2026-10-04 the gate searched the section's prose for one of three short words, so an artifact could delete all seven of its items, write *"the discovery was exhaustive and nothing of consequence remains outstanding"*, and pass on the word "nothing". The declared form cannot be arrived at by accident, which is the only property that makes the section load-bearing.
+
+**A DISPLAYED DECLARATION DECLARES NOTHING, and that is five forms rather than one.** This said *"inside a fenced block it declares nothing"* and the gate implemented exactly that, which left four ways in. The declaration above is written as an inline code span on purpose, and until 2026-10-05 writing it that way in a topic would have satisfied this check: the reproduction on issue #116 deleted all seven items from `topics/agent-pr-approval.md`, wrote one line mentioning the form in backticks, and the gate reported the artifact within the contract with every suite green. A declaration is not a declaration when it sits inside
+
+- a fenced block, opened with backticks or with tildes
+- an inline code span
+- an HTML comment other than its own
+- a four-space indented block
+
+The same five apply to **an item**. A fenced illustration containing one bulleted `[O]` line counted toward the item total until 2026-10-05, and **the fenced example above is a working demonstration of that** — it was both the statement of the rule and the exploit of it. It stays where it is, because showing a reader three real items is what the paragraph is for; what changed is that the gate no longer counts them. `tests/test_item_rule.sh` drives those exact three lines through both gates and asserts neither counts an item, so this illustration cannot quietly become a hole again. Wrapping an item in an inline code span is not a display form for one: the line then begins with a backtick rather than a list marker, so it is not a list item and the question does not arise.
+
+The one reading all of this goes through is `bin/lib-rendering.sh`, which also records why a grade marker written in backticks on a real item still counts.
 
 **What the declaration does not establish.** That nothing was found. It records that the author says the section is empty and why; whether that is true is a reader's job, and `CONTROLS.md` carries it under *what is not controlled*.
 
