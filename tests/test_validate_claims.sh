@@ -113,6 +113,45 @@ assert_status 0 "$rc" "a vendor's speed claim recorded in findings/ is not refus
 rm -f "$SB/process/01-scan/findings/2099-01-01.md"
 ( cd "$SB" && git add -A >/dev/null 2>&1 )
 
+# --- and the scope is what the documents say it is -----------------------------
+# The pathspec carried FOUR excludes and `AGENTS.md` names two. The gate's own header
+# warns that "one over-broad entry turns the gate off silently", and `tests/*` was that
+# entry: a speed claim appended to a fixture passed while the same line in
+# `STANDARDS.md` was caught. The fourth, `bin/validate-claims.sh`, was DEAD — the
+# include is `*.md`, so it never matched — and it read as a documented self-exemption
+# while being none.
+#
+# Asserted behaviourally, not by reading the pathspec: a claim in each place either is
+# or is not refused. A test that grepped the script for its excludes would pass against
+# any spelling of the same hole.
+printf 'Our pipeline makes delivery 3x faster.\n' > "$SB/tests/fixtures/scan/claim-probe.md"
+out="$(cd "$SB" && git add -A >/dev/null 2>&1; bash bin/validate-claims.sh 2>&1)"; rc=$?
+assert_status 1 "$rc" "a speed claim in a tests/ document is refused"
+assert_contains "$out" "claim-probe.md" "and the refusal names the file"
+rm -f "$SB/tests/fixtures/scan/claim-probe.md"
+( cd "$SB" && git add -A >/dev/null 2>&1 )
+
+# Our own reasoning is in scope: a problem, an option set and a decision are us
+# writing, not a record of what someone else said.
+for d in process/03-define/problems process/04-develop/options process/05-deliver/decisions; do
+  printf 'Our pipeline makes delivery 3x faster.\n' > "$SB/$d/claim-probe.md"
+  out="$(cd "$SB" && git add -A >/dev/null 2>&1; bash bin/validate-claims.sh 2>&1)"; rc=$?
+  assert_status 1 "$rc" "a speed claim in $d is refused"
+  rm -f "$SB/$d/claim-probe.md"
+  ( cd "$SB" && git add -A >/dev/null 2>&1 )
+done
+
+# A record of what others said is not, and `topics/` as well as `findings/` — the two
+# directories AGENTS.md names, both asserted, so neither exclusion can be removed
+# silently either.
+for d in process/01-scan/findings process/02-discover/topics; do
+  printf 'TypeSafe states its product makes delivery 3x faster.\n' > "$SB/$d/claim-probe.md"
+  out="$(cd "$SB" && git add -A >/dev/null 2>&1; bash bin/validate-claims.sh 2>&1)"; rc=$?
+  assert_status 0 "$rc" "a recorded vendor claim in $d is not refused"
+  rm -f "$SB/$d/claim-probe.md"
+  ( cd "$SB" && git add -A >/dev/null 2>&1 )
+done
+
 # --- a pattern that does not compile must be loud ----------------------------
 # This is the assertion that matters most. The gate printed ok for an invalid
 # pattern because a non-zero git grep exit was read as "nothing found".

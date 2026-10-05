@@ -108,11 +108,30 @@ PATTERN="((makes?|made|making) ${OWN}(us|it|them|teams?|everyone|delivery|work|e
 # The pathspec is set ONCE, in the positional parameters, and both commands read it.
 # Written twice it would be the duplicated rule this repository keeps being burnt by:
 # a count taken over a different set than the scan is not a denominator.
+#
+# TWO EXCLUDES, AND THEY ARE THE TWO AGENTS.md NAMES. There were four, and the two
+# extra ones were in no document:
+#
+#   ':(exclude)tests/*'  — six markdown files, and the warning above is about exactly
+#   this: "one over-broad entry turns the gate off silently". A speed claim appended
+#   to a fixture passed while the same line in STANDARDS.md was caught. Dropped
+#   rather than documented: nothing in tests/ trips the pattern, so the gate is
+#   wider for free and the scope is now what the documents say it is.
+#
+#   ':(exclude)bin/validate-claims.sh' — DEAD. The include is `*.md`, so this file
+#   never matched the pathspec in the first place and the exclude did nothing. It
+#   read as a documented self-exemption and was not one, which is worse than either.
+#   Removing it changes the document count by zero, measured.
+#
+# The two that remain are argued in AGENTS.md, under the `claims` row: those files
+# record what other people said, and the scan and discovery contracts REQUIRE a
+# vendor's claim to be recorded as a claim. The boundary is by directory rather than
+# by phrasing because a lexical rule telling "we claim X" from "they claim X" would
+# be guessing at attribution. Our own reasoning — problems, options, decisions,
+# cycles — is IN scope, because that is us writing.
 set -- '*.md' \
   ':(exclude)process/*/findings/*' \
-  ':(exclude)process/*/topics/*' \
-  ':(exclude)bin/validate-claims.sh' \
-  ':(exclude)tests/*'
+  ':(exclude)process/*/topics/*'
 
 scanned="$(git ls-files -- "$@" 2>/dev/null | grep -c .)"
 if [ "$scanned" -eq 0 ]; then

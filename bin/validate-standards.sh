@@ -42,6 +42,45 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DOC="${STANDARDS_DOC:-$ROOT/STANDARDS.md}"
 REG="${SOURCES_DOC:-$ROOT/SOURCES.md}"
 
+# documents -> every document whose graded claims and evidence pointers this gate
+# reads, relative to ROOT
+#
+# WHY THIS IS NOT JUST STANDARDS.md ANY MORE
+#
+# It was, and the rule it implements is not about one file. `AGENTS.md:156` says
+# "grade every claim", and `AGENTS.md` carried four `[E]` claims with no source ID
+# and none of their sources in the register — the exact failure this gate was built
+# for, "31 graded claims, zero citations", reproduced in a second document because
+# the gate was keyed to a FILENAME rather than to the marker.
+#
+# The pointer half was keyed to a hand-written list of four documents, and
+# `CONTROLS.md` was not one of them while carrying the heaviest commit-citation load
+# in the repository. Replacing one of its SHAs with a dead one passed every gate.
+#
+# ENUMERATED POSITIVELY, which is the point. A list of excludes is a denylist and
+# `AGENTS.md` rules against one for a gate: every miss is silent and the set of
+# things that should have been in scope is unbounded. These four globs say what IS
+# in scope, so a new document at one of those depths is read by existing rather than
+# by someone remembering to add it.
+#
+# WHAT IS OUT, AND WHY. The dated records — `process/*/findings/*`,
+# `process/*/topics/*`, `process/*/problems/*`, `process/*/options/*`,
+# `process/*/cycles/*`, `process/*/decisions/*` — are one level deeper than
+# `process/*/*.md` and so are outside these globs. Their contracts require a
+# resolving source IN THE ROW for every claim, which is a different and stricter
+# mechanism than a register ID; asking them for `S-` ids would refuse every one of
+# the 26 graded claims they carry correctly. `tests/` is out because a fixture
+# exists to be refused by a gate, and a document built to fail a check is not a
+# document making a claim to a reader.
+#
+# From the filesystem rather than from `git ls-files`, because
+# tests/test_validate_standards.sh drives this gate against a copied tree whose
+# index is empty — an enumeration from the index would read nothing there and the
+# suite would prove the opposite of what it is for.
+documents() {
+  ( cd "$ROOT" && ls *.md .github/*.md .github/*/*.md process/*/*.md 2>/dev/null )
+}
+
 refusals=0
 refuse() { printf '%s: refuse[%s]: %s\n' "${1#$ROOT/}" "$2" "$3" >&2; refusals=$((refusals + 1)); }
 
@@ -120,38 +159,91 @@ fi
 # and is counted in this gate's summary. The first-character skip it replaces was
 # unconditional, silent and uncounted. A marker carrying no reason does not
 # exempt anything, so a careless one produces a refusal rather than a hole.
-scan="$(awk '
-  /<!--[ \t]*end-not-a-claim-block[ \t]*-->/ { inblock = 0; next }
-  /<!--[ \t]*not-a-claim-block:[^>]*[A-Za-z][^>]*-->/ { inblock = 1; x++; next }
-  inblock { next }
-  /<!--[ \t]*not-a-claim:[^>]*[A-Za-z][^>]*-->/ { x++; next }
-  /\[E\]|\[S\]/ { printf "C%d:%s\n", FNR, $0 }
-  END { printf "X%d\n", x + 0 }
-' "$DOC")"
-exemptions="$(printf '%s\n' "$scan" | sed -n 's/^X//p')"
-
-while IFS= read -r ln; do
-  [ -n "$ln" ] || continue
-  n="${ln%%:*}"; text="${ln#*:}"
-  # Must be a WELL-FORMED id, matched with the same pattern used to extract
-  # citations below. A substring test for '`S-' passed a claim citing `S-`,
-  # which satisfied "has a citation" while being extracted as none — so neither
-  # uncited-claim nor unknown-source fired and the hole was silent.
+#
+# ONE DOCUMENT MAY DECLARE THAT ITS GRADED CLAIMS RESOLVE INLINE, with a reason:
+#
+#   <!-- graded-claims-cite-inline: reason -->
+#
+# That exempts the document from `uncited-claim` and from nothing else. It exists
+# because `AGENTS.md` carries four `[E]` claims whose sources — a Kubernetes release
+# audit, a repository, an ICSE 2013 paper, an arXiv id — are named in the prose and
+# are in no register entry. The two ways to make it pass were to invent four register
+# rows, which means guessing a publication date and a limitations field for sources
+# nobody here opened and is the defect `SOURCES.md` exists to prevent, or to declare
+# the weaker state and check that the declaration is there. The second is honest; the
+# first reads as evidence.
+#
+# It is DECLARED rather than hardcoded so a reader sees it in the document making the
+# claim, it carries a reason, it is counted in the summary, and `CONTROLS.md` names
+# every document that carries one. Promoting those claims to register entries is the
+# owner's: it needs the four sources opened.
+exemptions=0
+inline_docs=""
+for d in $(documents); do
+  f="$ROOT/$d"
+  [ -f "$f" ] || continue
+  # The fence is tracked for ONE purpose: a `graded-claims-cite-inline` declaration
+  # inside a fenced block declares nothing. Found by attacking this check after
+  # writing it — a document could show the reader what the form looks like and
+  # thereby exempt its own uncited claims, which is the fifth time this repository
+  # has paid for a fenced example being read as the real thing.
   #
-  # Found by LOOSENING the comparison rather than deleting it: swapping the exact
-  # match for a substring match broke no test, which showed the suite pinned that
-  # the check was reachable and not that it was sufficient. The method is in
-  # AGENTS.md, "Tests: pin the invariant, not the literals"; it came out of issue
-  # #29, which a clone cannot read.
-  if printf '%s' "$text" | grep -qE '`S-[A-Z0-9]+[A-Z0-9-]*`'; then :; else
-    refuse "$DOC" "uncited-claim" "line $n carries an [E] or [S] grade and cites no well-formed source ID: the grade is the point of this document, and an uncited grade is an assertion wearing a label. A line that names a grade without using one declares that in band — <!-- not-a-claim: reason -->"
-  fi
-done <<EOF
+  # It deliberately does NOT gate the claim scan. A graded claim inside a fence is
+  # read today and some are declared `not-a-claim` on their own line; skipping fenced
+  # lines would be a loosening of a check that already works, made as a side effect
+  # of closing something else. The per-line `not-a-claim` form needs no fence rule for
+  # the same reason it was never vulnerable: it exempts only the line it sits on, so a
+  # fenced one exempts a fenced line and nothing above it.
+  scan="$(awk '
+    /^[ \t]*(```|~~~)/ { fence = !fence }
+    /<!--[ \t]*end-not-a-claim-block[ \t]*-->/ { inblock = 0; next }
+    /<!--[ \t]*not-a-claim-block:[^>]*[A-Za-z][^>]*-->/ { inblock = 1; x++; next }
+    inblock { next }
+    !fence && /<!--[ \t]*graded-claims-cite-inline:[^>]*[A-Za-z][^>]*-->/ { inline = 1; next }
+    /<!--[ \t]*not-a-claim:[^>]*[A-Za-z][^>]*-->/ { x++; next }
+    /\[E\]|\[S\]/ { printf "C%d:%s\n", FNR, $0 }
+    END { printf "X%d\nI%d\n", x + 0, inline + 0 }
+  ' "$f")"
+  exemptions=$((exemptions + $(printf '%s\n' "$scan" | sed -n 's/^X//p')))
+  if [ "$(printf '%s\n' "$scan" | sed -n 's/^I//p')" = 1 ]; then
+    inline_docs="${inline_docs:+$inline_docs }$d"
+  else
+    while IFS= read -r ln; do
+      [ -n "$ln" ] || continue
+      n="${ln%%:*}"; text="${ln#*:}"
+      # Must be a WELL-FORMED id, matched with the same pattern used to extract
+      # citations below. A substring test for '`S-' passed a claim citing `S-`,
+      # which satisfied "has a citation" while being extracted as none — so neither
+      # uncited-claim nor unknown-source fired and the hole was silent.
+      #
+      # Found by LOOSENING the comparison rather than deleting it: swapping the exact
+      # match for a substring match broke no test, which showed the suite pinned that
+      # the check was reachable and not that it was sufficient. The method is in
+      # AGENTS.md, "Tests: pin the invariant, not the literals"; it came out of issue
+      # #29, which a clone cannot read.
+      if printf '%s' "$text" | grep -qE '`S-[A-Z0-9]+[A-Z0-9-]*`'; then :; else
+        refuse "$f" "uncited-claim" "line $n carries an [E] or [S] grade and cites no well-formed source ID: a grade is the claim's evidence, and an uncited grade is an assertion wearing a label. A line that names a grade without using one declares that in band — <!-- not-a-claim: reason -->. A document whose graded claims resolve in their own prose rather than through the register declares that once, <!-- graded-claims-cite-inline: reason -->, and CONTROLS.md names it"
+      fi
+    done <<EOF
 $(printf '%s\n' "$scan" | sed -n 's/^C//p')
 EOF
+  fi
+done
 
 # --- every cited ID is in the register ---------------------------------------
-cited="$(grep -oE '`S-[A-Z0-9-]+`' "$DOC" | tr -d '`' | sort -u)"
+# Over every document in the surface, not just the one: a citation that resolves to
+# nothing reads as evidence wherever it is written.
+#
+# THE REGISTER ITSELF IS NOT A CITATION OF ITS OWN ENTRIES. Found by this gate's own
+# suite the moment the surface widened: every register row names its id in backticks,
+# so reading citations out of SOURCES.md made all 22 entries self-cited, and
+# "register entries nothing cites" — the number DECIDERS.md and SOURCES.md have both
+# been corrected against — collapsed to zero. A row declaring an id is a definition,
+# not a reference to one.
+cited="$(for d in $(documents); do
+  [ "$ROOT/$d" = "$REG" ] && continue
+  grep -oE '`S-[A-Z0-9-]+`' "$ROOT/$d" 2>/dev/null
+done | tr -d '`' | sort -u)"
 while IFS= read -r c; do
   [ -n "$c" ] || continue
   printf '%s\n' "$ids" | grep -qx "$c" || refuse "$DOC" "unknown-source" \
@@ -205,16 +297,53 @@ EOF
 # in backticks are not distinguishable from an ordinary word or a version number
 # in prose, and guessing would refuse `v4.0.1` in a sentence about PCI DSS.
 # CONTROLS.md carries that under what is not controlled.
+# SEVEN MORE SHAPES ARE NOT POINTERS, added when the surface stopped being a list of
+# four. Each is a narrowing of the check and each is here because the token cannot be
+# a place, not because refusing it was inconvenient:
+#
+#   a glob          `bin/validate-*.sh` is a pattern over paths, not one path
+#   a bracket       `[E]/[S]` is a pair of grade markers
+#   a variable      `cycles/$c.md` is a path a script computes, not one that exists
+#   a locator       `bin/next.sh:163:?` is file:line:code output, not an object name
+#   absolute        `/bin/bash` is on the machine, not in the repository
+#   `scheme:`       `doi:10.1145/3597503` resolves through a registrar
+#   a namespace     `experiment/` and `findings/` name a namespace and not a place,
+#                   so a token whose only `/` is its last character is a fragment
+#
+# The seventh is the one worth arguing with: it means a dead ref written as `foo/`
+# passes. That is the same class as the one-level branch name CTRL-8 already records
+# as not covered, and the alternative was refusing every prose mention of a directory.
 is_pointer() { # token -> 0 if the document is pointing at something
   case "$1" in
     *' '*|*'<'*|*'>'*) return 1 ;;   # a phrase or an identity, not a pointer
     *'://'*) return 1 ;;             # a URL resolves on the web, not in here
+    *'*'*|*'['*|*']'*|*'$'*|*'?'*) return 1 ;;
+    /*) return 1 ;;
   esac
   printf '%s' "$1" | grep -qE '^[0-9a-f]{7,40}(:.+)?$' && return 0
-  case "$1" in */*) return 0 ;; esac
+  # `scheme:` ahead of any `/`. The object-name form above is checked first, so
+  # `fa7538a:research/...` is already accepted and only a real scheme reaches here.
+  case "${1%%/*}" in *:*) return 1 ;; esac
+  case "$1" in
+    */*/*) return 0 ;;               # two or more segments: a place
+    */) return 1 ;;                  # one segment and a trailing slash: a namespace
+    */*) return 0 ;;
+  esac
   return 1
 }
 
+# A path is resolved FROM THE REPOSITORY ROOT ONLY.
+#
+# A document-relative fallback was written here first, because widening the surface to
+# all seventeen documents refused eleven correct relative paths — a contract beside its
+# records writes `cycles/2026-09-29.md`. Then the surface became the six documents that
+# cite an object name, every one of them at the top level, and removing the fallback
+# broke nothing: measured, zero refusals and no suite failure. So it was a fix for a
+# problem the final shape does not have, and it is gone rather than kept in case.
+#
+# What that costs: if a document under `process/` later cites an object name it joins
+# this surface, and its relative paths would be refused until the fallback comes back.
+# Written down rather than guarded against.
 resolves() { # pointer -> 0 if this repository has it, as a path or in git
   [ -e "$ROOT/$1" ] && return 0
   # `^{object}` rather than a bare --verify, and that is load-bearing:
@@ -234,7 +363,31 @@ resolves() { # pointer -> 0 if this repository has it, as a path or in git
   return 1
 }
 
-for f in "$DOC" "$REG" "$ROOT/README.md" "$ROOT/DECIDERS.md"; do
+# DERIVED, not a hand-written list. This was `"$DOC" "$REG" README.md DECIDERS.md` —
+# four documents chosen by whoever last edited the line. `CONTROLS.md` was not among
+# them while carrying more commit citations than any of the four, so replacing one of
+# its SHAs with a dead one passed this gate, validate-controls, test_doc_claims and
+# test_controls. `spec.md` was missing too, with two.
+#
+# A document is in this surface when it CITES AN OBJECT NAME — a 7-to-40 character
+# hexadecimal token in backticks, optionally with `:<path>`. That is the shape of an
+# evidence route in this repository: the research corpus is in history at a commit and
+# not on any branch, so a document that says "the evidence is at X" says it with an
+# object name. Six documents qualify today and the list is read off the tree, so a
+# seventh is covered by existing rather than by someone remembering this line.
+#
+# WHY NOT EVERY DOCUMENT. `is_pointer` below treats a backticked token containing `/`
+# as a repository path, which is close to true in a document whose backticks are
+# mostly paths and badly false elsewhere: run over all seventeen documents it refuses
+# twenty-nine tokens, almost all of them globs, grade pairs, DOIs and third-party
+# repository slugs. Widening further means recalibrating that heuristic, which is its
+# own change with prose churn in ten files. The surface is derived from the thing the
+# check is for instead.
+pointer_docs="$(for d in $(documents); do
+  grep -qE '`[0-9a-f]{7,40}(:[^` ]+)?`' "$ROOT/$d" 2>/dev/null && printf '%s\n' "$d"
+done)"
+for d in $pointer_docs; do
+  f="$ROOT/$d"
   [ -f "$f" ] || continue
   refs="$(grep -oE '`[^` ]+`' "$f" 2>/dev/null | tr -d '`' | sort -u)"
   while IFS= read -r r; do
@@ -288,5 +441,7 @@ if [ "$refusals" -gt 0 ]; then
   printf 'validate-standards: %s refusal(s)\n' "$refusals" >&2
   exit 1
 fi
-printf 'validate-standards: %s source(s) cited and resolving, %s in the register, %s not currently cited, %s line(s) declared not a claim\n' \
-  "$(printf '%s\n' "$cited" | grep -c . )" "$(printf '%s\n' "$ids" | grep -c .)" "$uncited" "$exemptions"
+printf 'validate-standards: %s source(s) cited and resolving, %s in the register, %s not currently cited, %s line(s) declared not a claim, %s document(s) read%s\n' \
+  "$(printf '%s\n' "$cited" | grep -c . )" "$(printf '%s\n' "$ids" | grep -c .)" "$uncited" "$exemptions" \
+  "$(documents | grep -c .)" \
+  "${inline_docs:+, graded claims cite inline in: $inline_docs}"
