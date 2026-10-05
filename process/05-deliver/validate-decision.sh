@@ -222,6 +222,43 @@ deciders_note() {
     END { if (n) printf ". %s declares a Name column in %d table(s) it does not designate as the list — %s — and an undesignated table donates nobody", f, n, where }'
 }
 
+# option_ids <option set> -> one declared option id per line
+#
+# An option set declares its options as `## <id> · <name>`, so the ids are read out
+# of it and `chosen:` is compared against them AS A LITERAL.
+#
+# It used to be `grep -qE "^## $chosen · "` — the field interpolated into an
+# expression. `chosen: .` and `chosen: [A-Z]` each matched every option, so CTRL-2
+# said a chosen option existed before it was chosen and one metacharacter defeated
+# it. Same shape as the `decided_by` denylist: the check was a pattern where the rule
+# is membership of an enumerated set, and `authorized()` above already compares names
+# with `grep -qxF` for exactly this reason.
+#
+# LC_ALL=C so `index` and `substr` agree about bytes. The separator is a multibyte
+# `·`, and in a UTF-8 locale BSD awk counts characters in substr and bytes in index,
+# which would cut the id short.
+#
+# The heading is recognised with a STRING COMPARISON rather than an anchored regex,
+# the way validate-define.sh scopes its outlier section — an anchored regex has an
+# anchor a sweep can drop, and a comparison does not.
+#
+# NO TEST DISTINGUISHES THAT GUARD, and it is worth saying which claim it does and
+# does not support. Removing it entirely leaves every suite green, because a prose
+# line mentioning a heading cannot yield a WELL-FORMED id: the offsets no longer line
+# up and what comes out is `# A` or `## A`, which collides with nothing a record would
+# declare. So the guard makes the harvest well defined; it is not what makes the gate
+# correct. The invariant — a mention of an option is not a declaration of one — is
+# pinned by the mid-line case in tests/test_validate_decision.sh, which passes for
+# that reason rather than because of this line. A fixture built to make this line
+# observable would have to collide a byte offset with a `chosen:` value, which pins
+# the arithmetic and not the rule.
+option_ids() { # <path>
+  LC_ALL=C awk '
+    substr($0, 1, 3) != "## " { next }
+    { i = index($0, " · "); if (i > 3) print substr($0, 4, i - 4) }
+  ' "$1" 2>/dev/null
+}
+
 check_record() {
   local f="$1" chosen decided dated opts ln
   chosen="$(field "$f" chosen)"
@@ -310,12 +347,15 @@ check_record() {
     opts_ok=0
   fi
   if [ "$opts_ok" -eq 1 ]; then
-    local resolved; resolved="$(cd "$(dirname "$f")" && cd "$(dirname "$opts_path")" 2>/dev/null && pwd)/$(basename "$opts_path")"
+    local resolved ids; resolved="$(cd "$(dirname "$f")" && cd "$(dirname "$opts_path")" 2>/dev/null && pwd)/$(basename "$opts_path")"
     if [ ! -f "$resolved" ]; then
       refuse "$f" "-" "options-unresolved" "the declared option set does not resolve: $opts_path"
-    elif ! grep -qE "^## $chosen · " "$resolved"; then
-      refuse "$f" "-" "chosen-not-an-option" \
-        "chosen is '$chosen', which is not an option in $(basename "$resolved"): if the right answer was not developed, go back to Develop"
+    else
+      ids="$(option_ids "$resolved")"
+      if ! printf '%s\n' "$ids" | grep -qxF -- "$chosen"; then
+        refuse "$f" "-" "chosen-not-an-option" \
+          "chosen is '$chosen', which is not an option in $(basename "$resolved"). That set declares: ${ids:+$(printf '%s' "$ids" | tr '\n' ',' | sed -e 's/,$//' -e 's/,/, /g')}${ids:-nothing — no '## <id> · <name>' heading in it}. If the right answer was not developed, go back to Develop"
+      fi
     fi
   fi
 

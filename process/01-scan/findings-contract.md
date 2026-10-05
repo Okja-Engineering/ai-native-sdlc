@@ -26,10 +26,12 @@ nothing found: no
 
 ## Findings
 
-| what | source | dated | kind | might affect (guess) | consequence guess |
-|---|---|---|---|---|---|
-| <one plain sentence> | <URL or precise citation> | 2026-09-14 | practice-change | verify (guess) | medium |
+| id | what | source | dated | kind | might affect (guess) | consequence guess |
+|---|---|---|---|---|---|---|
+| F01 | <one plain sentence> | <URL or precise citation> | 2026-09-14 | practice-change | verify (guess) | medium |
 ```
+
+**This example had six columns where the declaration below has seven**, from the day the `id` column landed until 2026-10-04. A findings file written from it drew `refuse[columns]` twice, so the one document that calls itself the only place the shape is declared described a file its own gate refuses. `tests/test_validate_findings.sh` now extracts this block, writes it as a findings file and runs the gate over it — the example is the fixture, read from here rather than copied, because a copy would be a third declaration of the shape and would go stale the same way.
 
 Prose lines are allowed anywhere — a note about a gap, a caveat about a source. Fields and headings are not: the field keys, the table columns, and these headings are exactly what is declared, and each field appears once.
 

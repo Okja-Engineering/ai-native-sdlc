@@ -1,6 +1,6 @@
 # Source register
 
-Every `[E]` and `[S]` claim in [`STANDARDS.md`](STANDARDS.md) cites an ID from this file. `bin/validate-standards.sh` refuses a graded claim that cites no ID — `uncited-claim` — and refuses a cited ID that is not here — `unknown-source`.
+Every `[E]` and `[S]` claim in [`STANDARDS.md`](STANDARDS.md) cites an ID from this file. `bin/validate-standards.sh` refuses a graded claim that cites no ID — `uncited-claim` — and refuses a cited ID that is not here — `unknown-source`. <!-- not-a-claim: this sentence states the rule the gate enforces and names its two refusals, it does not grade anything -->
 
 **Each enforcement sentence above names the refusal it is claiming**, so a reader can check it against the gate rather than read it and believe it. `tests/test_controls.sh` resolves every code named here against the gate that emits it, and flags a sentence that claims a refusal without naming one. That rule applied to `CONTROLS.md` alone until 2026-10-03, which is how the sentence below went wrong here while the control document had it right.
 
@@ -15,7 +15,7 @@ validate-standards: 14 source(s) cited and resolving, 22 in the register, 8 not 
 
 The register is the corpus the research was done from, not an index of this document's footnotes. Refusing an uncited entry would force someone to delete a real source or attach it to a claim it does not support, and both are worse than a row nothing points at.
 
-**Why this file exists.** `STANDARDS.md` carried 31 graded claims and zero citations. Its only route to evidence was a reference to a branch, `experiment/0.0.0`, which does not exist on origin and never did. From inside the repository every `[E]` claim was an assertion. Found by the external audit in #22; the register was recovered from history at `fa7538a:research/sources/source-register.md`. <!-- dead-pointer: experiment/0.0.0 — named here to record that it never existed on origin, not as a route to anything -->
+**Why this file exists.** `STANDARDS.md` carried 31 graded claims and zero citations. Its only route to evidence was a reference to a branch, `experiment/0.0.0`, which does not exist on origin and never did. From inside the repository every `[E]` claim was an assertion. Found by the external audit in #22; the register was recovered from history at `fa7538a:research/sources/source-register.md`. <!-- dead-pointer: experiment/0.0.0 — named here to record that it never existed on origin, not as a route to anything --> <!-- not-a-claim: this records that STANDARDS.md once carried uncited grades, it does not grade anything -->
 
 **Three defects in the recovered corpus are corrected here**, not inherited. `STANDARDS.md` named them and nothing had acted on it:
 

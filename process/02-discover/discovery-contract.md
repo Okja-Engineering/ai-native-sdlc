@@ -46,7 +46,7 @@ A discovery artifact without a "verified by hand" section is a pile of agent out
 
 ### Claims, each with a grade and a resolving source
 
-Grades are the `STANDARDS.md` scheme: `[E]` empirical · `[S]` standard · `[V]` vendor, never outcome evidence · `[P]` practitioner, unmeasured · `[O]` open.
+Grades are the `STANDARDS.md` scheme: `[E]` empirical · `[S]` standard · `[V]` vendor, never outcome evidence · `[P]` practitioner, unmeasured · `[O]` open. <!-- not-a-claim: this is the grade key, it declares what each marker means rather than using one -->
 
 **No source, no claim.** Same rule as the scan, for the same reason.
 
@@ -121,7 +121,7 @@ Built as `validate-discovery.sh` once discovery had run twice on differently sha
 | no recommendation language appears anywhere | **Deliberately not built.** See below |
 | the required sections are present, including *verified by hand* | Built — `no-question`, `no-coverage`, `no-not-reached`, `no-verified-by-hand`, `no-where-this-stops` |
 
-**Why "every claim carries a grade and a source" is not mechanisable.** It needs a claim to be a delimited thing. The two topics write claims as prose paragraphs in different markup — one uses bare `[E]`, the other bold `**[E]**` — with no boundary a script can find. Checking it would mean inventing a claim convention mid-gate and then testing both artifacts against a rule neither was written to. What is checked instead is narrower and honest: that every grade *used* is from the enum, that the enum is declared, and that the artifact carries graded claims at all.
+**Why "every claim carries a grade and a source" is not mechanisable.** It needs a claim to be a delimited thing. The two topics write claims as prose paragraphs in different markup — one uses bare `[E]`, the other bold `**[E]**` — with no boundary a script can find. Checking it would mean inventing a claim convention mid-gate and then testing both artifacts against a rule neither was written to. What is checked instead is narrower and honest: that every grade *used* is from the enum, that the enum is declared, and that the artifact carries graded claims at all. <!-- not-a-claim: this quotes the two markup forms the topics use in order to explain why a grade cannot be gated here, it grades nothing -->
 
 **Why "no recommendation language" is deliberately not built.** It looks like the easiest of the four and is the trap. A pattern match on *recommend* fires on the sentence *"No option set, no recommendation, no decision"* — a correct disclaimer flagged as the thing it disclaims, which happened while self-checking the second topic. The real failure is a neutral-sounding paragraph that steers, which no pattern catches. Mechanising the proxy would spend reader trust on false positives while the actual failure walks through. `tests/test_validate_discovery.sh` asserts the gate does **not** refuse on it, so a later edit cannot quietly add it back.
 

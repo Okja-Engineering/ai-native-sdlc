@@ -387,6 +387,58 @@ out="$(bash "$GATE" "$(record Z 'Matt Van Dusen' 2026-10-01)" 2>&1)"
 assert_contains "$out" "refuse[chosen-not-an-option]" "an option that does not exist is refused"
 assert_contains "$out" "go back to Develop" "the message says where to go instead"
 
+# `chosen:` IS COMPARED AS A LITERAL, not interpolated into an expression. It used to
+# be `grep -qE "^## $chosen · "`, so a single metacharacter matched any option and
+# CTRL-2 — "a chosen option existed before it was chosen" — failed open. The option
+# set here declares `A` and `B`; none of these is an option.
+#
+# The invariant is the one CTRL-2 states, so the cases are chosen to sit outside
+# whatever the implementation obviously handles rather than to mirror one regex: a
+# metacharacter that matches anything, a bracket expression, an anchor, a repetition,
+# and an id that is a prefix or an extension of a real one.
+for pattern in '.' '[A-Z]' '[AB]' 'A|B' '^A' 'A*' 'A.' '.*' 'A$' '(A)' 'A?'; do
+  out="$(bash "$GATE" "$(record "$pattern" 'Matt Van Dusen' 2026-10-01)" 2>&1)"; rc=$?
+  assert_status 1 "$rc" "chosen: $pattern is not an option, it is a pattern"
+  assert_contains "$out" "refuse[chosen-not-an-option]" "and the refusal is chosen-not-an-option: $pattern"
+done
+
+# And the positive half, or the fix could be "always refuse": each id the set
+# declares is accepted, as a whole id.
+for real in A B; do
+  out="$(bash "$GATE" "$(record "$real" 'Matt Van Dusen' 2026-10-01)" 2>&1)"; rc=$?
+  assert_status 0 "$rc" "an option the set declares is accepted: $real"
+done
+
+# The refusal names what the set does declare, because an author who typed the wrong
+# id cannot see the right one from "that is not an option".
+out="$(bash "$GATE" "$(record Z 'Matt Van Dusen' 2026-10-01)" 2>&1)"
+assert_contains "$out" "A, B" "the refusal lists the ids the option set declares"
+
+# An id that is a PREFIX of a declared one is not that option. Found by loosening
+# rather than by deleting: the whole-line match became a substring match and no case
+# distinguished them, because every id in the fixture above is one character. A
+# comparison this suite cannot tell from a substring test is a comparison it has not
+# pinned.
+cat > "$TMP/process/04-develop/options/thing.md" <<'OPTS'
+# Develop — thing
+## AB · A two-letter id
+## C · Another way
+OPTS
+for near in A B ABC; do
+  out="$(bash "$GATE" "$(record "$near" 'Matt Van Dusen' 2026-10-01 OMIT)" 2>&1)"
+  assert_contains "$out" "refuse[chosen-not-an-option]" \
+    "an id that is a prefix or an extension of a declared one is not that option: $near"
+done
+out="$(bash "$GATE" "$(record AB 'Matt Van Dusen' 2026-10-01 OMIT)" 2>&1)"
+assert_not_contains "$out" "refuse[chosen-not-an-option]" "and the whole id still resolves"
+
+# Restored, because the cases below share this fixture.
+cat > "$TMP/process/04-develop/options/thing.md" <<'OPTS'
+# Develop — thing
+## A · First way
+## B · Second way
+OPTS
+
 out="$(bash "$GATE" "$(record pending 'Matt Van Dusen' 2026-10-01)" 2>&1)"
 assert_contains "$out" "refuse[pending-but-decided]" "a record cannot be both pending and decided"
 

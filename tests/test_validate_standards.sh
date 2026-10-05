@@ -379,4 +379,155 @@ after="$(uncited_count "$t")"
 assert_eq "$((base + 1))" "$after" \
   "an entry whose id is a prefix of a cited id is counted as uncited, not as cited"
 
+# And a register row does not CITE its own id. Every row names its id in backticks, so
+# reading citations out of the register makes all 22 entries self-cited and the number
+# above collapses to zero — which is what happened the moment the citation surface
+# stopped being one document. A row declaring an id is a definition, not a reference.
+t="$(fresh reg_selfcite)"
+assert_eq "8" "$(uncited_count "$t" | head -1)" \
+  "the register's own rows do not count as citations of its entries"
+
+# --- the surface is the documents, not a filename ------------------------------
+# `validate-standards.sh` was pinned to `STANDARDS.md` for graded claims and to a
+# hand-written list of four documents for evidence pointers. `AGENTS.md:156` says
+# "grade every claim" and carried four [E] claims outside the gate — the exact failure
+# it was built for, reproduced in a second document because the check was keyed to a
+# FILENAME. `CONTROLS.md` was outside the pointer list while citing more commits than
+# any document on it.
+t="$(fresh surface)"
+out="$(gate "$t")"
+assert_contains "$out" "document(s) read" "the gate reports how many documents it read"
+nread="$(printf '%s\n' "$out" | sed -n 's/.*, \([0-9]*\) document(s) read.*/\1/p')"
+[ "${nread:-0}" -ge 15 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "and it is a real denominator (reported ${nread:-none})"
+
+# A graded claim is read wherever it appears. Added to a document that was outside the
+# old scope entirely, and chosen to be a document nobody would think to list.
+t="$(fresh claim_elsewhere)"
+printf '\nA fixture claim nobody measured. [E]\n' >> "$t/process/04-develop/develop-contract.md"
+out="$(gate "$t")"; rc=$?
+assert_status 1 "$rc" "a graded claim in a contract is read"
+assert_contains "$out" "develop-contract.md: refuse[uncited-claim]" \
+  "and the refusal names the document it is in"
+
+# The same claim in a DATED RECORD is not, because those carry a resolving source in
+# their own row by their own contracts — a stricter mechanism than a register id, and
+# asking them for one would refuse all 26 graded claims they carry correctly.
+t="$(fresh claim_record)"
+printf '\nA fixture claim nobody measured. [E]\n' >> "$t/process/02-discover/topics/classifier-models.md"
+out="$(gate "$t")"; rc=$?
+assert_status 0 "$rc" "a graded claim in a dated record is outside this gate"
+
+# A dead commit citation in CONTROLS.md is refused. This is the reproduction: that
+# document carries the heaviest commit-citation load in the repository and was in no
+# gate's pointer surface, so replacing a SHA with a dead one passed everything.
+t="$(fresh controls_ptr)"
+sed 's/`fa7538a`/`deadbee`/g; s/`59b7cd2`/`deadbe1`/g' "$t/CONTROLS.md" > "$t/C" && mv "$t/C" "$t/CONTROLS.md"
+assert_contains "$(cat "$t/CONTROLS.md")" 'deadbee' "the fixture replaced a cited commit with a dead one"
+out="$(gate "$t")"; rc=$?
+assert_status 1 "$rc" "a dead commit citation in CONTROLS.md is refused"
+assert_contains "$out" "CONTROLS.md: refuse[dangling-ref]" "and the refusal names CONTROLS.md"
+
+# And in spec.md, the other document the hand-written list of four left out.
+t="$(fresh spec_ptr)"
+sed 's/`67a85aa`/`deadbee`/g' "$t/spec.md" > "$t/S" && mv "$t/S" "$t/spec.md"
+assert_contains "$(cat "$t/spec.md")" 'deadbee' "the fixture replaced a cited commit in spec.md"
+assert_contains "$(gate "$t")" "spec.md: refuse[dangling-ref]" "a dead commit citation in spec.md is refused"
+
+# The surface is DERIVED from the thing the check is for: a document is in it when it
+# cites an object name. A document with no object name is outside it, so a token that
+# merely looks like a path in one is not refused — which is what keeps the heuristic
+# from firing on globs, grade pairs and DOIs across seventeen documents.
+t="$(fresh ptr_derived)"
+printf '\nA path-shaped token that resolves nowhere: `no/such/place`.\n' \
+  >> "$t/process/04-develop/develop-contract.md"
+assert_eq "0" "$(grep -cE '`[0-9a-f]{7,40}(:[^` ]+)?`' "$t/process/04-develop/develop-contract.md")" \
+  "the fixture document cites no object name"
+out="$(gate "$t")"; rc=$?
+assert_status 0 "$rc" "a document that cites no object name is outside the pointer surface"
+
+# And it comes INTO the surface by citing one, rather than by being listed.
+printf '\nThe corpus is at `fa7538a`.\n' >> "$t/process/04-develop/develop-contract.md"
+out="$(gate "$t")"; rc=$?
+assert_status 1 "$rc" "citing an object name brings a document into the pointer surface"
+assert_contains "$out" "develop-contract.md: refuse[dangling-ref]" \
+  "and its unresolvable token is then refused"
+
+# The seven shapes that are not pointers, each in a document that IS in the surface.
+# These are narrowings of the check, so each is asserted rather than assumed.
+t="$(fresh notptr)"
+#
+# The bracket case is written `[a]/[b]` rather than `[E]/[S]`, which is the real token
+# in CONTROLS.md: a fixture line carrying `[E]` is a graded claim and would be refused
+# by the OTHER check in this gate, so the case would pass for the wrong reason. The
+# shape under test is the bracket, not the letter inside it.
+for tok in 'bin/validate-*.sh' '[a]/[b]' 'cycles/$c.md' 'bin/next.sh:163:?' \
+           '/bin/bash' 'doi:10.1145/3597503' 'experiment/'
+do
+  printf '\nA token that is not a pointer: `%s`.\n' "$tok" >> "$t/STANDARDS.md"
+done
+out="$(gate "$t")"; rc=$?
+assert_status 0 "$rc" "a glob, a grade pair, a variable, a locator, an absolute path, a DOI and a namespace are not pointers"
+
+# And the narrowing has a floor: a two-segment path that resolves nowhere still is one.
+printf '\nA real dead pointer: `experiment/0.0.0`.\n' >> "$t/STANDARDS.md"
+assert_contains "$(gate "$t")" "refuse[dangling-ref]" \
+  "a two-segment path that resolves nowhere is still refused"
+
+# --- a document may declare that its graded claims cite inline ------------------
+# AGENTS.md's four [E] claims name their sources in prose and none is in the register.
+# The declaration says so, with a reason, and exempts that document from
+# uncited-claim and nothing else.
+t="$(fresh inline_decl)"
+out="$(gate "$t")"; rc=$?
+assert_status 0 "$rc" "the shipped tree passes with AGENTS.md declaring its claims cite inline"
+assert_contains "$out" "graded claims cite inline in: AGENTS.md" \
+  "and the gate names every document carrying the declaration"
+
+# Remove the declaration and those claims are refused, so it is load-bearing rather
+# than decorative.
+t="$(fresh inline_removed)"
+grep -v 'graded-claims-cite-inline' "$t/AGENTS.md" > "$t/A" && mv "$t/A" "$t/AGENTS.md"
+out="$(gate "$t")"; rc=$?
+assert_status 1 "$rc" "without the declaration AGENTS.md's graded claims are refused"
+assert_contains "$out" "AGENTS.md: refuse[uncited-claim]" "and the refusal names AGENTS.md"
+
+# A declaration carrying no reason declares nothing, the same two checks every other
+# in-band declaration here is held to.
+t="$(fresh inline_noreason)"
+sed 's|<!-- graded-claims-cite-inline:.*-->|<!-- graded-claims-cite-inline: -->|' \
+  "$t/AGENTS.md" > "$t/A" && mv "$t/A" "$t/AGENTS.md"
+assert_contains "$(cat "$t/AGENTS.md")" '<!-- graded-claims-cite-inline: -->' \
+  "the fixture stripped the reason from the declaration"
+assert_contains "$(gate "$t")" "AGENTS.md: refuse[uncited-claim]" \
+  "a declaration with no reason does not exempt a document"
+
+# A declaration inside a FENCED BLOCK declares nothing. Found by attacking the repaired
+# check rather than by reproducing the finding, and it got through the first version: a
+# document could show a reader what the form looks like and thereby exempt its own
+# uncited claims. Fifth time this repository has paid for a fenced example.
+t="$(fresh inline_fenced)"
+{
+  printf '\nA fixture claim nobody measured. [E]\n\n'
+  printf '```\n<!-- graded-claims-cite-inline: this is only an example of the form -->\n```\n'
+} >> "$t/spec.md"
+out="$(gate "$t")"; rc=$?
+assert_status 1 "$rc" "a declaration shown inside a fenced block does not exempt a document"
+assert_contains "$out" "spec.md: refuse[uncited-claim]" "and the uncited claim above it is refused"
+
+# A document that did not exist when this gate was written is in scope by existing,
+# which is what the enumeration buys over a list of filenames.
+t="$(fresh newdoc)"
+printf '# A new document\n\nA fixture claim nobody measured. [E]\n' > "$t/probe.md"
+assert_contains "$(gate "$t")" "probe.md: refuse[uncited-claim]" \
+  "a document added at the top level is in scope without editing the gate"
+
+# And it exempts that document only — not every document, which is what a flag read
+# once and applied globally would do.
+t="$(fresh inline_scope)"
+printf '\nA fixture claim nobody measured. [E]\n' >> "$t/spec.md"
+out="$(gate "$t")"; rc=$?
+assert_status 1 "$rc" "AGENTS.md's declaration does not exempt another document"
+assert_contains "$out" "spec.md: refuse[uncited-claim]" "and the other document is named"
+
 assert_done
