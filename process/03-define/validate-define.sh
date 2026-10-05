@@ -155,6 +155,7 @@ outlier_body() {
 
 check_cycle() {
   local f="$1" src src_path resolved outliers outlier_text declared src_ids src_n declared_n
+  local acct_block src_cmp
   local uniq_declared missing extra dupes themes_sum accounted_n
 
   # --- method is declared -------------------------------------------------
@@ -273,12 +274,40 @@ check_cycle() {
   #
   # A total also cannot tell a dropped item from a miscounted one. Comparing the
   # declared id set against the source's gives each its own refusal.
-  declared="$(sed -n '/accounting:ids -->/,/\/accounting:ids -->/p' "$f" \
-    | grep -oE 'F[0-9]+' | sort)"
-
-  if [ -z "$declared" ]; then
+  # AN EMPTY SET AND AN ABSENT BLOCK ARE DIFFERENT STATES, and until 2026-10-05 this
+  # could not tell them apart. `findings-contract.md` protects `nothing found: yes`
+  # deliberately and a scan in that state passes its own gate; the Define record over
+  # it could not pass this one AT ALL. Every body for the block — `none`, a reason, a
+  # sentence, a comment, nothing — drew `no-accounting`, and the only way to a
+  # non-empty set was to invent an id, which trips three other refusals. CI runs this
+  # gate over the directory, so recording one quiet month would have made every branch
+  # red permanently. Neither of those is reachable at n=1, which is why a review that
+  # built the second cycle found it and a year of reading would not have.
+  #
+  # So the three states are now distinct:
+  #
+  #   no block            -> no-accounting, and the message says the block is ABSENT
+  #   block, no ids,
+  #     no declaration    -> no-accounting, and the message says it declares NO IDS
+  #   block declaring
+  #     itself empty      -> a set of zero, compared like any other
+  #
+  # The third is the same `<!-- declared-empty: reason -->` the Outliers section and
+  # the Discover open section already use — one form, three sections, checked for
+  # presence and for a reason. It does NOT excuse a cycle that has findings: a zero set
+  # against a source of six leaves all six missing, so `unaccounted` fires and names
+  # them. CTRL-4 is unchanged; this is only the state where the right answer is zero.
+  acct_block="$(sed -n '/accounting:ids -->/,/\/accounting:ids -->/p' "$f")"
+  if [ -z "$acct_block" ]; then
     refuse "$f" "-" "no-accounting" \
-      "no accounting:ids block: a theme is a summary, not a filter, and nothing may be dropped — which a total cannot establish, so the ids accounted for are declared explicitly"
+      "no accounting:ids block in this record: a theme is a summary, not a filter, and nothing may be dropped — which a total cannot establish, so the ids accounted for are declared explicitly"
+    return
+  fi
+
+  declared="$(printf '%s\n' "$acct_block" | grep -oE 'F[0-9]+' | sort)"
+  if [ -z "$declared" ] && ! declares_empty "$acct_block"; then
+    refuse "$f" "-" "no-accounting" \
+      "the accounting:ids block is present and declares no ids: a cycle over a source with findings accounts for every one of them, and a cycle over a source with none says so in band — <!-- declared-empty: reason --> inside the block, the same form the Outliers section uses. A blank block cannot be told from an unfinished one"
     return
   fi
 
@@ -286,9 +315,21 @@ check_cycle() {
   [ -z "$dupes" ] || refuse "$f" "-" "duplicate-accounting" \
     "id(s) accounted for more than once: $dupes"
 
-  uniq_declared="$(printf '%s\n' "$declared" | uniq)"
-  missing="$(printf '%s\n' "$src_ids" | comm -23 - <(printf '%s\n' "$uniq_declared") | tr '\n' ' ')"
-  extra="$(printf '%s\n' "$src_ids" | comm -13 - <(printf '%s\n' "$uniq_declared") | tr '\n' ' ')"
+  # BLANK LINES ARE DROPPED ON BOTH SIDES before the comparison. `printf '%s\n' ""`
+  # writes one empty line, so over an empty source that blank reached `comm` as a
+  # member of the set: `unaccounted` fired naming nothing, which is a refusal an
+  # operator cannot act on, at the same site and from the same cause as the state
+  # above. An empty set has no members, and this is where that is made true.
+  #
+  # Written first as a trailing-whitespace strip on the message, which made the
+  # refusal disappear for the right reason by accident of formatting and left the
+  # phantom member in the comparison. Mutating the blank filters to no-ops then broke
+  # nothing, which is what showed the strip was the thing doing the work. Only the
+  # filters remain: one mechanism, in the place where the set is defined.
+  uniq_declared="$(printf '%s\n' "$declared" | grep -v '^[[:space:]]*$' | uniq)"
+  src_cmp="$(printf '%s\n' "$src_ids" | grep -v '^[[:space:]]*$')"
+  missing="$(comm -23 <(printf '%s\n' "$src_cmp" | grep -v '^$') <(printf '%s\n' "$uniq_declared" | grep -v '^$') | tr '\n' ' ')"
+  extra="$(comm -13 <(printf '%s\n' "$src_cmp" | grep -v '^$') <(printf '%s\n' "$uniq_declared" | grep -v '^$') | tr '\n' ' ')"
 
   [ -z "$missing" ] || refuse "$f" "-" "unaccounted" \
     "finding(s) in the source and not accounted for: $missing — a theme is a summary, not a filter, and nothing may be dropped"

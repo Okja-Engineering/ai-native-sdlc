@@ -382,4 +382,91 @@ assert_file_exists "$made" "the decision skeleton exists"
 assert_contains "$(cat "$made")" "$exp:" \
   "and it carries the expiry field, so a decision has somewhere to set its own tripwire"
 
+# --- an artifact belongs to a (cycle, slug), not to a slug ----------------------
+# The three artifact paths were keyed on the slug alone, so with a second cycle on disk
+# `bin/next.sh <new-cycle> <existing-slug>` reported "Nothing missing" because cycle
+# one's problem, options and decision satisfied the chain. `bin/cycle.sh` reported
+# `problems 0 stated` for the same cycle at the same moment, so the two tools
+# contradicted each other and the one a person follows was the wrong one.
+#
+# This is the normal path. `define-contract.md` contemplates a theme recurring as the
+# same theme, and the `producing-themes` decision schedules a successor for 2026-11-30 —
+# which was unrepresentable for the same reason.
+#
+# Built, not reasoned about: neither defect is reachable at n=1.
+. "$TEST_DIR/lib/define-fixture.sh"
+
+second_cycle() { # <name> -> tree with a second cycle and its quiet scan
+  local t; t="$(fresh "$1")"
+  define_fixture "$t" "" 0 >/dev/null
+  printf '%s' "$t"
+}
+
+t="$(second_cycle recur)"
+assert_file_exists "$t/process/03-define/cycles/2026-12-01.md" "the tree now holds a second cycle"
+assert_file_exists "$t/process/03-define/problems/agent-pr-approval.md" \
+  "and cycle one's problem for that slug is still there"
+
+# The two tools have to agree, which is the assertion that stops them diverging again.
+# `cycle.sh` is read BEFORE `next.sh` runs, because next.sh writes: reading it after
+# would be comparing the two tools across a change to the tree.
+cyc_out="$( cd "$t" && /bin/bash bin/cycle.sh 2>&1 )"
+section="$(printf '%s\n' "$cyc_out" | awk '/^2026-12-01$/ { i = 1; next } i && /^[0-9]{4}-/ { exit } i')"
+assert_contains "$section" "problems  0 stated" \
+  "bin/cycle.sh reports no problem stated for the second cycle"
+
+out="$(run "$t" 2026-12-01 agent-pr-approval)"; rc=$?
+assert_not_contains "$out" "Nothing missing" \
+  "a slug whose artifacts belong to another cycle is not complete for this one"
+assert_not_contains "$out" "Nothing missing" \
+  "so bin/next.sh agrees with bin/cycle.sh rather than contradicting it"
+
+# And it produces the artifact, qualified by the cycle so it cannot collide.
+made="$t/process/03-define/problems/2026-12-01.agent-pr-approval.md"
+assert_file_exists "$made" "the recurrence is written under a cycle-qualified name"
+assert_contains "$(cat "$made")" "cycles/2026-12-01.md" "and its from: names the cycle it belongs to"
+assert_contains "$(cat "$t/process/03-define/problems/agent-pr-approval.md")" "cycles/2026-09-29.md" \
+  "while cycle one's problem is left exactly as it was"
+
+# Then the chain continues within the cycle: options and decision resolve from THIS
+# problem, not from a file that happens to share the slug.
+out="$(run "$t" 2026-12-01 agent-pr-approval)"
+assert_file_exists "$t/process/04-develop/options/2026-12-01.agent-pr-approval.md" \
+  "the options set for the recurrence is written too"
+assert_contains "$(cat "$t/process/04-develop/options/2026-12-01.agent-pr-approval.md")" \
+  "problems/2026-12-01.agent-pr-approval.md" "and it names this cycle's problem"
+out="$(run "$t" 2026-12-01 agent-pr-approval)"
+assert_file_exists "$t/process/05-deliver/decisions/2026-12-01.agent-pr-approval.md" \
+  "and so is the decision"
+out="$(run "$t" 2026-12-01 agent-pr-approval)"; rc=$?
+assert_status 0 "$rc" "once the chain is complete for this cycle it exits 0"
+assert_contains "$out" "Nothing missing" "and says so"
+assert_contains "$out" "2026-12-01.agent-pr-approval.md" \
+  "naming the files it read, so a reader can see which cycle satisfied it"
+
+# The first cycle is unaffected: its own chain still reads as complete.
+out="$(run "$t" 2026-09-29 producing-themes)"; rc=$?
+assert_status 0 "$rc" "the first cycle is still complete"
+assert_contains "$out" "Nothing missing" "and still says so"
+
+# A slug that exists for no cycle keeps the PLAIN name. The qualifier is added only
+# when it is needed to say which of two things this is, so nothing in the tree is
+# renamed and a first occurrence reads the way the two shipped problems do.
+t="$(second_cycle newslug)"
+out="$(run "$t" 2026-12-01 brand-new-theme)"
+assert_file_exists "$t/process/03-define/problems/brand-new-theme.md" \
+  "a slug new to the tree is written under its plain name"
+assert_eq "0" "$(ls "$t"/process/03-define/problems/2026-12-01.brand-new-theme.md 2>/dev/null | grep -c .)" \
+  "and not under a cycle-qualified one"
+
+# And asking for the other cycle's slug does not resolve to it. Found by attacking the
+# repaired resolution: matching the cycle alone returns whichever of that cycle's
+# problems sorts first, which is a different wrong answer from the one being fixed.
+t="$(second_cycle crossslug)"
+out="$(run "$t" 2026-09-29 producing-themes)"
+assert_contains "$out" "problems/producing-themes.md" \
+  "a request for one slug resolves to that slug and not to a sibling of the same cycle"
+assert_not_contains "$out" "problems/agent-pr-approval.md" \
+  "which is a different wrong answer from the one this replaces"
+
 assert_done

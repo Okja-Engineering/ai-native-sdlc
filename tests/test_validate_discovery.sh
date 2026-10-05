@@ -43,7 +43,13 @@ assert_status 0 "$rc" "the older topic is within the contract, with different ma
 
 out="$(bash "$GATE" 2>&1)"; rc=$?
 assert_status 0 "$rc" "both shipped topics pass when the gate runs over the directory"
-assert_contains "$out" "2 file(s) within the contract" "it reports how many it checked"
+# Derived from the directory. Written out, this is a suite pinned to the current size
+# of the tree, and a third topic reads as a defect — the same shape as the findings
+# count in tests/test_validate_findings.sh, fixed for the same reason.
+ntop="$(ls "$ROOT"/process/02-discover/topics/*.md 2>/dev/null | grep -c .)"
+[ "$ntop" -ge 2 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "the topics directory holds artifacts to count (found $ntop)"
+assert_contains "$out" "$ntop file(s) within the contract" "it reports how many it checked"
 
 # --- a run that read nothing does not report conformance -----------------------
 # Over an empty topics directory this said "0 file(s) within the contract" and

@@ -87,6 +87,10 @@ The form is a rounded duration, written the way a person would say it out loud: 
 
 ## Required fields — a problem
 
+**One file per problem, and a problem belongs to a `(cycle, slug)` pair.** The first problem for a slug is `problems/<slug>.md`; a **recurrence** — the same theme in a later cycle — is `problems/<cycle>.<slug>.md`, and the options set and decision that follow it carry the same qualifier. That is the qualifier `cycles/<cycle>.<method>.md` already uses for a comparison cycle: added only when it is needed to say which of two things this is, so the two shipped problems keep their plain names and nothing changes until a theme actually recurs.
+
+**What that is for.** `bin/next.sh` keyed all three artifacts on the slug alone, so with a second cycle on disk it reported *"Nothing missing"* for a cycle it had written nothing for, because cycle one's three files satisfied the chain — while `bin/cycle.sh` correctly reported `problems 0 stated` for the same cycle at the same moment. Two tools contradicting each other, and the one a person follows was the wrong one. Open question 2 below contemplates a theme recurring as the same theme, and the `producing-themes` decision schedules a successor for 2026-11-30, so this is the normal path. `bin/next.sh` now resolves an artifact by the links it declares — a problem's `from:`, an options set's and a decision's `problem:` — rather than by its filename, and `tests/test_next.sh` asserts the two tools agree.
+
 Declared after the second problem, and after finding that the first two disagreed about whether the Discover edge existed at all. One table served both artifacts until 2026-10-04, so `bin/next.sh` scaffolded a problem from the **cycle's** list: a problem got `method:`, which says nothing about a problem, and never got `rests on:`, which is the only thing that carries the Discover-to-Define edge.
 
 | Field | |
@@ -184,6 +188,18 @@ This section used to imply its own rule and `validate-define.sh` to implement on
 ```
 
 `bin/next.sh` emits this block verbatim and replaces `<!-- scaffold:source-ids -->` with the ids the source records, read through `process/01-scan/findings-ids.sh` — the same harvester the gate reads, so the two cannot disagree about which findings exist. Any required section in any contract may declare a skeleton this way; `next.sh` writes *To be written.* for the ones that do not.
+
+**The block above has to be the first fenced block in this section**, because that is how `next.sh` finds it. Writing an illustrative one before it made the scaffold emit the illustration instead, caught by two suites at once — so the example below sits after it, where it cannot be mistaken for the declaration.
+
+#### A quiet cycle declares a set of zero, and that is a passing state
+
+`findings-contract.md` protects `nothing found: yes` deliberately, and the Define record over such a scan accounts for nothing because there is nothing to account for. It says so in the block, in band and with a reason — `<!-- declared-empty: the source is a quiet cycle and records no findings -->` in place of the ids.
+
+Same form as the empty Outliers section and the Discover contract's empty open section: one form, three sections, checked for presence and for a reason. **An absent block and an empty set are different states** and the gate says which. A record with no block is refused for having none; a block that declares no ids without declaring itself empty is refused for that, because a blank block cannot be told from an unfinished one.
+
+**The declaration does not excuse a cycle that has findings.** A declared set of zero against a source of sixty-four leaves all sixty-four unaccounted for, and they are named. CTRL-4 is unchanged; this is only the state where the right answer is zero.
+
+**Until 2026-10-05 there was no passing state at all.** The gate read an empty id set and an absent block as the same thing, so every body — `none`, a reason, a sentence, a comment, nothing — drew `no-accounting`, and the only route to a non-empty set was to invent an id, which tripped three other refusals. `.github/workflows/ci.yml` runs this gate over the directory, so **recording one quiet month would have made every branch red permanently.** It was found by building the second cycle rather than by reading it, which is why a review of the gate did not find it.
 
 **What the scaffold enumerating these does and does not mean.** It is the denominator, not the claim. Transcribing sixty-four ids by hand is the kind of task that produces the error the control exists to catch, and the scaffold knows them exactly. What a person still has to do is put every one of them under a theme or in the outliers, and declare which — and from the next cycle that per-theme declaration is what the set is checked against, not this block.
 
