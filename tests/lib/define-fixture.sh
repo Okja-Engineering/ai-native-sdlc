@@ -69,7 +69,11 @@ define_fixture() {
     done
     printf -- '---\n\n## Outliers — surfaced because they fit no theme\n\n'
     if [ "$outl" -eq 0 ]; then
-      printf 'None this cycle.\n\n'
+      # The declared form, not a sentence. define-contract.md requires an empty
+      # outlier section to declare itself empty in band and with a reason; a
+      # fixture writing "None this cycle." would be building an artifact the gate
+      # refuses and calling it the zero case.
+      printf '<!-- declared-empty: this fixture was built with no outliers -->\n\n'
     else
       i=1
       while [ "$i" -le "$outl" ]; do

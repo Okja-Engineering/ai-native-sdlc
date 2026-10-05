@@ -94,6 +94,48 @@ field() {
   ' "$1" 2>/dev/null
 }
 
+# declares_empty <section body> -> 0 if the section declares itself empty
+#
+# A section with nothing in it has to SAY it is empty, in band, with a reason:
+#
+#   <!-- declared-empty: every finding this cycle fitted a theme -->
+#
+# Checked for the same two things as the `not-a-claim` and `dead-pointer`
+# declarations in bin/validate-standards.sh, and for the same reason `rests on:
+# none` needs its reason below: the declaration is present, and it carries a
+# reason. NOT whether the reason is true.
+#
+# WHY THIS REPLACED A WORD SEARCH. The check read this section's body for three
+# short words. The shipped cycle's own explanation of why outliers matter uses one
+# of them twice, so for that artifact the refusal could never fire: delete all
+# three outliers and the section still satisfied its own emptiness check. The same
+# shape in the Discover gate let a topic delete all seven of its "could not be
+# established" items, assert the opposite, and pass. A word in a sentence is not a
+# declaration, and this is the third time this repository has shipped a search
+# standing in for a reading — after the two-number coverage proxy and the
+# four-phrase dead-pointer match.
+#
+# A FENCED BLOCK IS NOT A DECLARATION, for the same reason `field` below skips
+# fences: a document showing what the form looks like must not thereby satisfy it.
+# A fenced `rests on: none` donated itself as the real field's value once, and an
+# example row in a fenced block in DECIDERS.md would have authorized everyone it
+# named. Found by attacking this check after writing it.
+#
+# This predicate is also written, identically, in
+# process/02-discover/validate-discovery.sh, which owns the other section that may
+# be empty. The gates share no library and adding one would put a load-bearing
+# script outside the enumeration bin/validate-controls.sh builds from the tree —
+# the gap that document records. So the form is declared once in the two contracts
+# and in CONTROLS.md, and what holds the two copies together is that both suites
+# pin the same behaviour rather than the expression.
+declares_empty() {
+  printf '%s\n' "$1" | awk '
+    /^[ \t]*(```|~~~)/ { fence = !fence; next }
+    fence { next }
+    /<!--[ \t]*declared-empty:[^>]*[A-Za-z][^>]*-->/ { found = 1 }
+    END { exit found ? 0 : 1 }'
+}
+
 # outlier_body <file> — the Outliers section's BODY, heading excluded.
 #
 # This was `sed -n '/^## Outliers/,/^---/p'`, which includes the heading, so any
@@ -129,9 +171,9 @@ check_cycle() {
   if ! grep -q '^## Outliers' "$f"; then
     refuse "$f" "-" "no-outlier-section" \
       "no Outliers section: an empty outlier list and an omitted one look identical, so an empty one must say so"
-  elif [ "$outliers" -eq 0 ] && ! printf '%s\n' "$outlier_text" | grep -qiE 'none|empty|nothing'; then
+  elif [ "$outliers" -eq 0 ] && ! declares_empty "$outlier_text"; then
     refuse "$f" "-" "silent-empty-outliers" \
-      "the Outliers section lists nothing and does not say it is empty — and saying so means saying it in the section, not in its heading"
+      "the Outliers section lists nothing and does not declare itself empty — the declared form is <!-- declared-empty: reason --> in the section, not in its heading and not as a sentence. Until 2026-10-04 this was a search of the section's prose for a short word, and the shipped cycle's own explanation of why outliers matter carries one of those words twice, so for that artifact this refusal could never fire"
   fi
 
   # --- every source item accounted for ------------------------------------

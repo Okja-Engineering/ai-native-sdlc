@@ -157,7 +157,13 @@ The most valuable finding in a period is often the one that clusters with nothin
 
 So an item that fits no theme is surfaced **because** it fits no theme, not despite it. On the first run this section immediately carried the finding most directly useful to how work gets shaped.
 
-An empty outlier list is permitted but must say so explicitly, because an empty one and an omitted one look identical.
+**An empty outlier list is permitted, and it declares itself empty**, because an empty one and an omitted one look identical. The declared form is a declaration in the section, naming the reason:
+
+`<!-- declared-empty: every finding this cycle fitted a theme -->`
+
+Same shape as `rests on: none` plus its reason above, and as `<!-- not-a-claim: … -->` in `STANDARDS.md`: the gate checks that the declaration is present and carries a reason, not that the reason is true. **Inside a fenced block it declares nothing**, for the same reason a fenced `rests on: none` does not satisfy that field. **A sentence is not a declaration.** Until 2026-10-04 the gate searched this section's prose for one of three short words, and the section's own explanation of why outliers matter carries one of them twice — so for cycle `2026-09-29` the refusal could never fire, and deleting all three outliers left the section satisfying its own emptiness check. A declared form cannot be arrived at by accident; a word in a sentence can.
+
+The same declaration is what the Discover contract requires of an empty *what could not be established* section. One form, two sections, declared in both contracts because the two gates share no library.
 
 ### Accounting
 
@@ -190,7 +196,7 @@ What the human now decides, and what cannot yet be recorded. Define names the ga
 
 - **every item in the source artifact is accounted for** — under a theme or in the outliers. This one caught a real defect by hand before it was mechanised: the first draft of cycle `2026-09-29` themed 54 of 64 and reported three wrong counts, and the ten strays included a pattern nobody had named
 - **the count `from:` declares is the number of findings the source records** — the check above compares the accounting to the source, and until this one existed nothing said what the source was supposed to contain
-- **the outlier section exists, and says so explicitly when empty** — an empty list and an omitted one look identical otherwise
+- **the outlier section exists, and declares itself empty when it is** — an empty list and an omitted one look identical otherwise, and a sentence that happens to carry the word "nothing" is not a declaration
 - **`method` is declared**
 
 Each refusal carries its own message, and each is asserted by that message in `tests/test_validate_define.sh`.

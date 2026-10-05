@@ -304,19 +304,207 @@ t="$(fresh gradekey2)"
 perl -0pi -e 's/^\*\*Grades\*\* are the.*$/**Grades**: `[E]` empirical and `[S]` standard./m' "$t/process/02-discover/$NEW"
 assert_contains "$(gate "$t" "$NEW")" "refuse[no-grade-key]" "a partial key is refused"
 
-# An open section that lists nothing and does not say so. The gate accepts an
-# explicit statement of emptiness and refuses silence, same as Define's outlier
-# check — an omitted list and an empty one look identical otherwise.
-t="$(fresh silentopen)"
-perl -0pi -e 's{(## What could not be established\n).*?(\n## Where this stops)}{$1\nSome prose with no items at all in it.\n$2}s' "$t/process/02-discover/$NEW"
-out="$(gate "$t" "$NEW")"
-assert_contains "$out" "refuse[silent-empty-open]" "an open section listing nothing without saying so is refused"
+# --- an empty open section DECLARES it, and a word in prose is not that --------
+#
+# This is the control behind the external audit's sixth question — where did the
+# process say it could not verify something — and it was a word search. The check
+# read the section's body for `none|nothing|everything was`, so an artifact could
+# delete every disclosure it owed, assert the opposite, and pass on one incidental
+# word. Reproduced by a review against `topics/agent-pr-approval.md`: all seven
+# items deleted and replaced with "The discovery was exhaustive and nothing of
+# consequence remains outstanding", and the gate reported it within the contract.
+#
+# Two more ways in were found while repairing it, and NEITHER NEEDED A WORD:
+#
+#   * the section's own trailing `---` separator was inside the body the check
+#     read, and `---` begins with a list marker, so it counted as an open item and
+#     the emptiness check never ran
+#   * an `[O]` anywhere in the body counted as an item, so one line of prose
+#     carrying a grade marker was enough
+#
+# So the body is now scoped to the next heading OR the next `---`, the way Define
+# already scopes its outlier section, and an open item is a list item carrying an
+# `[O]` grade — the form this contract asks for and both shipped topics use.
+#
+# What is pinned below is the invariant: an empty section declares itself empty, in
+# band, with a reason — the same shape as `not-a-claim` and `dead-pointer`. No case
+# here knows the gate's expression, so a different implementation of the same rule
+# still passes, and a case asserting a word would be the defect back again.
+#
+# THE FIXTURE IS BUILT, not mutated out of a shipped topic. These cases are about
+# shape, per AGENTS.md, and a hollow artifact that was never one of the inputs is
+# the only honest test of a repair derived from the inputs. It carries the trailing
+# `---` every shipped topic has, so every case below is also the separator case.
+topic() { # <open-section body> <suffix> -> path
+  local p="$TMP/open$2.md"
+  cat > "$p" <<EOF
+# Discovery — whether to turn the thing on
 
-# And the same section, empty but explicit, is accepted.
-t="$(fresh explicitopen)"
-perl -0pi -e 's{(## What could not be established\n).*?(\n## Where this stops)}{$1\nNothing — everything in scope was established.\n$2}s' "$t/process/02-discover/$NEW"
-out="$(gate "$t" "$NEW")"
-assert_not_contains "$out" "refuse[silent-empty-open]" "an explicitly empty open section is accepted"
+dated: 2026-10-04
+status: discovery complete, not assessed
+
+## The question, in the asker's own words
+
+> should we turn it on
+
+## 2 · Coverage
+
+**Reached:** the GitHub REST API, and the SemIf source at commit 23cf1f3
+**Not reached:** JevBench
+**Verified by hand:** the GitHub REST API
+
+## Claims
+
+The GitHub REST API returned 300 pull requests, and the SemIf source was read at commit 23cf1f3. JevBench was not read at all. [E]
+
+Grades are the STANDARDS.md scheme: [V] vendor, never outcome evidence, [S] standard, [P] practitioner, [O] open.
+
+## What could not be established
+
+$1
+
+---
+
+## Where this stops
+
+Here.
+EOF
+  printf '%s' "$p"
+}
+
+# The control first, so a refusal below cannot be the gate refusing everything.
+out="$(bash "$GATE" "$(topic '- **Whether JevBench seals its slice. [O]**' ctl)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "a built topic listing one open item is within the contract"
+
+# The review's artifact, with the separator the review's own copy had removed.
+HOLLOW='The discovery was exhaustive and nothing of consequence remains outstanding.'
+out="$(bash "$GATE" "$(topic "$HOLLOW" hollow)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "an open section emptied of items and asserting the opposite is refused"
+assert_contains "$out" "refuse[silent-empty-open]" \
+  "the word \"nothing\" in a sentence does not declare a section empty"
+
+# The same sentence with every one of the three searched words taken out. It has to
+# be refused for the SAME reason, because a word is not what decides.
+out="$(bash "$GATE" "$(topic 'The discovery was exhaustive and no item of consequence remains outstanding.' flat)" 2>&1)"
+assert_contains "$out" "refuse[silent-empty-open]" \
+  "the same assertion carrying no searched word is refused the same way"
+
+# A line of prose carrying a grade marker is not an open item.
+out="$(bash "$GATE" "$(topic 'Everything in scope was established. [O]' grade)" 2>&1)"
+assert_contains "$out" "refuse[silent-empty-open]" \
+  "an [O] in prose is not an item, so the section is still silently empty"
+
+# And the other half of the same rule: a line in an item's MARKUP that carries no
+# grade is not an item either. Both shipped topics write every item with its `[O]`,
+# which is what this contract asks for, so the grade is part of what an item is.
+#
+# Found by loosening rather than by deleting, per AGENTS.md: dropping the grade from
+# the item pattern broke no test, which meant the suite pinned that the check was
+# reachable and not that it was sufficient. Without this case an author can empty the
+# section and open it with any bold sentence.
+out="$(bash "$GATE" "$(topic '**Everything was established.** No gaps remain.' bold)" 2>&1)"
+assert_contains "$out" "refuse[silent-empty-open]" \
+  "a bold lead-in carrying no grade is not an open item"
+
+# The converse, so the rule is pinned in both directions and not just as a refusal:
+# a bulleted item carrying its grade is accepted even when its text is short.
+out="$(bash "$GATE" "$(topic '- **Whether JevBench seals its slice. [O]**' bolditem)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "a bulleted item carrying its [O] grade is accepted"
+
+# An empty section that DECLARES it, with a reason, is accepted — the repair must
+# not be "always refuse an empty section". A phase that genuinely left nothing open
+# is a real state and a legitimate one.
+DECL='<!-- declared-empty: every question in scope was answered, and the searches that found nothing are recorded under Coverage -->'
+out="$(bash "$GATE" "$(topic "$DECL" decl)" 2>&1)"; rc=$?
+assert_status 0 "$rc" "an open section that declares itself empty, with a reason, is accepted"
+assert_not_contains "$out" "silent-empty-open" "and is not called silently empty"
+
+# A declaration carrying no reason does not exempt anything — the same rule the
+# `not-a-claim` and `dead-pointer` declarations are held to.
+out="$(bash "$GATE" "$(topic '<!-- declared-empty: -->' noreason)" 2>&1)"
+assert_contains "$out" "refuse[silent-empty-open]" \
+  "a declaration with no reason does not declare a section empty"
+
+# A declaration inside a FENCED BLOCK declares nothing. Found by attacking this
+# check after writing it, and the third time this repository has paid for the same
+# class: a fenced example of `rests on: none` donated itself as the real field's
+# value, and an example row in a fenced block in DECIDERS.md would have authorized
+# everyone it named. An artifact documenting the convention must not thereby
+# satisfy it.
+out="$(bash "$GATE" "$(topic '```'$'\n''<!-- declared-empty: every question was answered -->'$'\n''```' fenced)" 2>&1)"
+assert_contains "$out" "refuse[silent-empty-open]" \
+  "a declaration shown inside a fenced block does not declare the section empty"
+
+# An indented line is not a list item — four spaces is a code block in Markdown, so
+# a reader does not see an item where the gate counted one. Found by the same
+# attack. The leading-whitespace tolerance this removes bought nothing: both shipped
+# topics write their items flush left, and a nested item always has a parent that
+# counts.
+out="$(bash "$GATE" "$(topic '    - nothing was left open [O]' indented)" 2>&1)"
+assert_contains "$out" "refuse[silent-empty-open]" \
+  "an indented line carrying [O] is not an open item"
+
+# And the declaration has to be IN the section. One in a later section exempts
+# nothing: the same scope error that let a heading satisfy Define's outlier check.
+p="$(topic "$HOLLOW" elsewhere)"
+printf '\n%s\n' "$DECL" >> "$p"
+out="$(bash "$GATE" "$p" 2>&1)"
+assert_contains "$out" "refuse[silent-empty-open]" \
+  "a declaration in a later section does not empty this one"
+
+# The section ends at its own `---`, not at the next heading. This is the third way
+# in, and the one that is realistic rather than adversarial: the grade key is a
+# required element, both shipped topics write it as a bold line carrying `[O]`, and
+# a document that puts it in a footer below its last section donates it to that
+# section as an open item. The open section here is hollow and the artifact passed.
+#
+# Built as its own fixture because the grade key has to move for the case to exist,
+# and `topic` above carries it in Claims where both shipped topics have it.
+p="$TMP/footer.md"
+cat > "$p" <<EOF
+# Discovery — whether to turn the thing on
+
+dated: 2026-10-04
+status: discovery complete, not assessed
+
+## The question, in the asker's own words
+
+> should we turn it on
+
+## 2 · Coverage
+
+**Reached:** the GitHub REST API, and the SemIf source at commit 23cf1f3
+**Not reached:** JevBench
+**Verified by hand:** the GitHub REST API
+
+## Claims
+
+The GitHub REST API returned 300 pull requests, and the SemIf source was read at commit 23cf1f3. JevBench was not read at all. [E]
+
+## Where this stops
+
+Here.
+
+## What could not be established
+
+$HOLLOW
+
+---
+
+**Grades** are the STANDARDS.md scheme: [E] empirical, [S] standard, [V] vendor never outcome evidence, [P] practitioner, [O] open.
+EOF
+out="$(bash "$GATE" "$p" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a hollow open section is refused with the grade key in a footer below it"
+assert_contains "$out" "refuse[silent-empty-open]" \
+  "a line below the section's own --- separator is not one of its items"
+
+# The suite must not be able to pass by pinning a word list back in. This is the
+# third time this repository has shipped a word search standing in for a reading —
+# after the two-number coverage proxy and the four-phrase dead-pointer match — so
+# the shape is refused here, not just the instance.
+src="$(cat "$GATE")"
+assert_not_contains "$src" "none|nothing|everything was" \
+  "the gate no longer decides emptiness by searching prose for a word"
 
 t="$(fresh nocoverage)"
 perl -0pi -e 's/^## Coverage$/## Notes/m' "$t/process/02-discover/$NEW"

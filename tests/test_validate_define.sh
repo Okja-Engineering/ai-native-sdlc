@@ -184,24 +184,66 @@ out="$(gate "$t")"
 assert_contains "$out" "refuse[silent-empty-outliers]" \
   "the emptiness has to be stated in the section, not implied by its title"
 
-# And a section that does say it is empty still passes that check, so the fix is
-# not simply "always refuse an empty list".
-t="$(fresh_tree empty_outliers_stated)"
-empty_outliers "$t" "None this cycle: every finding fitted a theme."
+# And a section that DECLARES it is empty, in band and with a reason, still passes
+# that check, so the fix is not simply "always refuse an empty list". An empty
+# outlier list is a legitimate state the contract permits.
+DECL='<!-- declared-empty: every finding this cycle fitted a theme -->'
+t="$(fresh_tree empty_outliers_declared)"
+empty_outliers "$t" "$DECL"
 out="$(gate "$t")"
 assert_not_contains "$out" "refuse[silent-empty-outliers]" \
-  "a section that states it is empty is accepted"
+  "a section that declares itself empty, with a reason, is accepted"
 
-# The stated limit of this check, asserted so nobody reads it as more. It is a
-# lexical test for three words over the section's body, so prose that merely uses
-# one of them satisfies it — the shipped cycle's own explanation of why outliers
-# matter contains "clusters with nothing". Closing that means requiring a declared
-# form rather than a sentence, which is a contract change and not this one.
+# WHAT THIS CHECK USED TO BE, and why a sentence is not a declaration.
+#
+# It was a lexical test for `none|empty|nothing` over the section's body, so prose
+# that merely used one of those words satisfied it. Two consequences, both real:
+#
+#   * the shipped cycle's own explanation of why outliers matter contains "nothing"
+#     twice, so for THAT artifact this refusal could never fire — delete all three
+#     outliers and the section still satisfied its own emptiness check
+#   * the same shape in the Discover gate let a topic delete all seven of its
+#     "could not be established" items, assert the opposite, and pass
+#
+# Both cases are below. The first is the one the lexical check was documented as
+# allowing; it is now refused.
 t="$(fresh_tree empty_outliers_prose)"
 empty_outliers "$t" "The one that clusters with nothing is often the most valuable."
 out="$(gate "$t")"
-assert_not_contains "$out" "refuse[silent-empty-outliers]" \
-  "prose that merely uses the word satisfies it — a lexical check, NOT a declaration"
+assert_contains "$out" "refuse[silent-empty-outliers]" \
+  "prose that merely uses the word does not declare the section empty"
+
+# A plainer sentence saying exactly the right thing, which is still a sentence.
+t="$(fresh_tree empty_outliers_stated)"
+empty_outliers "$t" "None this cycle: every finding fitted a theme."
+out="$(gate "$t")"
+assert_contains "$out" "refuse[silent-empty-outliers]" \
+  "a sentence stating the section is empty is not the declared form either"
+
+# A declaration inside a FENCED BLOCK declares nothing. Found by attacking this
+# check after writing it, and the same class `field` above already skips fences
+# for: a fenced example of `rests on: none` donated itself as the real field's
+# value. A cycle that documents the convention must not thereby satisfy it.
+t="$(fresh_tree empty_outliers_fenced)"
+empty_outliers "$t" '```\n<!-- declared-empty: all themed -->\n```'
+out="$(gate "$t")"
+assert_contains "$out" "refuse[silent-empty-outliers]" \
+  "a declaration shown inside a fenced block does not declare the section empty"
+
+# A declaration carrying no reason does not declare anything — the same rule the
+# `not-a-claim` and `dead-pointer` declarations are held to.
+t="$(fresh_tree empty_outliers_noreason)"
+empty_outliers "$t" '<!-- declared-empty: -->'
+out="$(gate "$t")"
+assert_contains "$out" "refuse[silent-empty-outliers]" \
+  "a declaration with no reason does not declare the section empty"
+
+# The two gates have to hold the same form. They are separate scripts with no
+# shared library, so the thing that keeps them together is that both suites pin the
+# same behaviour — this case and its twin in tests/test_validate_discovery.sh.
+assert_not_contains "$(cat "$ROOT/process/03-define/validate-define.sh")" \
+  "none|empty|nothing" \
+  "the gate no longer decides emptiness by searching prose for a word"
 
 # --- method -------------------------------------------------------------------
 t="$(fresh_tree method)"
