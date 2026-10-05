@@ -106,6 +106,25 @@ out="$(run "$TMP/stale-decl-row.md")"; st=$?
 assert_status 1 "$st" "a row for a declaration no contract carries is refused"
 assert_contains "$out" "refuse[declaration-stale]" "and the refusal is declaration-stale"
 
+# A row whose `Declared in` cell names the wrong contract is refused, and refused
+# with its own message, because the fix differs from a missing row: an assessor
+# following that row opens a file that says nothing about the field. Both halves of
+# the pair are checked — the forward direction sees a declaration with no matching
+# row, the backward direction sees a row with no matching declaration — so without
+# this case a check comparing names and ignoring paths would pass.
+awk '
+  /^\|[ \t]*`expires`[ \t]*\|/ {
+    n = split($0, c, "|")
+    printf "|%s| `process/03-define/define-contract.md` |%s\n", c[2], c[4]; next
+  }
+  { print }
+' "$DOC" > "$TMP/decl-wrong-contract.md"
+out="$(run "$TMP/decl-wrong-contract.md")"; st=$?
+assert_status 1 "$st" "a disclosure row naming the wrong contract is refused"
+assert_contains "$out" "refuse[declaration-undisclosed]" "the declaration reads as undisclosed"
+assert_contains "$out" "names a different contract" "and the message says that is the problem"
+assert_contains "$out" "refuse[declaration-stale]" "and the row reads as stale against the contract it names"
+
 # A row with no statement of what is unchecked is the silent exclusion this table
 # exists to replace, the same rule the exception table is held to.
 awk '
@@ -117,6 +136,18 @@ awk '
 out="$(run "$TMP/decl-no-reason.md")"; st=$?
 assert_status 1 "$st" "a disclosure row carrying no reason is refused"
 assert_contains "$out" "refuse[declaration-no-reason]" "and the refusal is declaration-no-reason"
+
+# Renaming the heading away does not switch the direction off. The table is found by
+# its heading, so without this the whole direction is disabled by an edit that looks
+# like tidying — the shape of a control an author turns off by omission, which
+# AGENTS.md rules against. Found by attacking this check after writing it.
+sed 's/^## Declarations no gate enforces/## Things worth knowing/' "$DOC" > "$TMP/decl-no-heading.md"
+assert_eq "0" "$(grep -c '^## Declarations no gate enforces' "$TMP/decl-no-heading.md")" \
+  "the derived document no longer carries the heading"
+out="$(run "$TMP/decl-no-heading.md")"; st=$?
+assert_status 1 "$st" "renaming the disclosure heading away refuses rather than disabling the check"
+assert_contains "$out" "refuse[declaration-undisclosed]" \
+  "and every declaration reads as undisclosed"
 
 # --- the declaration is read from the contracts, not from a list here ----------
 # Pinned by adding one to a COPY of the contract tree. The live document cannot
