@@ -104,6 +104,19 @@ Declared after the second problem, and after finding that the first two disagree
 
 So the conditional route is declared and has **no worked example**. That is worth stating plainly rather than letting a missing field stand in for one.
 
+## Required fields — a comparison cycle
+
+A comparison cycle is a cycle, so it carries a cycle's fields and two more. Declared here because `bin/next.sh` reads a field table per artifact; what a comparison cycle is *for* is in *A comparison cycle* near the end of this contract.
+
+| Field | |
+|---|---|
+| `dated` | when the comparison was run |
+| `from` | the source artifact, linked, with its item count — **the same source the record it compares against reads** |
+| `method` | what produced this grouping. On a comparison this is the load-bearing field, because the comparison is a test of the method and nothing else |
+| `compares` | the cycle record this one is being read against, linked |
+| `criterion` | what result counts as which reading, written **before** the comparison is run. **Unset**, and the owner's to set — the two readings it chooses between are in the section A comparison cycle, below |
+| `status` | `defined, not decided` |
+
 ## Required sections
 
 These are a cycle's sections. A problem's are **not yet declared**, and `bin/next.sh` emits a cycle's into a problem skeleton for want of anything else to read — so a scaffolded problem arrives with a Themes heading it does not want. Two problems is enough to declare a problem's fields and is not obviously enough to declare its sections; the two shipped ones share a shape but neither was written against a declaration. Named here rather than invented, and carried in *Open* below.
@@ -208,9 +221,44 @@ Resolving alone would not have been enough. A link to any file that happens to e
 
 **A problem's `from:` is declared above and is still unread.** Stated here rather than left implicit: a required field nothing reads is the defect this repository has found twice already, once in `problem:` on a decision record and once in `rests on:` here. It is recorded as an open gap in `CONTROLS.md` under CTRL-10 rather than closed in the same change, because no artifact has shown it failing.
 
+## A comparison cycle
+
+**Where the cross-cutting test lands.** The `producing-themes` decision says the comparison *"is part of this decision, not a separate task"* — does a model produce the same seven themes from the same sixty-four rows? The question is in this contract's *Open* list, in the problem, in the option set and in the decision. There was nowhere for an answer to go.
+
+### It is a cycle record, and that is the point
+
+A comparison record is **a second Define cycle over the same findings file, with a different `method:`**, living in `cycles/` beside the hand pass and named `<cycle>.<method>.md` — `2026-09-29.by-model.md`.
+
+**Not its own contract, and not its own directory**, because `validate-define.sh` already reads every file in `cycles/` and the checks it runs are exactly the ones a comparison needs. The model's grouping has to account for every id in the source, declare its count, surface an outlier section and say what produced it. A model that quietly drops a finding is refused by `unaccounted`, with the id named — the same control that caught ten strays in the first hand pass, pointed at the thing being tested. A separate contract would have been a second declaration of a cycle's shape, which is the duplicated-declaration failure this repository keeps paying for; a separate directory would have put the comparison outside the one check that makes it worth running.
+
+The dotted name is deliberate. It is not a date, so it cannot be mistaken for a cycle of its own, and `<cycle>.*` is a pattern a reader or a script can resolve back to the scan both records read.
+
+`bin/next.sh <cycle>.<method>` scaffolds one, over the findings file the part before the dot names. The scaffold stops there: a problem is stated from the hand pass, and offering to continue a problem from the model's grouping would be offering to state a problem from the thing under test.
+
+### The criterion is unset, and it is the owner's
+
+**`criterion:` is declared and has no value, here or in any record.** The decision names two readings and the gap between them is not small:
+
+- *"If a model reproduces the seven themes closely, B moves to the front"* — B being *model drafts, person signs*.
+- *"if it produces a plausible but differently-shaped grouping, that is evidence about anchoring and B gets harder to choose, not easier."*
+
+Those point at opposite decisions, and **nothing says what "closely" means.** Seven themes against seven? The same names? The same membership, which the hand pass cannot answer because it predates per-theme ids? A theme the model found that the reader missed, which is the outcome theme 7 came from and is neither "closely" nor "differently shaped"?
+
+Each of those is a defensible line and they do not agree with each other. Picking one here would be this contract deciding the thing the decision reserved for a person, so the field is declared, stated unset, and the two readings are written down — the choice is between stated alternatives rather than invented ones. **What the field requires is that the criterion is written before the comparison runs**, because a criterion set after the result is a reading, not a test.
+
+### Declared, not yet enforced
+
+Nothing checks that a record named `<cycle>.<method>.md` carries `compares:` or `criterion:`, and nothing checks that `compares:` resolves to a cycle over the same source. The four cycle checks do apply, because the gate reads the directory. **What would make gating it right:** one comparison record. The checks worth building are then the ones that follow from the shape it turns out to have — `compares:` resolving to a cycle, both records naming the same `from:` source, and `criterion:` set to something other than empty — and each of those is a guess until there is a record to generalise from.
+
+### One gap, recorded rather than fixed
+
+**`bin/cycle.sh` cannot see a comparison record.** It walks the findings files and looks up `cycles/$c.md` by exact name, so a record named for the comparison is absent from the report with nothing said — the same shape as the `example: yes` defect that made a whole cycle vanish, arriving from the other direction. The gate reads it and the report does not, so a comparison record is checked and invisible.
+
+Not fixed here, and said rather than left to be rediscovered: closing it means changing how the report addresses a cycle's records, which is worth doing against a real comparison record rather than against the idea of one. `tests/test_comparison_record.sh` asserts the gap, for the same reason `tests/test_validate_claims.sh` asserts that a speed claim its gate cannot catch does pass — a limitation nobody can see is indistinguishable from coverage.
+
 ## Open
 
-1. **Whether a small model produces the same themes.** The first cycle was themed by reading. That is the interesting test and it is now cheap, because the source artifact and the hand-made themes both exist to compare against.
+1. **Whether a small model produces the same themes.** The first cycle was themed by reading. That is the interesting test and it is now cheap, because the source artifact and the hand-made themes both exist to compare against. **Still open, and now it has a place to land** — see *A comparison cycle* above. What is open is the answer and the criterion the answer is read against, not where the answer goes.
 2. **Whether themes should be stable across cycles** — "the software factory" recurring next month as the same theme, or re-derived each time. Re-deriving is honest and loses continuity; carrying them forward gains continuity and risks seeing last month's pattern in this month's data.
 3. **Where the human's per-theme decision is recorded.** Not invented here.
 4. **A problem's required sections.** Its fields are declared above; its sections are not. `bin/next.sh` therefore emits a cycle's sections into a problem skeleton. Declaring them from the two problems that exist would encode whatever those two happen to share.
