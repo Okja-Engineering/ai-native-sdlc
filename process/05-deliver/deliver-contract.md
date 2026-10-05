@@ -110,11 +110,25 @@ Three phases have deferred their gates on the grounds that one artifact cannot t
 
 **A record with `chosen:` set to anything but `pending` must carry a `decided_by:` naming a person.**
 
-That is mechanical, cheap, and guards the only thing in the repository that cannot be reconstructed afterwards. Everything else about Deliver's shape should wait for a second decision.
+That is mechanical, cheap, and guards the only thing in the repository that cannot be reconstructed afterwards. Everything else about Deliver's shape was to wait for a second decision.
 
 **Built**, as `validate-decision.sh`, with two companions that are equally shape-independent: a chosen option must exist in the option set it claims to choose from, and a decided record must be dated. A `decided_by` naming a role, a team or a model is refused as not a person.
 
-Every refusal carries its own message and is asserted by that message in `tests/test_validate_decision.sh`. Everything else about Deliver's shape still waits for a second decision.
+Every refusal carries its own message and is asserted by that message in `tests/test_validate_decision.sh`.
+
+**That deferral has been spent, and this said otherwise until 2026-10-04.** The second decision arrived on 2026-10-03, Deliver's shape changed because of it — `amends:` is a required field this contract added *"after the second decision"*, thirty lines above the sentence saying the shape still waits for one — and the gate grew to hold it:
+
+```
+$ bash bin/list-refusals.sh process/05-deliver/validate-decision.sh | wc -l
+23
+$ bash bin/list-refusals.sh process/05-deliver/validate-decision.sh \
+    | cut -d: -f3 | grep -c amends
+11
+```
+
+Eleven of the twenty-three emission sites are the `amends` family — seven distinct refusals covering the field's presence, a bare `none`, the link, the anchor, and the reciprocal link in both directions. None of that is shape-independent; all of it is Deliver's shape, derived from the second decision exactly as the deferral said it should be.
+
+**What is still deferred, and now for a stated reason rather than a count.** The two questions under *Open* below — whether a decision needs a review period, and where a reversal lives — are not deferred for want of a second artifact. They are undecided, and a gate cannot be written for a rule nobody has stated. That is the honest form of this sentence: nothing is waiting on arithmetic.
 
 **`expires` is declared and not yet enforced**, which is a different state from deferred: the field exists, `bin/next.sh` scaffolds it, `bin/cycle.sh` reports days to the nearest expiry, and no gate reads it. What would make gating it right is a second record carrying it, and the reasoning is above under *`expires`, and why a date in prose was not a tripwire*. A reporting tool is not a gate: the report makes the date visible to a person and refuses nothing.
 

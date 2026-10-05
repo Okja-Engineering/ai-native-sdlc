@@ -36,6 +36,8 @@ There is still no classifier, no CLI, no MCP server, and no scheduled job. Nothi
 
 > **"Each" was too strong, and git says so.** Define, Develop and Discover hold the claimed order. Scan does not — `67a85aa` declared the contract before `d6da793` added the worked example. Deliver's contract landed one second before its first record, so the two were one batch and `deliver-contract.md`'s specific claim that "the record was drafted first" is unverifiable from the repository, with git's only testimony against it. Three of five, stated for five. Found by an external audit.
 
+> **And the second half of the sentence describes what the repository intends, not what it did.** Four contracts deferred enforcement until a second artifact. Discover's second topic arrived and its contract was updated and gated. Develop's and Deliver's arrived on 2026-10-03 and neither deferral was re-read: Develop's contract went on saying it had run once, and Deliver's said its shape still waited for a second decision thirty lines below recording a field added *because of* one. Both are corrected, and `CONTROLS.md` item 5 records that nothing watches a deferral's condition and why no check for it was built. Define's deferral is the one still live, with one cycle on disk.
+
 ## The loop
 
 **Drawn once, in [`README.md`](README.md#the-loop).** It used to be drawn twice — here and there — and the two copies disagreed with each other and with `process/` for five phases of real work. One drawing is the declaration; this section says what the drawing does not.
