@@ -613,6 +613,83 @@ assert_eq "1" "$(printf '%s\n' "$out" | grep -c .)" \
 
 anchor_gate() { bash "$ROOT/process/03-define/validate-define.sh" "$1" 2>&1; }
 
+# --- a quiet cycle is a passing state ------------------------------------------
+# `findings-contract.md` protects `nothing found: yes` deliberately, and a scan in that
+# state passes its own gate. The Define record over it could not pass this one at all:
+# the accounting check conflated an EMPTY declared id set with an ABSENT block, so
+# every body — `none`, a reason, a sentence, a comment, nothing — drew `no-accounting`,
+# and the only way to a non-empty set was to invent an id, which trips three other
+# refusals. **There was no passing state.** `.github/workflows/ci.yml` runs this gate
+# over the directory, so recording one quiet month would have made every branch red.
+#
+# Built rather than reasoned about, per the finding: this is not visible from reading.
+cyc="$(define_fixture "$TMP/quiet" "" 0)"
+assert_contains "$(cat "$TMP/quiet/process/01-scan/findings/2026-12-01.md")" 'nothing found: yes' \
+  "the fixture source is a quiet cycle"
+assert_eq "0" "$(bash "$ROOT/process/01-scan/findings-ids.sh" "$TMP/quiet/process/01-scan/findings/2026-12-01.md" | grep -c .)" \
+  "and it records no finding ids"
+out="$(bash "$ROOT/process/01-scan/validate-findings.sh" "$TMP/quiet/process/01-scan/findings/2026-12-01.md" 2>&1)"; rc=$?
+assert_status 0 "$rc" "the quiet scan passes its own gate, which is why this matters"
+out="$(anchor_gate "$cyc")"; rc=$?
+assert_status 0 "$rc" "a Define record over a quiet cycle is within the contract"
+assert_not_contains "$out" "refuse[no-accounting]" "and is not refused for an accounting block it has"
+assert_not_contains "$out" "refuse[unaccounted]" "and nothing is reported as unaccounted"
+
+# CI runs this gate with NO ARGUMENTS over the directory. That is the blast radius, so
+# it is the thing asserted rather than the single-file case alone.
+out="$(cd "$TMP/quiet" && bash "$ROOT/process/03-define/validate-define.sh" 2>&1)"; rc=$?
+assert_status 0 "$rc" "and the gate run over a directory containing it stays green"
+
+# An ABSENT block is still refused, and the two messages are different — the old one
+# said "no accounting:ids block" about a record whose block was present and correct.
+cyc="$(define_fixture "$TMP/noacct" "" 0)"
+mutate "$cyc" 's|<!-- accounting:ids -->.*?<!-- /accounting:ids -->\n||s' \
+  "remove the accounting block from a quiet cycle entirely"
+assert_eq "0" "$(grep -c 'accounting:ids' "$cyc")" "the fixture has no accounting block at all"
+out="$(anchor_gate "$cyc")"
+assert_contains "$out" "refuse[no-accounting]" "a record with no accounting block is still refused"
+assert_contains "$out" "no accounting:ids block in this record" \
+  "and the message says the block is absent rather than empty"
+
+# A block present and declaring nothing, without declaring itself empty, is refused —
+# so the passing state is a DECLARATION and not an oversight. Same reasoning the
+# Outliers and open sections already carry.
+cyc="$(define_fixture "$TMP/silentacct" "" 0)"
+mutate "$cyc" 's|<!-- declared-empty: the source is a quiet cycle[^>]*-->|none|' \
+  "replace the declared-empty accounting set with the word none"
+out="$(anchor_gate "$cyc")"
+assert_contains "$out" "refuse[no-accounting]" "an empty block that does not declare itself empty is refused"
+assert_contains "$out" "declares no ids" "and the message says that is what is wrong"
+
+# And a declaration carrying no reason declares nothing.
+cyc="$(define_fixture "$TMP/noreasonacct" "" 0)"
+mutate "$cyc" 's|<!-- declared-empty: the source is a quiet cycle[^>]*-->|<!-- declared-empty: -->|' \
+  "strip the reason from the declared-empty accounting set"
+assert_contains "$(anchor_gate "$cyc")" "refuse[no-accounting]" \
+  "a declaration with no reason does not declare the set empty"
+
+# The declaration does NOT excuse a cycle that has findings to account for. This is the
+# half that keeps CTRL-4: declaring the set empty over a source with six findings is
+# dropping all six, and they are named.
+cyc="$(define_fixture "$TMP/emptylie" "3 2" 1)"
+mutate "$cyc" 's|<!-- accounting:ids -->\n.*?\n<!-- /accounting:ids -->|<!-- accounting:ids -->\n<!-- declared-empty: a false claim that there is nothing to account for -->\n<!-- /accounting:ids -->|s' \
+  "declare the accounting set empty over a source that has six findings"
+out="$(anchor_gate "$cyc")"; rc=$?
+assert_status 1 "$rc" "declaring the set empty over a source with findings is refused"
+assert_contains "$out" "refuse[unaccounted]" "and the refusal is unaccounted"
+assert_contains "$out" "F01" "and it names the findings that were dropped"
+
+# The compounding defect at the same site: with an empty source the `unaccounted`
+# refusal used to fire NAMING NOTHING, because a blank line survived the comparison.
+# A refusal that names no instance is a refusal an operator cannot act on.
+cyc="$(define_fixture "$TMP/blankname" "" 0)"
+mutate "$cyc" 's|<!-- accounting:ids -->\n.*?\n<!-- /accounting:ids -->|<!-- accounting:ids -->\nF01\n<!-- /accounting:ids -->|s' \
+  "put an invented id in a quiet cycle's accounting block"
+out="$(anchor_gate "$cyc")"
+assert_contains "$out" "refuse[invented-accounting]" "an invented id over a quiet source is refused"
+assert_not_contains "$out" "not accounted for:  " \
+  "and no refusal fires naming nothing"
+
 # The baseline. Nothing below means anything if this does not pass.
 cyc="$(define_fixture "$TMP/anchor_base" "3 2" 1)"
 out="$(anchor_gate "$cyc")"; rc=$?

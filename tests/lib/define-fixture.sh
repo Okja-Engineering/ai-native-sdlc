@@ -23,6 +23,13 @@
 # Writes <dir>/process/01-scan/findings/2026-12-01.md and
 #        <dir>/process/03-define/cycles/2026-12-01.md
 # and prints the path of the cycle file.
+# A QUIET CYCLE is `define_fixture <dir> "" 0`: no themes, no outliers, and a source
+# marked `nothing found: yes` with no findings table. That is a state the scan
+# contract protects deliberately, and until 2026-10-05 the Define gate had no passing
+# state over it at all — every body for the accounting block drew `no-accounting`, and
+# CI runs that gate over the directory, so recording one quiet month would have made
+# every branch red. It is a fixture rather than a hand-built file because the shape is
+# the point and because the next cycle may really be one.
 define_fixture() {
   local dir="$1" themes="$2" outl="$3"
   local total=0 n i id
@@ -36,21 +43,29 @@ define_fixture() {
 
   local src="$dir/process/01-scan/findings/2026-12-01.md"
   {
-    printf '# Scan cycle — 2026-12-01\n\nsince: 2026-11-01\nnothing found: no\nexample: no\n\n'
+    printf '# Scan cycle — 2026-12-01\n\nsince: 2026-11-01\n'
+    if [ "$total" -eq 0 ]; then
+      printf 'nothing found: yes\n'
+    else
+      printf 'nothing found: no\n'
+    fi
+    printf 'example: no\n\n'
     printf '## Looked at\n\n'
     printf -- '- web: a built fixture, 2026-11-01 to 2026-12-01.\n'
     printf -- '- X: a built fixture, 2026-11-01 to 2026-12-01.\n'
     printf -- '- YouTube: a built fixture, 2026-11-01 to 2026-12-01.\n\n'
-    printf '## Findings\n\n'
-    printf '| id | what | source | dated | kind | might affect (guess) | consequence guess |\n'
-    printf '|---|---|---|---|---|---|---|\n'
-    i=1
-    while [ "$i" -le "$total" ]; do
-      id="$(printf 'F%02d' "$i")"
-      printf '| %s | A thing numbered %s happened | https://example.com/%s | 2026-11-15 | practice-change | build (guess) | low |\n' \
-        "$id" "$i" "$i"
-      i=$((i + 1))
-    done
+    if [ "$total" -gt 0 ]; then
+      printf '## Findings\n\n'
+      printf '| id | what | source | dated | kind | might affect (guess) | consequence guess |\n'
+      printf '|---|---|---|---|---|---|---|\n'
+      i=1
+      while [ "$i" -le "$total" ]; do
+        id="$(printf 'F%02d' "$i")"
+        printf '| %s | A thing numbered %s happened | https://example.com/%s | 2026-11-15 | practice-change | build (guess) | low |\n' \
+          "$id" "$i" "$i"
+        i=$((i + 1))
+      done
+    fi
   } > "$src"
 
   local cyc="$dir/process/03-define/cycles/2026-12-01.md"
@@ -61,6 +76,9 @@ define_fixture() {
     printf 'method: built by tests/lib/define-fixture.sh\n'
     printf 'status: defined, not decided\n\n'
     printf -- '---\n\n## Themes\n\n'
+    if [ -z "$themes" ]; then
+      printf '<!-- declared-empty: the source recorded no findings, so there is nothing to group -->\n\n'
+    fi
     i=1
     for n in $themes; do
       printf '### %s · A theme that is a claim\n**%s findings · `practice-change`**\n\n' "$i" "$n"
@@ -83,13 +101,21 @@ define_fixture() {
       printf '\n'
     fi
     printf -- '---\n\n## Accounting\n\n<!-- accounting:ids -->\n'
-    i=1
-    while [ "$i" -le "$total" ]; do
-      printf 'F%02d' "$i"
-      if [ "$i" -lt "$total" ]; then printf ' '; fi
-      i=$((i + 1))
-    done
-    printf '\n<!-- /accounting:ids -->\n\n'
+    if [ "$total" -eq 0 ]; then
+      # A declared EMPTY set, which is a different state from an absent block. The
+      # same form the Themes and Outliers sections use, and the gate reads it the same
+      # way: present, and carrying a reason.
+      printf '<!-- declared-empty: the source is a quiet cycle and records no findings, so there is nothing to account for -->\n'
+    else
+      i=1
+      while [ "$i" -le "$total" ]; do
+        printf 'F%02d' "$i"
+        if [ "$i" -lt "$total" ]; then printf ' '; fi
+        i=$((i + 1))
+      done
+      printf '\n'
+    fi
+    printf '<!-- /accounting:ids -->\n\n'
     printf -- '---\n\n## Where this stops\n\nA person decides per theme. Nothing here records that.\n'
   } > "$cyc"
 
