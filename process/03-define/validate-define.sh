@@ -124,7 +124,7 @@ field() {
 # This predicate is also written, identically, in
 # process/02-discover/validate-discovery.sh, which owns the other section that may
 # be empty. The gates share no library and adding one would put a load-bearing
-# script outside the enumeration bin/validate-controls.sh builds from the tree —
+# script outside the filename pattern bin/validate-controls.sh enumerates —
 # the gap that document records. So the form is declared once in the two contracts
 # and in CONTROLS.md, and what holds the two copies together is that both suites
 # pin the same behaviour rather than the expression.
