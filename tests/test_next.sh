@@ -294,4 +294,92 @@ out="$(run "$t" 2099-01-01)"; rc=$?
 assert_status 2 "$rc" "an unknown cycle exits 2"
 assert_contains "$out" "a cycle starts with a scan" "it says what is missing"
 
+# --- a skeleton may contain a markdown heading -------------------------------
+# skeleton() ended a section at the next `## ` or `### ` line WITHOUT asking
+# whether that line was inside a fence, and sections() read `### ` out of the
+# Required sections range the same way. So a contract could not declare a
+# skeleton that contains a heading — the scaffold truncated it at the heading,
+# and sections() read the heading as the name of another required section.
+#
+# That is the shape every per-theme structure needs, because a theme IS a
+# heading. Asserted on a constructed contract rather than on the shipped theme
+# skeleton, so this survives that skeleton being rewritten.
+t="$(fresh fenced_heading)"
+perl -0pi -e 's/^### Where this stops$/### Reviewed\n\n```markdown\n### N \xc2\xb7 a heading inside a fence\n**N findings**\n\n<!-- review:signoff -->\n<!-- \/review:signoff -->\n```\n\n### Where this stops/m' \
+  "$t/process/03-define/define-contract.md"
+assert_contains "$(cat "$t/process/03-define/define-contract.md")" "a heading inside a fence" \
+  "the fixture really did add a skeleton containing a heading"
+rm -f "$t/process/03-define/cycles/2026-09-29.md"
+run "$t" 2026-09-29 >/dev/null
+made="$t/process/03-define/cycles/2026-09-29.md"
+assert_contains "$(grep '^### ' "$made")" "a heading inside a fence" \
+  "a declared skeleton is emitted whole, heading included, at the level it was written"
+assert_contains "$(cat "$made")" "<!-- review:signoff -->" \
+  "and the part below that heading is not truncated away"
+assert_not_contains "$(grep '^## ' "$made")" "a heading inside a fence" \
+  "a heading inside a fence is not read as a required section of its own"
+
+# --- a cycle records what the convergence pass cost ---------------------------
+# Decision F commits to two more cycles and to recording the pass duration, and
+# no artifact had anywhere to put it. The field name is read OUT OF the contract
+# rather than written here twice: the contract is the single declaration of a
+# cycle's shape, and what this asserts is that the declaration reaches the
+# scaffold.
+contract="$ROOT/process/03-define/define-contract.md"
+dur="$(sed -n '/^## Required fields$/,/^## /p' "$contract" \
+  | sed -n 's/^| `\([a-z_ ]*\)` *|.*convergence pass took.*/\1/p' | head -1)"
+assert_eq "pass took" "$dur" \
+  "the cycle's own field table declares a field for how long the convergence pass took"
+# An empty `$dur` would make every assertion below it pass against nothing, which
+# is the vacuous-fixture failure tests/lib/mutate.sh exists for.
+[ -n "$dur" ] && any=yes || any=no
+assert_eq "yes" "$any" "and the field name was read from the contract, not assumed"
+
+t="$(fresh duration)"
+rm -f "$t/process/03-define/cycles/2026-09-29.md"
+run "$t" 2026-09-29 >/dev/null
+made="$t/process/03-define/cycles/2026-09-29.md"
+assert_contains "$(cat "$made")" "$dur:" \
+  "and a scaffolded cycle carries it, so the next pass has somewhere to write it"
+
+# --- and the scaffold produces a theme's own ids ------------------------------
+# define-contract.md has required this since 2026-10-03 — "From the next cycle,
+# each theme lists its own ids" — and nothing produced the structure, so the
+# requirement came into force against a skeleton that could not meet it. The
+# marker is read out of the contract for the same reason as the field above.
+marker="$(awk '
+  /^### Themes$/ { on = 1; next }
+  /^[ \t]*(```|~~~)/ { fence = !fence }
+  on && !fence && /^### / { exit }
+  on' "$contract" | sed -n 's/.*\(<!-- theme:ids -->\).*/\1/p' | head -1)"
+assert_eq "<!-- theme:ids -->" "$marker" \
+  "the Themes section declares a block for a theme's own ids"
+[ -n "$marker" ] && any=yes || any=no
+assert_eq "yes" "$any" "and the marker was read from the contract, not assumed"
+assert_contains "$(cat "$made")" "$marker" \
+  "and a scaffolded cycle carries it"
+# --- a decision carries an expiry --------------------------------------------
+# The only open decision in the repository expires on a date that lived in one
+# prose sentence. Six required fields and none of them was an expiry or a review
+# date, so nothing could read the condition the decision set for itself.
+#
+# The field name is read OUT OF the Deliver contract rather than written twice.
+# What this asserts is the chain: the contract declares it, the scaffold produces
+# it, and bin/next.sh needed no edit for either.
+deliver="$ROOT/process/05-deliver/deliver-contract.md"
+exp="$(sed -n '/^## Required fields$/,/^## /p' "$deliver" \
+  | sed -n 's/^| `\([a-z_ ]*\)` *|.*when this decision expires.*/\1/p' | head -1)"
+assert_eq "expires" "$exp" "a decision's field table declares when the decision expires"
+[ -n "$exp" ] && any=yes || any=no
+assert_eq "yes" "$any" "and the field name was read from the contract, not assumed"
+
+t="$(fresh expiry)"
+rm -f "$t/process/05-deliver/decisions/producing-themes.md"
+out="$(run "$t" 2026-09-29 producing-themes)"; rc=$?
+assert_status 0 "$rc" "scaffolding a decision exits 0"
+made="$t/process/05-deliver/decisions/producing-themes.md"
+assert_file_exists "$made" "the decision skeleton exists"
+assert_contains "$(cat "$made")" "$exp:" \
+  "and it carries the expiry field, so a decision has somewhere to set its own tripwire"
+
 assert_done

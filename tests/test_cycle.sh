@@ -167,6 +167,218 @@ assert_not_contains "$out" "topics" "naming a cycle reports that cycle only"
 out="$(run 2099-01-01)"; rc=$?
 assert_status 1 "$rc" "an unknown cycle exits 1"
 
+# --- what the convergence pass cost -------------------------------------------
+# Decision F commits to recording the pass duration across two more cycles, and
+# the report named everything about a cycle except that. The field is declared in
+# define-contract.md and read by no gate, so this report is the only place a
+# person sees it.
+#
+# The field name is read out of the contract rather than written here, so the test
+# is about the chain from the declaration to the report.
+dur_field="$(sed -n '/^## Required fields$/,/^## /p' "$ROOT/process/03-define/define-contract.md" \
+  | sed -n 's/^| `\([a-z_ ]*\)` *|.*convergence pass took.*/\1/p' | head -1)"
+[ -n "$dur_field" ] && any=yes || any=no
+assert_eq "yes" "$any" "the contract declares a field for the pass duration"
+
+sed 's/2026-09-29/2026-11-03/g' "$SB/process/01-scan/findings/2026-09-29.md" \
+  > "$SB/process/01-scan/findings/2026-11-03.md"
+sed -e 's|findings/2026-09-29|findings/2026-11-03|g' \
+    -e "s|^method: .*|method: read by hand, not by classifier\n$dur_field: about two hours, in one sitting|" \
+  "$SB/process/03-define/cycles/2026-09-29.md" > "$SB/process/03-define/cycles/2026-11-03.md"
+assert_contains "$(cat "$SB/process/03-define/cycles/2026-11-03.md")" "$dur_field: about two hours" \
+  "the fixture really does carry a duration"
+
+out="$(run 2026-11-03)"
+assert_contains "$out" "about two hours, in one sitting" \
+  "the report names how long the convergence pass took"
+define_line="$(printf '%s\n' "$out" | grep '03 define')"
+assert_contains "$define_line" "about two hours" \
+  "and it says so on the line that reports the rest of the cycle's state"
+rm -f "$SB/process/01-scan/findings/2026-11-03.md" "$SB/process/03-define/cycles/2026-11-03.md"
+
+# A cycle that does not record it must be SAID to not record it. A blank would
+# read as a pass that took no time, and an omitted phrase as a cycle nobody
+# asked. The shipped cycle predates the field, so it is the real case.
+out="$(run 2026-09-29)"
+define_line="$(printf '%s\n' "$out" | grep '03 define')"
+assert_contains "$define_line" "not recorded" \
+  "a cycle that records no duration is reported as not recording one"
+
+# And "not recorded" is only a true sentence while the contract still declares the
+# field the report looks for. A report that hardcodes a field name goes on saying
+# "not recorded" after a rename, about an artifact that records one — so the drift
+# is announced.
+cp "$SB/process/03-define/define-contract.md" "$TMP/define-contract.bak"
+grep -v "^| \`$dur_field\` |" "$TMP/define-contract.bak" > "$SB/process/03-define/define-contract.md"
+assert_eq "0" "$(grep -c "^| \`$dur_field\` |" "$SB/process/03-define/define-contract.md")" \
+  "the fixture really did remove the declaration"
+out="$(run 2026-09-29)"
+assert_contains "$out" "no longer declared" \
+  "the report says so when the contract stops declaring the field it reads"
+cp "$TMP/define-contract.bak" "$SB/process/03-define/define-contract.md"
+out="$(run 2026-09-29)"
+assert_not_contains "$out" "no longer declared" \
+  "and says nothing about drift while the declaration is there"
+
+# --- a cycle with no themes is reported as a cycle with no themes --------------
+# count_themes() was `grep -cE ... || echo 0`. `grep -c` ALREADY prints 0 and
+# exits 1 when it matches nothing, so the fallback printed a second zero and the
+# report read `0\n0 themes, 0\n0 outliers` across four lines. Unreachable while
+# the only cycle in the tree had seven themes; a scaffolded cycle has none, and
+# bin/next.sh now scaffolds one for every new date.
+sed 's/2026-09-29/2026-11-04/g' "$SB/process/01-scan/findings/2026-09-29.md" \
+  > "$SB/process/01-scan/findings/2026-11-04.md"
+{
+  printf '# Define — cycle 2026-11-04\n\n'
+  printf 'dated: 2026-11-04\n'
+  printf 'from: [`process/01-scan/findings/2026-11-04.md`](../../01-scan/findings/2026-11-04.md), 64 findings\n'
+  printf 'method: nothing has been read yet\n'
+  printf 'status: defined, not decided\n\n## Themes\n\n*To be written.*\n'
+} > "$SB/process/03-define/cycles/2026-11-04.md"
+out="$(run 2026-11-04)"
+define_line="$(printf '%s\n' "$out" | grep '03 define')"
+assert_contains "$define_line" "0 themes, 0 outliers" \
+  "an unthemed cycle reports no themes and no outliers on one line"
+assert_eq "0" "$(printf '%s\n' "$out" | grep -cE '^[0-9]+ (themes|outliers)')" \
+  "and no count spills onto a line of its own, which is what a doubled zero did"
+rm -f "$SB/process/01-scan/findings/2026-11-04.md" "$SB/process/03-define/cycles/2026-11-04.md"
+# --- the two numbers a tripwire needs -----------------------------------------
+# A decision commits to two more cycles and expires on a date. One missed cycle
+# ends it. Nothing in the repository could compute either number, so both were
+# going to be remembered or lost.
+#
+# `CYCLE_TODAY` is how the suite drives fixed dates through the real arithmetic.
+# A report that reads the wall clock is otherwise testable only by hardcoding
+# today, which is a test that fails tomorrow.
+runat() { ( cd "$SB" && CYCLE_TODAY="$1" bash bin/cycle.sh 2>&1 ); }
+
+# The date arithmetic. Every case is a pair a reader can check by eye, and the
+# set covers what a naive implementation gets wrong: a month boundary, a year
+# boundary, a leap day, and the day itself.
+#
+# None of these is today's date or the shipped decision's expiry. The shipped
+# values are asserted separately, by reading them rather than by repeating them.
+decision="$SB/process/05-deliver/decisions/producing-themes.md"
+cp "$decision" "$TMP/decision.bak"
+
+# The field is replaced where it belongs, next to `dated:`, rather than appended.
+set_expiry() { # value
+  grep -v '^expires:' "$TMP/decision.bak" \
+    | awk -v v="$1" '{ print } /^dated:/ && !ins { print "expires: " v; ins = 1 }' > "$decision"
+}
+
+while IFS='|' read -r today expiry want; do
+  [ -n "$today" ] || continue
+  set_expiry "$expiry"
+  out="$(runat "$today")"
+  line="$(printf '%s\n' "$out" | grep 'expir')"
+  assert_contains "$line" "$want" "on $today, an expiry of $expiry reads \`$want\`"
+done <<'CASES'
+2027-01-10|2027-01-10|, today
+2027-01-10|2027-01-11|in 1 day
+2027-01-10|2027-02-10|in 31 days
+2027-01-10|2027-03-10|in 59 days
+2028-02-27|2028-03-01|in 3 days
+2027-02-27|2027-03-01|in 2 days
+2026-12-30|2027-01-02|in 3 days
+2027-03-10|2027-03-08|2 days ago
+CASES
+
+# An expiry in the past is the state the whole field exists to make visible, so it
+# is not reported in the same voice as one in the future.
+set_expiry "2027-03-08"
+out="$(runat 2027-03-10)"
+assert_contains "$(printf '%s\n' "$out" | grep 'expir')" "!!" \
+  "an expiry in the past is flagged on its own line, not reported as ordinary"
+set_expiry "2027-03-12"
+out="$(runat 2027-03-10)"
+assert_not_contains "$(printf '%s\n' "$out" | grep 'expir')" "!!" \
+  "and an expiry still ahead is not flagged"
+
+# A malformed expiry must say it is malformed. A report that silently drops it is
+# worse than one that says nothing, because it looks like a tree with no tripwire.
+for bad in "soon" "2027-02-31" "2027-13-01" "30/11/2026" "2027-3-8"; do
+  set_expiry "$bad"
+  out="$(runat 2027-01-10)"
+  assert_contains "$out" "not a date" "an expiry of \`$bad\` is reported as unreadable"
+  assert_contains "$out" "$bad" "and the unreadable value is quoted back"
+done
+
+# A decision with no expiry at all is a real state — most decisions do not expire
+# — and it is said rather than left blank.
+grep -v '^expires:' "$TMP/decision.bak" > "$decision"
+assert_eq "0" "$(grep -c '^expires:' "$decision")" "the fixture really did remove the field"
+out="$(runat 2027-01-10)"
+assert_contains "$out" "no decision declares one" \
+  "a tree where nothing declares an expiry says so"
+
+# `none` is a declaration that the decision does not expire, and that is NOT the
+# same state as the field being absent. Reporting both as "no decision declares
+# one" would hide a record that answered the question.
+set_expiry "none — nothing about this one is waiting on a measurement"
+out="$(runat 2027-01-10)"
+line="$(printf '%s\n' "$out" | grep 'expir')"
+assert_contains "$line" 'declare `none`' "a declared \`none\` is reported as a declaration"
+assert_not_contains "$line" "no decision declares one" "and not as an absent field"
+
+# And `none` has to be the whole first word. `amends:` had the prefix version of
+# this defect, where `nonetheless, ...` read as a declaration that nothing changed.
+set_expiry "nonetheless this one runs out on 2027-01-20"
+out="$(runat 2027-01-10)"
+line="$(printf '%s\n' "$out" | grep 'expir')"
+assert_contains "$line" "not a date" "a value beginning \`nonetheless\` is not read as \`none\`"
+
+# A date followed by a note is a date.
+set_expiry "2027-01-20 — unless the comparison lands first"
+out="$(runat 2027-01-10)"
+line="$(printf '%s\n' "$out" | grep 'expir')"
+assert_contains "$line" "in 10 days" "a date followed by a note is read as the date"
+
+cp "$TMP/decision.bak" "$decision"
+
+# The shipped record's own expiry is read, not repeated. Hardcoding the date here
+# would pin the test to a decision that is meant to be superseded.
+shipped="$(sed -n 's/^expires:[[:space:]]*//p' "$decision" | head -1)"
+assert_contains "$shipped" "-" "the open decision declares an expiry"
+[ -n "$shipped" ] && any=yes || any=no
+assert_eq "yes" "$any" "and the value was read from the record, not repeated here"
+out="$(runat 2026-10-01)"
+assert_contains "$out" "$shipped" "and the report names it"
+assert_not_contains "$out" "not a date" "and it parses"
+
+# --- days since the last cycle ------------------------------------------------
+# F's stated failure is a cycle that quietly stops happening, and intent.md notes
+# that such a failure leaves no trace. This is the trace.
+last="$(ls "$SB/process/01-scan/findings"/*.md | sed -e 's|.*/||' -e 's|\.md$||' | sort | tail -1)"
+assert_contains "$last" "-" "the newest findings file has a dated name"
+out="$(runat "$last")"
+assert_contains "$out" "last scan" "the report names when the last scan was"
+line="$(printf '%s\n' "$out" | grep 'last scan')"
+assert_contains "$line" ", today" "a scan dated today is nought days ago"
+
+# Thirty-three days on, across two month boundaries.
+y="$(printf '%s\n' "$last" | awk -F- '{print $1}')"
+out="$(runat "$y-11-01")"
+line="$(printf '%s\n' "$out" | grep 'last scan')"
+assert_contains "$line" ", 33 days ago" "and the count is the days between the two dates"
+
+# A worked example is not a scan. The report already refuses to count an
+# `example: yes` file as a cycle; counting one as the LAST cycle would reset the
+# tripwire by adding a file, which is the two-word edit this suite exists for.
+printf '# Scan cycle — %s-12-01\n\nsince: %s\nexample: yes\nnothing found: no\n' "$y" "$last" \
+  > "$SB/process/01-scan/findings/$y-12-01.md"
+out="$(runat "$y-12-02")"
+line="$(printf '%s\n' "$out" | grep 'last scan')"
+assert_contains "$line" "$last" "an example-marked file is not counted as the last scan"
+assert_not_contains "$line" "$y-12-01" "and the report does not name it as one"
+rm -f "$SB/process/01-scan/findings/$y-12-01.md"
+
+# An unreadable CYCLE_TODAY must not read as a clean report. A wrong today makes
+# every number below it wrong, silently.
+out="$( ( cd "$SB" && CYCLE_TODAY=tomorrow bash bin/cycle.sh 2>&1 ) )"; rc=$?
+assert_status 2 "$rc" "an unreadable CYCLE_TODAY exits 2"
+assert_contains "$out" "CYCLE_TODAY" "and says which input it could not read"
+
 # --- it writes nothing --------------------------------------------------------
 # The header says "Reads the tree. Writes nothing." Asserted rather than trusted.
 before="$(git -C "$SB" status --porcelain)"
