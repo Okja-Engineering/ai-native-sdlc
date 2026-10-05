@@ -57,13 +57,45 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TOPICS="${DISCOVER_TOPICS_DIR:-$SCRIPT_DIR/topics}"
 
+# A document that DISPLAYS a declaration must not thereby SATISFY it. The rule used
+# to be stated here, about fenced blocks, and applied to one predicate. It is now one
+# reading, shared by every gate — see bin/lib-rendering.sh for the rule, the two
+# projections and the cost of sharing it.
+#
+# Refusing to run without it, the same way this file's sibling refuses to run without
+# the findings harvester: a gate that silently lost its reading would read every
+# displayed declaration as real, which is the defect, not a degraded mode.
+RENDERING="${RENDERING_LIB:-$SCRIPT_DIR/../../bin/lib-rendering.sh}"
+if [ ! -f "$RENDERING" ]; then
+  printf 'validate-discovery: no rendering library at %s — without it a declaration shown to a reader would satisfy the check it illustrates, so this gate will not run\n' "$RENDERING" >&2
+  exit 2
+fi
+. "$RENDERING"
+
 refusals=0
 
 refuse() { printf '%s:%s: refuse[%s]: %s\n' "$1" "$2" "$3" "$4" >&2; refusals=$((refusals + 1)); }
-field()  { sed -n "s/^$2:[[:space:]]*//p" "$1" 2>/dev/null | head -1 | sed 's/[[:space:]]*$//'; }
 
-# has <file> <extended-regex> -> 0 if present, case-insensitive
-has() { grep -qiE "$2" "$1"; }
+# VIEW is the artifact as a reader sees it, line by line — fences, indented blocks
+# and HTML comment bodies blanked, code spans kept because a code span is this
+# repository's house style for a real grade marker. Set once per file in check_topic
+# and read by every predicate below, so a predicate written later is safe without
+# knowing this rule exists.
+VIEW=""
+# SPANVIEW additionally blanks inline code spans, and is what a DECLARATION is read
+# from: a whole HTML comment fits inside one and still matches a declaration regex.
+SPANVIEW=""
+
+# field <file> <key> — the first value in a rendering context, trimmed. It renders
+# the file it is given rather than reading VIEW, so a call site reading a different
+# file cannot silently get this artifact's answer; the Define twin had exactly that
+# bug for one commit and its own suite caught it.
+field()  { rendered_lines_file "$1" 2>/dev/null | sed -n "s/^$2:[[:space:]]*//p" | head -1 | sed 's/[[:space:]]*$//'; }
+
+# has <file> <extended-regex> -> 0 if present in the rendering context,
+# case-insensitive. The argument is kept for the call sites; the text comes from
+# VIEW, because a section heading shown inside a fence is not a section.
+has() { printf '%s\n' "$VIEW" | grep -qiE "$2"; }
 
 # declares_empty <section body> -> 0 if the section declares itself empty
 #
@@ -86,27 +118,30 @@ has() { grep -qiE "$2" "$1"; }
 # this gate reported the artifact within the contract: the artifact deleted every
 # disclosure it owed, asserted the opposite, and passed on one incidental word.
 #
-# A FENCED BLOCK IS NOT A DECLARATION. A document showing what the form looks
-# like must not thereby satisfy it. This is the third time this repository has
-# paid for that class — a fenced `rests on: none` donated itself as the real
-# field's value, and an example row in a fenced block in DECIDERS.md would have
-# authorized everyone it named — so the fence skip is the house rule, lifted from
-# `field` in process/03-define/validate-define.sh. Found by attacking this check
-# after writing it.
+# A DISPLAYED DECLARATION IS NOT A DECLARATION. A document showing what the form
+# looks like must not thereby satisfy it.
 #
-# This predicate is also written, identically, in
-# process/03-define/validate-define.sh, which owns the other section that may be
-# empty. The gates share no library and adding one would put a load-bearing
-# script outside the filename pattern bin/validate-controls.sh enumerates —
-# the gap that document records. So the form is declared once in the two
-# contracts and in CONTROLS.md, and what holds the two copies together is that
-# both suites pin the same behaviour rather than the expression.
-declares_empty() {
-  printf '%s\n' "$1" | awk '
-    /^[ \t]*(```|~~~)/ { fence = !fence; next }
-    fence { next }
-    /<!--[ \t]*declared-empty:[^>]*[A-Za-z][^>]*-->/ { found = 1 }
-    END { exit found ? 0 : 1 }'
+# THIS USED TO SAY "A FENCED BLOCK IS NOT A DECLARATION", and that was the whole of
+# it — the skip was two lines of awk toggling on ``` and ~~~. Issue #116 reproduced
+# the rest of the class against this very predicate: delete the seven [O] items from
+# topics/agent-pr-approval.md, write one line mentioning
+# `<!-- declared-empty: reason -->` IN BACKTICKS, and this gate reported the artifact
+# within the contract with all eighteen suites green. An inline code span, an HTML
+# comment and a four-space indented block are all non-rendering and none of them was
+# known to any predicate anywhere.
+#
+# So the caller hands this the SPAN projection of the section, and the question this
+# predicate asks is only the one it is named for. The rule itself, the five display
+# forms and the reason the two projections differ are in bin/lib-rendering.sh.
+#
+# THIS PREDICATE IS NO LONGER DUPLICATED. It was written identically here and in
+# process/03-define/validate-define.sh, held together by tests/test_item_rule.sh,
+# because a shared helper would be a load-bearing script outside the filename pattern
+# bin/validate-controls.sh enumerates. The reading they both needed is now shared and
+# that reasoning is answered where the library lives; what is left here is one regex,
+# and tests/test_rendering.sh drives both sections through all five display forms.
+declares_empty() { # <section body, span projection>
+  printf '%s\n' "$1" | grep -q '<!--[ 	]*declared-empty:[^>]*[A-Za-z][^>]*-->'
 }
 
 # tokens <text> -> the words of a text, one per line.
@@ -144,7 +179,20 @@ referents() {
 }
 
 check_topic() {
-  local f="$1" grades bad bad_links seen cov R_LABEL N_LABEL V_LABEL opensec
+  local f="$1" grades bad bad_links seen cov R_LABEL N_LABEL V_LABEL opensec opensec_spans
+
+  # The artifact as a reader sees it, read once. Every check below reads this rather
+  # than the file, so a heading, a field, an item, a grade or a link that exists only
+  # inside a fenced example is not there as far as this gate is concerned — in both
+  # directions: it cannot satisfy a requirement and it cannot draw a refusal.
+  VIEW="$(rendered_lines_file "$f")" || {
+    printf 'validate-discovery: could not read %s as rendered text\n' "$f" >&2
+    exit 2
+  }
+  SPANVIEW="$(rendered_spans_file "$f")" || {
+    printf 'validate-discovery: could not read %s as rendered text\n' "$f" >&2
+    exit 2
+  }
 
   # --- the fields the contract declares -----------------------------------
   [ -n "$(field "$f" dated)" ] || refuse "$f" "-" "undated" \
@@ -157,7 +205,7 @@ check_topic() {
   if ! has "$f" "the question, in the (asker|owner)'s"; then
     refuse "$f" "-" "no-question" \
       "the question is not stated in the asker's own words: a tidied restatement answers a different question, and the first topic's skepticism and the second's falsified premise both survived only because the wording did"
-  elif ! grep -qE '^>' "$f"; then
+  elif ! printf '%s\n' "$VIEW" | grep -qE '^>'; then
     refuse "$f" "-" "question-not-quoted" \
       "the question section carries no quotation: the contract requires the asker's words, not a summary of them"
   fi
@@ -182,13 +230,16 @@ check_topic() {
   # immediately after the hashes, so `## Coverage` passed while `## 2 · Coverage`
   # was refused — heading-shape coupling in a gate whose header says it avoids
   # exactly that, and the only reason the hollow artifact was refused at all.
-  if ! grep -qiE '^#+[^a-z]*coverage|^\*\*coverage' "$f"; then
+  if ! printf '%s\n' "$VIEW" | grep -qiE '^#+[^a-z]*coverage|^\*\*coverage'; then
     refuse "$f" "-" "no-coverage" "no coverage section"
   else
     cov="$(awk '
       /^#+[^a-zA-Z]*[Cc]overage|^\*\*[Cc]overage/ { inside = 1; next }
       /^## / { if (inside) exit }
-      inside { print }' "$f")"
+      inside { print }' <<EOF
+$VIEW
+EOF
+)"
 
     # part_body <label-regex> — the lines belonging to one coverage part.
     #
@@ -241,7 +292,7 @@ check_topic() {
       # The artifact with this part's own lines removed, so a word cannot
       # corroborate itself. Same scope discipline as the checks above: look at
       # the part, then at everything that is not the part.
-      rest="$(printf '%s\n' "$b" | grep -vxFf - "$f")"
+      rest="$(printf '%s\n' "$VIEW" | grep -vxFf <(printf '%s\n' "$b"))"
       tokens "$rest" | grep -qxF -- "$refs"
     }
 
@@ -291,7 +342,7 @@ check_topic() {
   # renamed — and then refused as a silently empty section. Wrong refusal for
   # the wrong reason. The presence check and the range below now use the same
   # anchored pattern.
-  if ! grep -qiE '^#+.*could not .*establish' "$f"; then
+  if ! printf '%s\n' "$VIEW" | grep -qiE '^#+.*could not .*establish'; then
     refuse "$f" "-" "no-open-section" \
       "no 'what could not be established' section: this is the section a reader checks to find out whether the question was actually answered, and omitting it claims completeness"
   else
@@ -315,7 +366,19 @@ check_topic() {
     # list items in later sections.
     opensec="$(awk '/^#+.*could not .*establish/ { inside = 1; next }
                     inside && (substr($0, 1, 3) == "## " || $0 ~ /^---[[:space:]]*$/) { exit }
-                    inside { print }' "$f")"
+                    inside { print }' <<EOF
+$VIEW
+EOF
+)"
+    # The same range over the SPAN projection, which is what a DECLARATION is read
+    # from. One range expression, two projections, so the body the item count walks
+    # and the body the declaration is looked for in cannot be different sections.
+    opensec_spans="$(awk '/^#+.*could not .*establish/ { inside = 1; next }
+                    inside && (substr($0, 1, 3) == "## " || $0 ~ /^---[[:space:]]*$/) { exit }
+                    inside { print }' <<EOF
+$SPANVIEW
+EOF
+)"
     # AN OPEN ITEM IS A LIST ITEM CARRYING ITS `[O]` GRADE. A list item is a line
     # beginning, FLUSH LEFT, with a list marker — `-`, `*`, `+`, `1.` or `1)` —
     # followed by a space. Nothing about emphasis: a bullet is what makes the line a
@@ -361,7 +424,7 @@ check_topic() {
     # behind it; two asterisks do not.
     seen=$(printf '%s\n' "$opensec" \
       | grep -cE '^([-*+]|[0-9]+[.)])[[:space:]].*\[O\]')
-    if [ "$seen" -eq 0 ] && ! declares_empty "$opensec"; then
+    if [ "$seen" -eq 0 ] && ! declares_empty "$opensec_spans"; then
       refuse "$f" "-" "silent-empty-open" \
         "the open section lists no [O] item and does not declare itself empty. An item is a LIST ITEM carrying its own grade: a line starting flush left with \`-\`, \`*\`, \`+\`, \`1.\` or \`1)\` and a space, with its [O] on that line. A bold label is not a list marker, and a line of prose carrying an [O] somewhere in it is not an item — this is the same rule validate-define.sh counts in Outliers, stated in discovery-contract.md. An artifact with nothing open is making a strong claim, and it makes it as a declaration in the section — <!-- declared-empty: reason --> — not as a sentence. Two earlier versions of this check were weaker: a search of the section's prose for a short word, and then a count that accepted any bold-led line carrying an [O] anywhere, so a sentence denying the grade satisfied a check for an item carrying it"
     fi
@@ -374,7 +437,7 @@ check_topic() {
   # --- grades --------------------------------------------------------------
   # Not "every claim has a grade" — see the header. This checks that the grades
   # used are the declared ones, which catches a typo and an invented grade.
-  grades=$(grep -oE '\[[A-Z]{1,2}\]' "$f" | sort -u | tr -d '[]' | tr '\n' ' ')
+  grades=$(printf '%s\n' "$VIEW" | grep -oE '\[[A-Z]{1,2}\]' | sort -u | tr -d '[]' | tr '\n' ' ')
   bad=""
   for g in $grades; do
     case "$g" in E|S|V|P|O) ;; *) bad="$bad $g" ;; esac
@@ -404,7 +467,10 @@ check_topic() {
         if ($0 ~ /\[P\]/) n++
         if ($0 ~ /\[O\]/) n++
         if (n >= 3) found = 1 }
-      END { exit found ? 0 : 1 }' "$f"; then
+      END { exit found ? 0 : 1 }' <<EOF
+$VIEW
+EOF
+  then
     refuse "$f" "-" "no-grade-key" \
       "the grade scheme is not declared on any one line: a reader meeting [V] for the first time has no way to know it is never outcome evidence"
   fi
@@ -436,7 +502,7 @@ check_topic() {
   # same function, and one name for two meanings is how the next reader gets it
   # wrong.
   bad_links="$(
-    grep -oE '\]\(([^)h][^)]*)\)' "$f" 2>/dev/null | sed 's/](\(.*\))/\1/' | sed 's/#.*//' | sort -u \
+    printf '%s\n' "$VIEW" | grep -oE '\]\(([^)h][^)]*)\)' 2>/dev/null | sed 's/](\(.*\))/\1/' | sed 's/#.*//' | sort -u \
     | while IFS= read -r p; do
         [ -n "$p" ] || continue
         ( cd "$(dirname "$f")" && [ -e "$p" ] ) || printf '%s\n' "$p"

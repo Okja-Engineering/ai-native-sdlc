@@ -20,6 +20,21 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONTRACT="${FINDINGS_CONTRACT:-$SCRIPT_DIR/findings-contract.md}"
 FINDINGS_DIR="${FINDINGS_DIR:-$SCRIPT_DIR/findings}"
 
+# A document that DISPLAYS a declaration must not thereby SATISFY it.
+#
+# THIS GATE HAD NO FENCE AWARENESS ANYWHERE, across six machine-read contract lists,
+# and that is finding 4 on #116. A fenced illustration naming a third section widened
+# the closed set and `## What this means` — the heading findings-contract.md:40 says
+# the gate refuses — then passed, exit 0. Reproduced before this change.
+#
+# bin/lib-rendering.sh holds the rule, the two projections and the cost of sharing it.
+RENDERING="${RENDERING_LIB:-$SCRIPT_DIR/../../bin/lib-rendering.sh}"
+if [ ! -f "$RENDERING" ]; then
+  printf 'validate-findings: no rendering library at %s — without it a contract list shown to a reader would be read as a declaration of the rule, so this gate will not run\n' "$RENDERING" >&2
+  exit 2
+fi
+. "$RENDERING"
+
 refusals=0
 
 # refuse <file> <line|-> <code> <message>
@@ -39,10 +54,33 @@ cannot_run() { # <message>
 
 # ---------------------------------------------------------------- the contract
 
-# contract_list <block name> — the items declared in one machine-readable block.
+[ -f "$CONTRACT" ] || cannot_run "the findings contract is missing, so the gate has nothing to enforce"
+
+# The contract as a reader sees it, read once. A block inside a fenced example, an
+# indented block or an HTML comment is an illustration and is not here.
+#
+# The LINE projection, not the span one: every item in these blocks is written as
+# `- `id``, in backticks, and blanking code spans would have emptied all six lists —
+# which `require_list` turns into exit 2, so it would have been loud rather than a
+# hole, but it would still have been wrong. Measured, not assumed.
+CONTRACT_VIEW="$(rendered_lines_file "$CONTRACT")" || \
+  cannot_run "the findings contract could not be read as rendered text"
+
+# contract_list <block name> — the items declared in THE ONE machine-readable block.
+#
+# EXACTLY ONE BLOCK, IN A RENDERING CONTEXT. A second block used to be unioned with
+# the first, silently: `inside` was simply set again, so two blocks declaring the same
+# rule produced the union of them and nobody could tell which was the declaration.
+# Combined with no fence awareness that was finding 4 on #116 — a fenced illustration
+# naming a third section widened the closed set and the heading this contract says the
+# gate refuses then passed.
+#
+# A rule declared twice is a rule that can drift, which is the duplicated-declaration
+# failure this repository keeps finding. So two openers is a refusal to run rather
+# than a merge: a gate that cannot tell which block is the declaration must say so.
 contract_list() {
-  awk -v begins="<!-- contract:$1 -->" -v ends="<!-- /contract:$1 -->" '
-    $0 == begins { inside = 1; next }
+  printf '%s\n' "$CONTRACT_VIEW" | awk -v begins="<!-- contract:$1 -->" -v ends="<!-- /contract:$1 -->" '
+    $0 == begins { seen++; inside = 1; next }
     $0 == ends { inside = 0 }
     inside && substr($0, 1, 2) == "- " {
       item = substr($0, 3)
@@ -50,14 +88,17 @@ contract_list() {
       sub(/[[:space:]]+$/, "", item)
       if (item != "") print item
     }
-  ' "$CONTRACT"
+    END { if (seen > 1) printf "!MORE-THAN-ONE-BLOCK %d\n", seen }
+  '
 }
 
 require_list() { # <block name> <value>
+  case "$2" in
+    *'!MORE-THAN-ONE-BLOCK'*)
+      cannot_run "the \"$1\" list is declared in more than one block, so the gate cannot tell which one is the rule — a rule declared twice is a rule that can drift, and the union of two is nobody's declaration. Delete the duplicate, or if one of them is showing a reader what the form looks like, put it inside a fenced block" ;;
+  esac
   [ -n "$2" ] || cannot_run "the \"$1\" list is empty or missing, so the gate would pass everything — refusing to run"
 }
-
-[ -f "$CONTRACT" ] || cannot_run "the findings contract is missing, so the gate has nothing to enforce"
 
 COLUMNS_L="$(contract_list columns)"
 KIND_L="$(contract_list kind)"
@@ -101,19 +142,23 @@ is_date() {
     }'
 }
 
+# VIEW is the findings file as a reader sees it, set once per file in validate_file.
+# A field, a heading or a table row shown inside a fenced example is not one.
+VIEW=""
+
 # field_value <key> <file> — the first value of a `key: value` line.
 field_value() {
-  trim "$(sed -n "s/^$1:[[:space:]]*//p" "$2" | head -1)"
+  trim "$(printf '%s\n' "$VIEW" | sed -n "s/^$1:[[:space:]]*//p" | head -1)"
 }
 
-field_count() { grep -c "^$1:" "$2"; }
+field_count() { printf '%s\n' "$VIEW" | grep -c "^$1:"; }
 
 section_body() { # <file> <section name>
-  awk -v h="## $2" '
+  printf '%s\n' "$VIEW" | awk -v h="## $2" '
     $0 == h { inside = 1; next }
     substr($0, 1, 3) == "## " { inside = 0 }
     inside { print }
-  ' "$1"
+  '
 }
 
 # cells_of <table row> — one `<index><tab><trimmed cell>` line per cell, so a
@@ -228,12 +273,12 @@ check_sections() {
     if ! in_list "$text" "$SECTIONS_L"; then
       refuse "$file" "$lno" sections "\"$text\" is not a declared section; a stage 1 file carries only these: $(list_inline "$SECTIONS_L")"
     fi
-  done < <(grep -n '^## ' "$file")
+  done < <(printf '%s\n' "$VIEW" | grep -n '^## ')
 }
 
 check_looked_at() {
   local file="$1" body src
-  if ! grep -Eq '^## Looked at[[:space:]]*$' "$file"; then
+  if ! printf '%s\n' "$VIEW" | grep -Eq '^## Looked at[[:space:]]*$'; then
     refuse "$file" - looked-at "no \"Looked at\" section: without the ground actually covered, a quiet cycle and a shallow one read the same"
     return
   fi
@@ -342,12 +387,15 @@ check_finding_row() {
 check_findings_table() {
   local file="$1" table entry lno row seen_header
   FINDINGS_COUNT=0
-  grep -Eq '^## Findings[[:space:]]*$' "$file" || return 0
+  printf '%s\n' "$VIEW" | grep -Eq '^## Findings[[:space:]]*$' || return 0
   table="$(awk '
     $0 ~ /^## Findings[[:space:]]*$/ { inside = 1; next }
     substr($0, 1, 3) == "## " { inside = 0 }
     inside && substr($0, 1, 1) == "|" { printf "%d:%s\n", NR, $0 }
-  ' "$file")"
+  ' <<EOF
+$VIEW
+EOF
+)"
   seen_header=0
   while IFS= read -r entry; do
     [ -n "$entry" ] || continue
@@ -377,6 +425,14 @@ check_outcome() {
 validate_file() {
   NOTHING_FOUND="missing"
   FINDINGS_COUNT=0
+  # Read once, in the LINE projection: everything this gate reads out of a findings
+  # file is line-shaped — a field, a heading, a table row — and the cells are written
+  # in backticks, so blanking code spans would read every source cell as empty.
+  VIEW="$(rendered_lines_file "$1")" || {
+    printf 'validate-findings: %s could not be read as rendered text\n' "$1" >&2
+    refusals=$((refusals + 1))
+    return
+  }
   check_filename "$1"
   check_fields "$1"
   check_sections "$1"

@@ -11,6 +11,8 @@ TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$TEST_DIR/lib/assert.sh"
 
 ROOT="$(cd "$TEST_DIR/.." && pwd)"
+. "$ROOT/bin/lib-rendering.sh"
+. "$TEST_DIR/lib/enforcement-claim.sh"
 DOC="$ROOT/CONTROLS.md"
 
 assert_file_exists "$DOC" "the controls document exists"
@@ -476,42 +478,16 @@ assert_file_exists "$REG_DOC" "the source register exists"
 # here would leave the first directory behind, because the trap only removes
 # whatever TMP points at last.
 
-# A declaration honoured only when it carries a reason. One copy of the pattern,
-# used by the sweep and by the count, so the two cannot disagree about what
-# counts as declared. An exemption that needs no reason is one nobody justifies.
-DECLARED='not-an-enforcement-claim:[[:space:]]*[A-Za-z0-9`]'
-
-# One implementation, run against the register and against fixtures, so a fixture
-# proves the decision this makes rather than a second copy of it. Prints the
-# offending line numbers and nothing else — a function whose output is captured
-# runs in a subshell, so it cannot report a count by setting a variable.
-unbacked_enforcement_claims() { # <document> <gate> -> offending line numbers
-  local doc="$1" gate="$2" base ln rn text backed c
-  base="$(basename "$gate")"
-  while IFS= read -r ln; do
-    [ -n "$ln" ] || continue
-    rn="${ln%%:*}"; text="${ln#*:}"
-    # Only a sentence naming the gate is a claim about what the gate does.
-    case "$text" in
-      *"$base"*) ;;
-      *) continue ;;
-    esac
-    if printf '%s' "$text" | grep -q -- '<!-- not-an-enforcement-claim:'; then
-      printf '%s' "$text" | grep -qE "$DECLARED" || printf '%s(declared,no-reason) ' "$rn"
-      continue
-    fi
-    # Does it name a refusal the gate emits? The gate writes them as
-    # `refuse "$DOC" "code" "..."`, so the QUOTED form is what resolves — a bare
-    # match would be satisfied by the code appearing in one of the gate's comments.
-    backed=no
-    for c in $(printf '%s' "$text" | grep -oE '`[a-z][a-z-]*[a-z]`' | tr -d '`'); do
-      grep -q -- "\"$c\"" "$gate" && { backed=yes; break; }
-    done
-    [ "$backed" = yes ] || printf '%s ' "$rn"
-  done <<EOF
-$(grep -nE '[Rr]efus(e|es|ed|ing)[^a-z]' "$doc")
-EOF
-}
+# THE PREDICATE AND ITS PATTERN MOVED TO tests/lib/enforcement-claim.sh, because
+# tests/test_rendering.sh has to ask the display question of `not-an-enforcement-claim`
+# through the same check that runs over SOURCES.md rather than through a second copy.
+# What moved with it is the display question: the exemption was read out of the raw
+# line, so a document showing a reader the marker inside an inline code span exempted
+# its own enforcement claim.
+#
+# `DECLARED` is kept as an alias because the count below reads it, and the count
+# existing is what stops an exemption being added silently.
+DECLARED="$ENFORCEMENT_DECLARED"
 
 out="$(unbacked_enforcement_claims "$REG_DOC" "$STD_GATE")"
 assert_eq "" "${out% }" "every enforcement claim in SOURCES.md names a refusal the gate emits"

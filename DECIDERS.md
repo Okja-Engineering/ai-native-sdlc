@@ -8,7 +8,7 @@ A decision record's `decided_by:` must name someone on this list. `process/05-de
 <!-- deciders-table: reason -->
 ```
 
-It is written here inside a fenced block on purpose. Inside a fence it declares nothing, so showing the reader the form does not designate a second table — the same rule `<!-- declared-empty: … -->` already follows, and the reason an example row in a fenced block authorizes nobody.
+It is written here inside a fenced block on purpose. A displayed declaration declares nothing, so showing the reader the form does not designate a second table — the same rule `<!-- declared-empty: … -->` already follows, and the reason an example row in a fenced block authorizes nobody. **Five forms count as displayed, not one:** a backtick fence, a tilde fence, an inline code span, an HTML comment other than the declaration's own, and a four-space indented block. Until 2026-10-05 this gate knew only the first, so a designation written in backticks designated a table. The reading is `bin/lib-rendering.sh` and it is the same one every other gate uses.
 
 Nothing else in this file authorizes anybody: not the column heading, not an example in a code block, not a table inside an HTML comment, and not a second table added later.
 

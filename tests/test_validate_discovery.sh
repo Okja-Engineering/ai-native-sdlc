@@ -75,6 +75,48 @@ assert_contains "$(gate "$t" "$NEW")" "refuse[undated]" "an undated artifact is 
 t="$(fresh status)"; perl -0pi -e 's/^status: .*\n//m' "$t/process/02-discover/$NEW"
 assert_contains "$(gate "$t" "$NEW")" "refuse[no-status]" "a statusless artifact is refused"
 
+# A DISPLAYED FIELD IS NOT A FIELD, and this is the one site where that was repaired
+# and tested by nothing — found by loosening `field` back to reading the raw file,
+# which broke no suite. The class is the one issue #116 is about: a fenced
+# `rests on: none` donating itself as a real field's value is why the Define gate reads
+# a rendering context at all, and the same field reader here had the same gap.
+#
+# Both fields, and both display forms that can carry a whole `key: value` line. An
+# inline code span cannot: wrapping the line in backticks moves the key off the first
+# column, so the reader does not see a field there either.
+# Each block is written with one printf. Built by concatenating `$(printf '\n')`
+# first, which is empty — command substitution strips trailing newlines — so all
+# three blocks collapsed onto one line, no case was a display form at all, and the
+# three assertions passed against an unmodified check. Caught by loosening `field`
+# back to reading the raw file and finding the suite still green. Same class as the
+# `awk -v` newline trap tests/lib/splice.sh records.
+for form in backtick-fence tilde-fence html-comment indented-block; do
+  t="$(fresh "field-$form")"
+  perl -0pi -e 's/^dated: (.*)\n//m' "$t/process/02-discover/$NEW"
+  case "$form" in
+    backtick-fence) printf '\n```\ndated: 2026-10-03\n```\n' ;;
+    tilde-fence)    printf '\n~~~\ndated: 2026-10-03\n~~~\n' ;;
+    html-comment)   printf '\n<!-- what a dated field looks like:\ndated: 2026-10-03\nand no more. -->\n' ;;
+    indented-block) printf '\n    dated: 2026-10-03\n\n' ;;
+  esac >> "$t/process/02-discover/$NEW"
+  assert_contains "$(gate "$t" "$NEW")" "refuse[undated]" \
+    "a dated: field shown in a $form does not satisfy the field check"
+done
+
+# And the fixture has to be able to satisfy the check, or the four cases above pass
+# because the field is simply absent rather than because it is displayed. The same
+# line, flush left, outside everything.
+t="$(fresh field-plain)"
+perl -0pi -e 's/^dated: (.*)\n//m' "$t/process/02-discover/$NEW"
+printf '\ndated: 2026-10-03\n' >> "$t/process/02-discover/$NEW"
+assert_not_contains "$(gate "$t" "$NEW")" "refuse[undated]" \
+  "the same field line, written plainly, does satisfy it"
+
+# And the shipped topic's own field is still read.
+t="$(fresh field-real)"
+assert_not_contains "$(gate "$t" "$NEW")" "refuse[undated]" \
+  "the shipped topic's own dated: field is still read"
+
 # --- the question in the asker's own words ------------------------------------
 t="$(fresh question)"
 perl -0pi -e "s/## The question, in the asker's own words/## Background/" "$t/process/02-discover/$NEW"

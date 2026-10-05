@@ -28,6 +28,17 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DECISIONS="${DECISIONS_DIR:-$SCRIPT_DIR/decisions}"
 
+# A document that DISPLAYS a declaration must not thereby SATISFY it. This gate had
+# the most careful hand-rolled version of that rule in the tree and it still only knew
+# fenced blocks opened with backticks. bin/lib-rendering.sh holds the rule, the two
+# projections and the cost of sharing it.
+RENDERING="${RENDERING_LIB:-$ROOT/bin/lib-rendering.sh}"
+if [ ! -f "$RENDERING" ]; then
+  printf 'validate-decision: no rendering library at %s — without it a table designation shown to a reader would designate a table, so this gate will not run\n' "$RENDERING" >&2
+  exit 2
+fi
+. "$RENDERING"
+
 refusals=0
 
 refuse() { # file line code message
@@ -113,31 +124,74 @@ OBVIOUSLY_NOT_A_PERSON='(^|[^a-z])(team|group|everyone|owner|reviewer|maintainer
 # Blank lines between the declaration and the table do not break the pair, because
 # that is how the two read in Markdown. Anything else between them does.
 deciders_scan() {
+  local sv lv
+  # THREE READINGS OF ONE FILE, which is what this scan needs and what it used to
+  # approximate by hand.
+  #
+  # It carried its own fence rule (``` only, never ~~~, never an indented block) and
+  # its own HTML comment rule, and knew nothing about inline code spans. So a
+  # designation written inside backticks — a document showing a reader the form —
+  # designated a table. bin/lib-rendering.sh answers all five display forms once.
+  #
+  #   S  the span projection, which is where the DESIGNATION is read from: a whole
+  #      HTML comment fits inside a code span and still matches this regex.
+  #   L  the line projection, which is where TABLES and HEADINGS are read from. Not
+  #      the span one: a Name cell may be written in backticks — `clean()` strips them,
+  #      so the markup is expected — and blanking the span would authorize nobody.
+  #   $0 the raw line, needed for one thing only, below.
+  sv="$(rendered_spans_file "$DECIDERS" 2>/dev/null)" || return 1
+  lv="$(rendered_lines_file "$DECIDERS" 2>/dev/null)" || return 1
   awk -F'|' -v TAB="$(printf '\t')" '
     function clean(s) {
       gsub(/[*_`]/, "", s); sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s
     }
     function endtable() { head = 0; sep = 0; col = 0; donate = 0 }
 
+    FNR == 1 { pass++ }
+    pass == 1 { S[FNR] = $0; next }
+    pass == 2 { L[FNR] = $0; next }
+
+    # WHAT BREAKS THE DESIGNATION IS A SEPARATE QUESTION FROM WHAT A DECLARATION IS,
+    # and the rules below answer only the first, from the RAW line, as they did before.
+    #
+    # A fence breaks the pair and an HTML comment does not, and that difference is
+    # real rather than an inconsistency: a fenced block RENDERS, as code, so the author
+    # put something a reader sees between the declaration and the table; a comment
+    # renders as nothing at all, so it is invisible rather than interposed. Deriving
+    # this from the projections instead was tried and reverted — both forms are blank
+    # there, so the commented-out list started breaking the designation and the real
+    # table below it became undesignated, which this suite caught.
+    #
+    # Widened to `~~~` and to three leading spaces, which are fenced blocks the rule
+    # was written without. The designation ITSELF is answered for all five display
+    # forms by the span projection below, so this is only the adjacency rule.
+    # `[ ]?[ ]?[ ]?` and not `[ ]{0,3}`: BSD awk does not support interval expressions,
+    # and this repository has already paid three times for a GNU-only construct that
+    # silently matched nothing on macOS.
     incomment { if ($0 ~ /-->/) incomment = 0; next }
-
-    # A fence BREAKS the designation, unlike a blank line and unlike a comment
-    # block. Found by attacking this check after it was written: put the real list
-    # inside a fenced example and a second table below it, and the designation
-    # skipped the fence and landed on the second table. A fence is content the
-    # author wrote between the two, so it separates them.
-    /^```/ { fence = !fence; endtable(); marked = 0; next }
+    /^[ ]?[ ]?[ ]?(```|~~~)/ { fence = !fence; endtable(); marked = 0; next }
     fence  { next }
+    # An indented code block renders as visible code too, so it interposes for the same
+    # reason a fence does.
+    /^(    |\t)[^ \t]/ { endtable(); marked = 0; next }
 
-    # The designation. A reason is required, so `<!-- deciders-table: -->` declares
-    # nothing — the same shape the other in-band declarations in this repository use.
-    /<!--[ \t]*deciders-table:[^>]*[A-Za-z][^>]*-->/ {
+    # The designation, read from the SPAN projection. A whole HTML comment fits inside
+    # an inline code span and still matches this regex, so a document showing a reader
+    # the form used to designate a table. A reason is required, so
+    # `<!-- deciders-table: -->` declares nothing — the same shape the other in-band
+    # declarations in this repository use.
+    S[FNR] ~ /<!--[ \t]*deciders-table:[^>]*[A-Za-z][^>]*-->/ {
       endtable(); marked = 1; next
     }
 
     # An HTML comment block is not content, so it does not break the designation
     # either — it is invisible, not interposed.
     /<!--/ && !/-->/ { incomment = 1; endtable(); next }
+
+    # From here on the record is the line a reader sees. The LINE projection, not the
+    # span one: a Name cell may be written in backticks and `clean()` strips them, so
+    # the markup is expected and blanking it would authorize nobody.
+    { $0 = L[FNR] }
 
     /^#+[ \t]/ {
       label = $0; sub(/^#+[ \t]+/, "", label); endtable(); marked = 0; next
@@ -173,7 +227,7 @@ deciders_scan() {
       endtable()
       if ($0 !~ /^[ \t]*$/) marked = 0
     }
-  ' "$DECIDERS" 2>/dev/null
+  ' <(printf '%s\n' "$sv") <(printf '%s\n' "$lv") "$DECIDERS" 2>/dev/null
 }
 
 # deciders_listed -> one authorized name per line

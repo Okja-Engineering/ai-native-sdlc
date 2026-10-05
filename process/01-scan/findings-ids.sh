@@ -61,14 +61,32 @@ CONTRACT="${FINDINGS_CONTRACT:-$SCRIPT_DIR/findings-contract.md}"
 
 cannot_run() { printf 'findings-ids: %s\n' "$1" >&2; exit 2; }
 
+# A document that DISPLAYS a declaration must not thereby SATISFY it. This harvester
+# reads the contract's `columns` block and a findings file's table, and had no fence
+# awareness in either — the same hole as the gate it feeds, and it decides which cell
+# an id comes out of. bin/lib-rendering.sh holds the rule.
+RENDERING="${RENDERING_LIB:-$SCRIPT_DIR/../../bin/lib-rendering.sh}"
+[ -f "$RENDERING" ] || cannot_run "no rendering library at $RENDERING, so a column list shown to a reader would be read as the declaration of the order — refusing to run rather than printing ids from the wrong cell"
+. "$RENDERING"
+
 [ "$#" -eq 1 ] || cannot_run "usage: findings-ids.sh <findings file>"
 [ -f "$1" ] || cannot_run "no such findings file: $1"
 [ -f "$CONTRACT" ] || cannot_run "the findings contract is missing at $CONTRACT, so the column order cannot be read — refusing to run rather than printing no ids"
 
 # The 1-based position the CONTRACT gives a column. Empty when it declares none.
+#
+# EXACTLY ONE BLOCK, IN A RENDERING CONTEXT, the same rule validate-findings.sh now
+# applies to all six of these lists: a block inside a fenced example is an
+# illustration, and two blocks are two declarations of one order, so the gate cannot
+# tell which is the rule. Here that mattered more than anywhere else, because the
+# answer is which CELL an id is read out of — a second block reordering the columns
+# would have moved every id silently.
+#
+# `n = 0` on the opener is kept and is now unreachable by a second block, which is
+# the point: it used to be the thing that made a second block look harmless.
 column_index() { # <column name>
-  awk -v want="$1" '
-    $0 == "<!-- contract:columns -->" { inside = 1; n = 0; next }
+  rendered_lines_file "$CONTRACT" | awk -v want="$1" '
+    $0 == "<!-- contract:columns -->" { seen++; inside = 1; n = 0; next }
     $0 == "<!-- /contract:columns -->" { inside = 0 }
     inside && substr($0, 1, 2) == "- " {
       item = substr($0, 3)
@@ -76,12 +94,17 @@ column_index() { # <column name>
       sub(/[[:space:]]+$/, "", item)
       if (item == "") next
       n++
-      if (item == want) { print n; exit }
+      if (item == want) { found = n }
     }
-  ' "$CONTRACT"
+    END {
+      if (seen > 1) { print "!MORE-THAN-ONE-BLOCK"; exit }
+      if (found) print found
+    }
+  '
 }
 
 ID_COL="$(column_index id)"
+[ "$ID_COL" = '!MORE-THAN-ONE-BLOCK' ] && cannot_run "the contract declares its columns in more than one block, so which cell an id comes from is ambiguous — refusing to run rather than reading a cell at a position nobody declared. Delete the duplicate, or fence the one that is showing a reader the form"
 [ -n "$ID_COL" ] || cannot_run "the contract's columns list declares no \`id\` column, so a finding cannot be identified — refusing to run rather than printing no ids"
 
 # Cells are split the same way validate-findings.sh splits them, so the two
@@ -101,4 +124,6 @@ awk -v col="$ID_COL" '
     sub(/[[:space:]]+$/, "", v)
     if (v ~ /^F[0-9]+$/) print v
   }
-' "$1"
+' <<EOF
+$(rendered_lines_file "$1")
+EOF

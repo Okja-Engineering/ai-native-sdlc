@@ -143,25 +143,40 @@ t="$(fresh exempt_bare)"
 printf '\nThe grade `[E]` is the strongest one. <!-- not-a-claim: -->\n' >> "$t/STANDARDS.md"
 assert_contains "$(gate "$t")" "refuse[uncited-claim]" "an exemption with no reason does not exempt"
 
-# The sharpest pair: the SAME table row, inside the declared block and outside
-# it. The grade key is a table and must not be read as a pile of uncited claims;
-# an identical row appended elsewhere is a claim. Identical markup, and the
-# declaration is what differs.
-t="$(fresh exempt_block)"
-printf '\n<!-- not-a-claim-block: these rows declare what a grade means -->\n| **[E]** | Empirical, something |\n<!-- end-not-a-claim-block -->\n' >> "$t/STANDARDS.md"
+# The sharpest pair: the SAME table row, with the declaration on it and without.
+# The grade key is a table and must not be read as a pile of uncited claims; an
+# identical row appended elsewhere is a claim. Identical markup, and the declaration
+# is what differs.
+t="$(fresh exempt_row)"
+printf '\n| **[E]** | Empirical, something <!-- not-a-claim: this row defines the marker -->|\n' >> "$t/STANDARDS.md"
 out="$(gate "$t")"; rc=$?
-assert_status 0 "$rc" "a row inside a declared not-a-claim block is accepted"
+assert_status 0 "$rc" "a table row carrying the per-line declaration is accepted"
 
 t="$(fresh exempt_outside)"
 printf '\n| **[E]** | Empirical, something |\n' >> "$t/STANDARDS.md"
-assert_contains "$(gate "$t")" "refuse[uncited-claim]" "the same row outside the block is refused"
+assert_contains "$(gate "$t")" "refuse[uncited-claim]" "the same row without the declaration is refused"
 
-# The block form needs a reason for the same reason the line form does. Found by
-# mutating the block rule rather than the line rule: dropping the reason from one
-# of them failed a test and dropping it from the other failed none.
-t="$(fresh exempt_block_bare)"
-printf '\n<!-- not-a-claim-block: -->\n| **[E]** | Empirical, something |\n<!-- end-not-a-claim-block -->\n' >> "$t/STANDARDS.md"
-assert_contains "$(gate "$t")" "refuse[uncited-claim]" "a block exemption with no reason does not open a block"
+# THE SPAN FORM IS RETIRED, and these two cases are what that means.
+#
+# `<!-- not-a-claim-block: reason -->` exempted every line until
+# `<!-- end-not-a-claim-block -->`. The terminator was not required and the opener was
+# honoured inside a fenced block, so deleting one line from STANDARDS.md turned CTRL-8
+# off: 20 uncited graded claims, exit 0. It is dropped rather than repaired — see the
+# gate's header for why the per-line form does the same job with three properties the
+# span did not have.
+#
+# A document still writing it gets `uncited-claim` on the lines it meant to exempt.
+t="$(fresh retired_block)"
+printf '\n<!-- not-a-claim-block: these rows declare what a grade means -->\n| **[E]** | Empirical, something |\n<!-- end-not-a-claim-block -->\n' >> "$t/STANDARDS.md"
+assert_contains "$(gate "$t")" "refuse[uncited-claim]" \
+  "the retired span form exempts nothing, so the row inside it is read as a claim"
+
+# And with no terminator at all, which is the reproduction: the opener must not
+# swallow the rest of the document.
+t="$(fresh retired_block_unterminated)"
+printf '\n<!-- not-a-claim-block: no terminator, which is the reproduction -->\n| **[E]** | Empirical, something |\n' >> "$t/STANDARDS.md"
+assert_contains "$(gate "$t")" "refuse[uncited-claim]" \
+  "an unterminated retired opener exempts nothing either"
 
 # A cited claim in any of those forms must still pass, or the gate is refusing
 # markup rather than reading grades.
@@ -352,8 +367,15 @@ assert_status 0 "$rc" "the shipped document, grade key included, is within the c
 
 # And the key rows are exempt because they are DECLARED, not because they are a
 # table. Strip the declarations out and the gate reads them as claims.
+#
+# The DECLARATION is removed, not the line. `grep -v not-a-claim` deleted whole lines,
+# which worked while the declarations sat on their own and stopped working the moment
+# the grade key carried them inside its rows: deleting the row deletes the claim, so
+# the fixture proved nothing and the suite reported the wrong check. Same class as the
+# mutation-matched-nothing failure tests/lib/mutate.sh exists for.
 t="$(fresh key_undeclared)"
-grep -v 'not-a-claim' "$t/STANDARDS.md" > "$t/S.tmp" && mv "$t/S.tmp" "$t/STANDARDS.md"
+sed 's/<!--[[:space:]]*not-a-claim:[^>]*-->//g' "$t/STANDARDS.md" > "$t/S.tmp" && mv "$t/S.tmp" "$t/STANDARDS.md"
+assert_eq 0 "$(grep -c 'not-a-claim:' "$t/STANDARDS.md")" "the fixture removed every declaration"
 assert_contains "$(gate "$t")" "refuse[uncited-claim]" "with the declarations removed, the key rows are read as claims"
 
 

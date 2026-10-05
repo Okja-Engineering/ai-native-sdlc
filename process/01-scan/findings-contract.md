@@ -42,6 +42,8 @@ Prose lines are allowed anywhere — a note about a gap, a caveat about a source
 
 There is no third section. A `## What this means` heading would be stage 2 arriving in a stage 1 file, so the set is closed and the gate refuses anything outside it.
 
+**Each of the six machine-read blocks in this file is read from EXACTLY ONE place, in a rendering context.** Until 2026-10-05 neither half was true, and the two together were a hole: a second block was unioned with the first, and a block inside a fenced example was read as a real one. So appending a fenced illustration of the `sections` block naming a third section widened the closed set, and `## What this means` — the heading the sentence above says the gate refuses — then passed with exit 0. A rule declared twice is a rule that can drift, so two blocks is now a refusal to run rather than a merge: the union of two declarations is nobody's declaration. A block shown to a reader goes inside a fenced block, an inline code span, an HTML comment or an indented block, any of which `bin/lib-rendering.sh` reads as an illustration.
+
 ## Per-cycle fields
 
 | Field | Required | Value |
