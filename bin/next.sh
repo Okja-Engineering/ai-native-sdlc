@@ -52,8 +52,17 @@ hint() {
 }
 
 # sections <contract> -> one section heading per line, from Required sections
+#
+# A FENCED BLOCK IS LITERAL CONTENT, NOT A DECLARATION. A section's skeleton is
+# declared in a fence, and a theme is a `### ` heading — so the moment the Themes
+# section declared the shape of a theme, the heading inside that fence was read
+# here as the name of another required section, and the scaffold emitted
+# `## N · a name that is a claim` as a section of its own. Same class as the
+# fenced `rests on:` example that donated its value to the Define gate's field
+# reader, and the fence-skipping is written the same way it is there.
 sections() {
   sed -n '/^## Required sections/,/^## What/p' "$1" 2>/dev/null \
+    | awk '/^[ \t]*(```|~~~)/ { fence = !fence; next } !fence' \
     | sed -n 's/^### //p'
 }
 
@@ -68,15 +77,20 @@ sections() {
 skeleton() {
   awk -v h="### $2" '
     $0 == h { inside = 1; next }
-    # The NEXT heading of either level ends the section. Resetting only on `## `
-    # let every section read the next one: asking for "Themes" returned the
-    # accounting block, because that is the first fence below it, and the skeleton
-    # was written into three sections.
-    inside && (substr($0, 1, 3) == "## " || substr($0, 1, 4) == "### ") { exit }
+    # The fence is read FIRST, and the heading test only applies outside one. A
+    # heading inside a fence is literal content: the section that declares the
+    # shape of a theme has to put a `### ` line in its skeleton, and testing the
+    # heading first truncated that skeleton at the heading — emitting the heading
+    # and nothing under it.
     inside && substr($0, 1, 3) == "```" {
       if (fenced) exit
       fenced = 1; next
     }
+    # The NEXT heading of either level ends the section. Resetting only on `## `
+    # let every section read the next one: asking for "Themes" returned the
+    # accounting block, because that is the first fence below it, and the skeleton
+    # was written into three sections.
+    inside && !fenced && (substr($0, 1, 3) == "## " || substr($0, 1, 4) == "### ") { exit }
     inside && fenced { print }
   ' "$1"
 }
@@ -156,8 +170,20 @@ write_once() { # path content-producer...
 cycle="${1:-}"; slug="${2:-}"
 [ -n "$cycle" ] || die "usage: bin/next.sh <cycle> [slug]"
 
-findings="process/01-scan/findings/$cycle.md"
-[ -f "$findings" ] || die "no findings for $cycle — a cycle starts with a scan"
+# A COMPARISON CYCLE reads the same scan as the record it is compared against, so
+# the source is the part of the name before the first dot:
+# `bin/next.sh 2026-09-29.by-model` writes cycles/2026-09-29.by-model.md from
+# findings/2026-09-29.md. Declared in define-contract.md under "A comparison
+# cycle"; the cross-cutting test the producing-themes decision commissioned had no
+# place to land, and the whole value of putting it in cycles/ is that the Define
+# gate's accounting check then applies to the model's grouping too.
+#
+# `${cycle%%.*}` and not a regex: a cycle id is a name, not a pattern. With no dot
+# the two are the same string, so an ordinary cycle is unchanged.
+scan="${cycle%%.*}"
+
+findings="process/01-scan/findings/$scan.md"
+[ -f "$findings" ] || die "no findings for $scan — a cycle starts with a scan"
 
 define="process/03-define/cycles/$cycle.md"
 
@@ -179,6 +205,40 @@ ids=$(bash "$IDS" "$findings") || die "could not read the ids of $findings"
 # grep's, and grep exits 1 on no match, so a cycle that honestly found nothing
 # would be read as a failure to read the file.
 rows=$(printf '%s\n' "$ids" | grep -c .)
+
+# --- a comparison cycle -------------------------------------------------------
+# A second grouping of the same findings, with its own field table because it
+# carries two fields a cycle does not: what it is compared against, and the
+# criterion its result is read against.
+#
+# It stops here rather than falling into the problem chain below. A problem is
+# stated from the hand pass; offering to continue one from the model's grouping
+# would be offering to state a problem from the thing under test.
+if [ "$scan" != "$cycle" ]; then
+  c="process/03-define/define-contract.md"
+  if [ ! -f "$define" ]; then
+    write_once "$define" emit "$c" "Define — cycle $scan, $(printf '%s' "${cycle#*.}" | tr '-' ' ')" \
+"from: [\`$findings\`](../../01-scan/findings/$scan.md), $rows findings
+compares: [\`process/03-define/cycles/$scan.md\`]($scan.md)
+status: defined, not decided" \
+      '## Required fields — a comparison cycle' "$ids"
+    # Said, not refused. Nothing reads `compares:` yet, so a link to a record that
+    # is not there would otherwise sit in the skeleton looking resolved. A
+    # comparison with nothing to compare against is still a grouping of the scan,
+    # which is why this is a note rather than a refusal.
+    # Worded without the phrase "does not exist": tests/test_doc_claims.sh refuses
+    # a line asserting that a path under a built phase is absent, and it reads a
+    # window around the phrase rather than resolving the path. The rule is right
+    # and the sentence was the thing to change.
+    [ -f "process/03-define/cycles/$scan.md" ] || \
+      printf '\nNote: compares: names process/03-define/cycles/%s.md, and there is no such record yet.\n' "$scan"
+  else
+    printf 'Nothing missing for the comparison %s over %s.\n' "${cycle#*.}" "$scan"
+    printf '\n%s is AWAITING A PERSON: `criterion:` is what result counts as which\n' "$define"
+    printf 'reading, and define-contract.md states it unset on purpose.\n'
+  fi
+  exit 0
+fi
 
 # --- define -------------------------------------------------------------------
 if [ ! -f "$define" ]; then
