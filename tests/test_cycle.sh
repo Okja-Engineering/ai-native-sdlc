@@ -19,6 +19,8 @@ TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$TEST_DIR/lib/assert.sh"
 
 ROOT="$(cd "$TEST_DIR/.." && pwd)"
+. "$ROOT/bin/lib-rendering.sh"
+. "$TEST_DIR/lib/retired-claim.sh"
 TMP="$(mktemp -d)"
 SB="$TMP/wt"
 cleanup() { git -C "$ROOT" worktree remove --force "$SB" >/dev/null 2>&1; rm -rf "$TMP"; }
@@ -403,22 +405,37 @@ assert_eq "dates" "$last_block" "and the last block is the one the documents mus
 # `<!-- corrected-claim: ... -->`, the form AGENTS.md, CONTROLS.md and DECIDERS.md
 # already use. A correction has to quote the sentence it corrects, so without the
 # exemption this check would refuse the only honest way to record that it was wrong.
+#
+# THE PREDICATE MOVED TO tests/lib/retired-claim.sh, and this is one of the two false
+# refusals on issue #116. It was a `case` chain over the raw line, which was wrong in
+# both directions at once:
+#
+#   it refused a document that QUOTED the retired sentence inside a fenced block — so
+#   the one place that has to be able to show a reader the sentence could not show it
+#
+#   it accepted a declaration written inside an inline code span, so a document
+#   illustrating the form retired a live claim
+#
+# It also differed from the near-identical rule in tests/test_doc_claims.sh: that one
+# requires the declaration to NAME the phrase it retires and this one did not. Two
+# copies of three rules is two things to get wrong, so there is one copy now and this
+# suite keeps only the thing that is specific to it — which block is the last one.
+#
 # stale_last_block_claims <files...> -> the files carrying one
+LASTBLOCK_CLAIM='the last thing printed|the last thing it prints'
 stale_last_block_claims() {
-  local f line out=""
-  for f in "$@"; do
-    while IFS= read -r line; do
-      [ -n "$line" ] || continue
-      case "$line" in
-        # A declaration needs a REASON, the same two checks every other in-band
-        # declaration here is held to. `<!-- corrected-claim: -->` exempts nothing.
-        *'<!-- corrected-claim:'*[A-Za-z]*'-->'*) continue ;;
-        *"\`$last_block\` block is the last thing"*) continue ;;
-        *"the last thing printed"*|*"the last thing it prints"*) out="$out $f" ;;
-      esac
-    done <<CLAIMS
-$(grep -nE 'the last thing (printed|it prints)' "$f" 2>/dev/null)
-CLAIMS
+  local hit f lno text out=""
+  for hit in $(retired_claim_offenders corrected-claim "$LASTBLOCK_CLAIM" "$@"); do
+    f="${hit%:*}"; lno="${hit##*:}"
+    text="$(sed -n "${lno}p" "$f" 2>/dev/null)"
+    # A line naming THIS block is making a TRUE claim, so it is not stale and needs no
+    # retirement. Kept per line rather than per file: an earlier draft of this skipped
+    # the whole document when any line named the right block, which would have let a
+    # stale sentence ride along beside a correct one.
+    case "$text" in
+      *"\`$last_block\` block is the last thing"*) continue ;;
+    esac
+    out="$out $f"
   done
   printf '%s' "$out"
 }
@@ -450,9 +467,56 @@ case "$(stale_last_block_claims "$TMP/p3.md")" in
 esac
 assert_eq "yes" "$ok" "a declaration carrying no reason does not exempt it either"
 
-printf 'This said the `topics` block is the last thing printed. <!-- corrected-claim: it was true until the dates block landed -->\n' > "$TMP/p4.md"
+printf 'This said the `topics` block is the last thing printed. <!-- corrected-claim: the last thing printed — it was true until the dates block landed -->\n' > "$TMP/p4.md"
 assert_eq "" "$(stale_last_block_claims "$TMP/p4.md")" \
   "and a correction quoting the sentence it corrects is allowed to say it"
+
+# The declaration has to NAME the phrase it retires, which is the rule
+# tests/test_doc_claims.sh already held and this check did not until the two were made
+# one. A reason about something else retires nothing.
+printf 'The `topics` block is the last thing printed. <!-- corrected-claim: a reason about something else entirely -->\n' > "$TMP/p5.md"
+case "$(stale_last_block_claims "$TMP/p5.md")" in
+  *p5.md*) ok=yes ;; *) ok=no ;;
+esac
+assert_eq "yes" "$ok" "a declaration naming no phrase does not exempt the claim"
+
+# --- the false refusal, from #116 ----------------------------------------------
+# A document that QUOTES the retired sentence in order to show it was retired was
+# refused, so the one place that has to be able to display it could not. Four display
+# forms, because assuming they behave alike is how four of this week's holes were made.
+printf '# A note\n\nREADME.md used to say:\n\n```\nThe `topics` block is the last thing printed.\n```\n' > "$TMP/q1.md"
+assert_eq "" "$(stale_last_block_claims "$TMP/q1.md")" \
+  "a quotation inside a backtick fence is not a claim"
+
+printf '# A note\n\nREADME.md used to say:\n\n~~~\nThe `topics` block is the last thing printed.\n~~~\n' > "$TMP/q2.md"
+assert_eq "" "$(stale_last_block_claims "$TMP/q2.md")" \
+  "a quotation inside a tilde fence is not a claim"
+
+printf '# A note\n\n<!-- README.md used to say:\nThe `topics` block is the last thing printed.\n-->\n' > "$TMP/q3.md"
+assert_eq "" "$(stale_last_block_claims "$TMP/q3.md")" \
+  "a quotation inside an HTML comment is not a claim"
+
+printf '# A note\n\nREADME.md used to say:\n\n    The `topics` block is the last thing printed.\n\nand it stopped being true.\n' > "$TMP/q4.md"
+assert_eq "" "$(stale_last_block_claims "$TMP/q4.md")" \
+  "a quotation inside an indented block is not a claim"
+
+# And an inline code span is NOT a display form for a sentence — a reader reads it —
+# so that one is still a claim. Written out rather than assumed alike with the four
+# above.
+printf '# A note\n\nREADME.md said `the last thing printed` was the topics block.\n' > "$TMP/q5.md"
+case "$(stale_last_block_claims "$TMP/q5.md")" in
+  *q5.md*) ok=yes ;; *) ok=no ;;
+esac
+assert_eq "yes" "$ok" "a sentence inside an inline code span is still read, because a reader reads it"
+
+# --- and the declaration cannot be displayed either ----------------------------
+# The other direction of the same defect: a document showing a reader what the
+# declaration looks like must not thereby retire a live claim.
+printf 'The `topics` block is the last thing printed. `<!-- corrected-claim: the last thing printed — a reason -->`\n' > "$TMP/r1.md"
+case "$(stale_last_block_claims "$TMP/r1.md")" in
+  *r1.md*) ok=yes ;; *) ok=no ;;
+esac
+assert_eq "yes" "$ok" "a declaration shown inside an inline code span retires nothing"
 
 # --- it writes nothing --------------------------------------------------------
 # The header says "Reads the tree. Writes nothing." Asserted rather than trusted.

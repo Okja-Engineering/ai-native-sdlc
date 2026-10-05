@@ -75,6 +75,33 @@ assert_contains "$(gate "$t" "$NEW")" "refuse[undated]" "an undated artifact is 
 t="$(fresh status)"; perl -0pi -e 's/^status: .*\n//m' "$t/process/02-discover/$NEW"
 assert_contains "$(gate "$t" "$NEW")" "refuse[no-status]" "a statusless artifact is refused"
 
+# A DISPLAYED FIELD IS NOT A FIELD, and this is the one site where that was repaired
+# and tested by nothing — found by loosening `field` back to reading the raw file,
+# which broke no suite. The class is the one issue #116 is about: a fenced
+# `rests on: none` donating itself as a real field's value is why the Define gate reads
+# a rendering context at all, and the same field reader here had the same gap.
+#
+# Both fields, and both display forms that can carry a whole `key: value` line. An
+# inline code span cannot: wrapping the line in backticks moves the key off the first
+# column, so the reader does not see a field there either.
+for form in fence indent comment; do
+  t="$(fresh "field-$form")"
+  perl -0pi -e 's/^dated: (.*)\n//m' "$t/process/02-discover/$NEW"
+  case "$form" in
+    fence)   block='```'"$(printf '\n')"'dated: 2026-10-03'"$(printf '\n')"'```' ;;
+    indent)  block='    dated: 2026-10-03' ;;
+    comment) block='<!-- what a dated field looks like:'"$(printf '\n')"'dated: 2026-10-03'"$(printf '\n')"'and no more. -->' ;;
+  esac
+  printf '\n%s\n' "$block" >> "$t/process/02-discover/$NEW"
+  assert_contains "$(gate "$t" "$NEW")" "refuse[undated]" \
+    "a dated: field shown in a $form does not satisfy the field check"
+done
+
+# And the real field is still read, or the three cases above pass for the wrong reason.
+t="$(fresh field-real)"
+assert_not_contains "$(gate "$t" "$NEW")" "refuse[undated]" \
+  "the shipped topic's own dated: field is still read"
+
 # --- the question in the asker's own words ------------------------------------
 t="$(fresh question)"
 perl -0pi -e "s/## The question, in the asker's own words/## Background/" "$t/process/02-discover/$NEW"

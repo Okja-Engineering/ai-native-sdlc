@@ -67,31 +67,59 @@ if [ ! -f "$IDS" ]; then
   exit 2
 fi
 
+# A document that DISPLAYS a declaration must not thereby SATISFY it. The fence skip
+# that used to be written out twice in this file is now one shared reading — see
+# bin/lib-rendering.sh for the rule, the two projections and the cost of sharing it.
+#
+# Refusing to run without it, the same way this gate refuses to run without the
+# findings harvester below: a gate that silently lost its reading would read every
+# displayed declaration as real, which is the defect, not a degraded mode.
+RENDERING="${RENDERING_LIB:-$ROOT/bin/lib-rendering.sh}"
+if [ ! -f "$RENDERING" ]; then
+  printf 'validate-define: no rendering library at %s — without it a declaration shown to a reader would satisfy the check it illustrates, so this gate will not run\n' "$RENDERING" >&2
+  exit 2
+fi
+. "$RENDERING"
+
 refusals=0
 
 refuse() { printf '%s:%s: refuse[%s]: %s\n' "$1" "$2" "$3" "$4" >&2; refusals=$((refusals + 1)); }
-# field <file> <key> -> the first value outside a fenced block, trimmed
+
+# VIEW is the artifact as a reader sees it, line by line. SPANVIEW additionally
+# blanks inline code spans and is what a DECLARATION is read from. Both are set once
+# per file, in check_cycle and check_problem, and every predicate below reads one of
+# them rather than the file — so a predicate written later is safe without knowing
+# this rule exists.
+VIEW=""
+SPANVIEW=""
+
+# field <file> <key> -> the first value in a rendering context, trimmed
 #
-# A FENCED BLOCK is skipped. This was `sed -n "s/^$2:...//p" | head -1`, so a
-# document showing what a field looks like donated the example as the field's
-# value: a fenced `rests on: none — ...` ahead of the real field satisfied the
-# check and the real link was never read. Found by attacking the problem check
-# after writing it, and the same class this repository has already paid for once —
-# an example row in a fenced block in `DECIDERS.md` would have authorized everyone
-# it named, which is why the deciders list skips fences.
+# A DISPLAYED FIELD IS NOT A FIELD. This was `sed -n "s/^$2:...//p" | head -1`, so a
+# document showing what a field looks like donated the example as the field's value:
+# a fenced `rests on: none — ...` ahead of the real field satisfied the check and the
+# real link was never read. That was repaired here with a fence toggle; the other four
+# display forms were not known to it, and bin/lib-rendering.sh now answers all five.
 #
-# `index` rather than a regex, because a key can contain a space (`rests on`) and
-# a key is not a pattern.
+# The LINE projection, not the span one: a field is line-shaped, and wrapping the
+# line in backticks moves the key off the first column, so that cell closes itself.
+#
+# `index` rather than a regex, because a key can contain a space (`rests on`) and a
+# key is not a pattern.
+#
+# IT RENDERS THE FILE IT IS GIVEN rather than reading the cycle's own VIEW, because
+# one call site reads a DIFFERENT file: `field "$resolved" example` asks the source
+# findings file whether it declares itself a worked example. Reading VIEW there asked
+# the cycle instead, and the refusal stopped firing — caught by this gate's own suite,
+# which is the reason that call site keeps a file argument rather than text.
 field() {
-  awk -v key="$2" '
-    /^[ \t]*(```|~~~)/ { fence = !fence; next }
-    fence { next }
+  rendered_lines_file "$1" 2>/dev/null | awk -v key="$2" '
     index($0, key ":") == 1 {
       v = substr($0, length(key) + 2)
       sub(/^[ \t]+/, "", v); sub(/[ \t]+$/, "", v)
       print v; exit
     }
-  ' "$1" 2>/dev/null
+  '
 }
 
 # declares_empty <section body> -> 0 if the section declares itself empty
@@ -115,28 +143,30 @@ field() {
 # standing in for a reading — after the two-number coverage proxy and the
 # four-phrase dead-pointer match.
 #
-# A FENCED BLOCK IS NOT A DECLARATION, for the same reason `field` below skips
-# fences: a document showing what the form looks like must not thereby satisfy it.
-# A fenced `rests on: none` donated itself as the real field's value once, and an
-# example row in a fenced block in DECIDERS.md would have authorized everyone it
-# named. Found by attacking this check after writing it.
+# A DISPLAYED DECLARATION IS NOT A DECLARATION, for the same reason `field` above
+# reads a rendering context: a document showing what the form looks like must not
+# thereby satisfy it.
 #
-# This predicate is also written, identically, in
-# process/02-discover/validate-discovery.sh, which owns the other section that may
-# be empty. The gates share no library and adding one would put a load-bearing
-# script outside the filename pattern bin/validate-controls.sh enumerates —
-# the gap that document records. So the form is declared once in the two contracts
-# and in CONTROLS.md, and what holds the two copies together is that both suites
-# pin the same behaviour rather than the expression.
-declares_empty() {
-  printf '%s\n' "$1" | awk '
-    /^[ \t]*(```|~~~)/ { fence = !fence; next }
-    fence { next }
-    /<!--[ \t]*declared-empty:[^>]*[A-Za-z][^>]*-->/ { found = 1 }
-    END { exit found ? 0 : 1 }'
+# THIS USED TO SKIP FENCES AND NOTHING ELSE. Issue #116 reproduced the rest of the
+# class against the Discover twin of this predicate: a section emptied of every item,
+# with one line mentioning `<!-- declared-empty: reason -->` IN BACKTICKS, passed with
+# every suite green. An inline code span, an HTML comment and a four-space indented
+# block are all non-rendering, and no predicate anywhere knew that.
+#
+# So the caller hands this the SPAN projection of the section and this predicate asks
+# only the question it is named for. The rule and the five display forms are in
+# bin/lib-rendering.sh.
+#
+# THIS PREDICATE IS NO LONGER DUPLICATED. It was written identically here and in
+# process/02-discover/validate-discovery.sh, held together by tests/test_item_rule.sh,
+# because a shared helper would be a load-bearing script outside the filename pattern
+# bin/validate-controls.sh enumerates. The reading they both needed is now shared and
+# that reasoning is answered where the library lives.
+declares_empty() { # <section body, span projection>
+  printf '%s\n' "$1" | grep -q '<!--[ 	]*declared-empty:[^>]*[A-Za-z][^>]*-->'
 }
 
-# outlier_body <file> — the Outliers section's BODY, heading excluded.
+# outlier_body <text> — the Outliers section's BODY, heading excluded.
 #
 # This was `sed -n '/^## Outliers/,/^---/p'`, which includes the heading, so any
 # of `none`, `empty` or `nothing` in the TITLE satisfied the "it must say it is
@@ -145,18 +175,36 @@ declares_empty() {
 # listing no outliers at all passed the one refusal that makes the section
 # load-bearing. The range also ran to end of file when a cycle carried no `---`
 # after the section, taking every section below it with it.
+#
+# It takes TEXT rather than a file, so the one range expression can be applied to
+# both projections: the items are counted in the body of the line view and the
+# declaration is looked for in the body of the span view. Two range expressions
+# would be two places for the section boundary to be got wrong differently, which
+# is the reason this function exists at all.
 outlier_body() {
   awk '
     !inside && substr($0, 1, 11) == "## Outliers" { inside = 1; next }
     inside && (substr($0, 1, 3) == "## " || $0 ~ /^---[[:space:]]*$/) { exit }
     inside { print }
-  ' "$1"
+  ' <<EOF
+$1
+EOF
 }
 
 check_cycle() {
-  local f="$1" src src_path resolved outliers outlier_text declared src_ids src_n declared_n
-  local acct_block src_cmp
+  local f="$1" src src_path resolved outliers outlier_text outlier_spans declared src_ids src_n declared_n
+  local acct_block acct_spans acct_range src_cmp
   local uniq_declared missing extra dupes themes_sum accounted_n
+
+  # The record as a reader sees it, read once, in both projections. Every check below
+  # reads one of these rather than the file, so a field, an item, a count or a block
+  # that exists only inside a fenced example is not there as far as this gate is
+  # concerned — in both directions: it cannot satisfy a requirement and it cannot
+  # draw a refusal.
+  VIEW="$(rendered_lines_file "$f")" || {
+    printf 'validate-define: could not read %s as rendered text\n' "$f" >&2; exit 2; }
+  SPANVIEW="$(rendered_spans_file "$f")" || {
+    printf 'validate-define: could not read %s as rendered text\n' "$f" >&2; exit 2; }
 
   # --- method is declared -------------------------------------------------
   if [ -z "$(field "$f" method)" ]; then
@@ -167,7 +215,8 @@ check_cycle() {
   # --- the outlier section exists ----------------------------------------
   # Read once. The count was computed from the same expression three times over,
   # which is three places for the section boundary to be got wrong differently.
-  outlier_text="$(outlier_body "$f")"
+  outlier_text="$(outlier_body "$VIEW")"
+  outlier_spans="$(outlier_body "$SPANVIEW")"
   # AN ITEM IS A LIST ITEM: a line beginning, FLUSH LEFT, with `-`, `*`, `+`, `1.`
   # or `1)` and a space. The rule is stated once, in
   # process/02-discover/discovery-contract.md under "What could not be
@@ -193,10 +242,10 @@ check_cycle() {
   # fabricated-item-in-the-right-markup bar CONTROLS.md already discloses. The
   # shipped cycle's count is unchanged at three.
   outliers=$(printf '%s\n' "$outlier_text" | grep -cE '^([-*+]|[0-9]+[.)])[[:space:]]')
-  if ! grep -q '^## Outliers' "$f"; then
+  if ! printf '%s\n' "$VIEW" | grep -q '^## Outliers'; then
     refuse "$f" "-" "no-outlier-section" \
       "no Outliers section: an empty outlier list and an omitted one look identical, so an empty one must say so"
-  elif [ "$outliers" -eq 0 ] && ! declares_empty "$outlier_text"; then
+  elif [ "$outliers" -eq 0 ] && ! declares_empty "$outlier_spans"; then
     refuse "$f" "-" "silent-empty-outliers" \
       "the Outliers section lists nothing and does not declare itself empty — the declared form is <!-- declared-empty: reason --> in the section, not in its heading and not as a sentence. Until 2026-10-04 this was a search of the section's prose for a short word, and the shipped cycle's own explanation of why outliers matter carries one of those words twice, so for that artifact this refusal could never fire"
   fi
@@ -297,7 +346,24 @@ check_cycle() {
   # presence and for a reason. It does NOT excuse a cycle that has findings: a zero set
   # against a source of six leaves all six missing, so `unaccounted` fires and names
   # them. CTRL-4 is unchanged; this is only the state where the right answer is zero.
-  acct_block="$(sed -n '/accounting:ids -->/,/\/accounting:ids -->/p' "$f")"
+  # THE BLOCK IS LOCATED BY ITS DELIMITERS IN THE SPAN PROJECTION, and its CONTENTS are
+  # then read out of both projections over the same line range.
+  #
+  # The delimiters are HTML comments, so a whole one fits inside an inline code span: a
+  # document showing a reader `<!-- accounting:ids -->` in backticks opened a real block,
+  # and the ids on the next line were then the account. Located by range rather than by
+  # content so the two projections cannot disagree about where the block is.
+  acct_range="$(printf '%s\n' "$SPANVIEW" | awk '
+    !a && /<!--[ \t]*accounting:ids[ \t]*-->/ { a = FNR; next }
+    a && !b && /<!--[ \t]*\/accounting:ids[ \t]*-->/ { b = FNR }
+    END { if (a) printf "%d %d\n", a, (b ? b : NR) }')"
+  if [ -n "$acct_range" ]; then
+    acct_block="$(printf '%s\n' "$VIEW" | sed -n "${acct_range% *},${acct_range#* }p")"
+    acct_spans="$(printf '%s\n' "$SPANVIEW" | sed -n "${acct_range% *},${acct_range#* }p")"
+  else
+    acct_block=""
+    acct_spans=""
+  fi
   if [ -z "$acct_block" ]; then
     refuse "$f" "-" "no-accounting" \
       "no accounting:ids block in this record: a theme is a summary, not a filter, and nothing may be dropped — which a total cannot establish, so the ids accounted for are declared explicitly"
@@ -305,7 +371,7 @@ check_cycle() {
   fi
 
   declared="$(printf '%s\n' "$acct_block" | grep -oE 'F[0-9]+' | sort)"
-  if [ -z "$declared" ] && ! declares_empty "$acct_block"; then
+  if [ -z "$declared" ] && ! declares_empty "$acct_spans"; then
     refuse "$f" "-" "no-accounting" \
       "the accounting:ids block is present and declares no ids: a cycle over a source with findings accounts for every one of them, and a cycle over a source with none says so in band — <!-- declared-empty: reason --> inside the block, the same form the Outliers section uses. A blank block cannot be told from an unfinished one"
     return
@@ -339,7 +405,7 @@ check_cycle() {
   # Theme counts must still sum to what was accounted for. This does NOT detect
   # an item moved between themes; that needs per-theme ids, which this cycle
   # predates and the contract requires from the next one.
-  themes_sum=$(grep -oE '^\*\*[0-9]+ findings' "$f" | grep -oE '[0-9]+' | awk '{s+=$1} END {print s+0}')
+  themes_sum=$(printf '%s\n' "$VIEW" | grep -oE '^\*\*[0-9]+ findings' | grep -oE '[0-9]+' | awk '{s+=$1} END {print s+0}')
   accounted_n=$(printf '%s\n' "$uniq_declared" | grep -c .)
   if [ "$((themes_sum + outliers))" -ne "$accounted_n" ]; then
     refuse "$f" "-" "counts-disagree" \
@@ -361,6 +427,13 @@ check_cycle() {
 # `from:` is still unread.
 check_problem() {
   local f="$1" rests first rest path resolved topics_dir
+
+  # The same reading as check_cycle. `rests on:` is the field a fenced example once
+  # donated a value to, which is where the fence rule in this gate came from.
+  VIEW="$(rendered_lines_file "$f")" || {
+    printf 'validate-define: could not read %s as rendered text\n' "$f" >&2; exit 2; }
+  SPANVIEW="$(rendered_spans_file "$f")" || {
+    printf 'validate-define: could not read %s as rendered text\n' "$f" >&2; exit 2; }
 
   rests="$(field "$f" 'rests on')"
   if [ -z "$rests" ]; then

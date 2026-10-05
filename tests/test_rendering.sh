@@ -14,7 +14,13 @@
 # Five separate repairs produced five separate holes because each one sampled. So
 # this suite does not sample. It enumerates:
 #
-#   FIFTEEN declaration forms   every `<!-- name: ... -->` in the tree
+#   FIFTEEN declaration forms   every in-band HTML comment carrying a name and a
+#                               colon, enumerated from the tree at the end of this
+#                               file. The form is not written out here, because the
+#                               enumeration reads tracked text and this file is
+#                               tracked — writing the shape as prose added a
+#                               sixteenth form called `name`, which is the
+#                               stage-before-you-verify trap in a new place.
 #   FIVE display forms          backtick fence, tilde fence, inline code span,
 #                               HTML comment, four-space indented block
 #

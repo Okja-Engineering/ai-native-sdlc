@@ -105,6 +105,16 @@ CONTRACT_ROOT="${CONTRACT_ROOT:-$ROOT}"
 [ -x "$LISTER" ] || { printf 'validate-controls: cannot run %s\n' "$LISTER" >&2; exit 2; }
 [ -f "$CI_FILE" ] || { printf 'validate-controls: no workflow at %s\n' "$CI_FILE" >&2; exit 2; }
 
+# A document that DISPLAYS a declaration must not thereby SATISFY it — and for this
+# gate the gap pointed the other way: a contract illustrating the marker in an inline
+# code span made this document refuse for not disclosing an illustration.
+RENDERING="${RENDERING_LIB:-$ROOT/bin/lib-rendering.sh}"
+if [ ! -f "$RENDERING" ]; then
+  printf 'validate-controls: no rendering library at %s — without it a contract illustrating a declaration would be read as making one, so this gate will not run\n' "$RENDERING" >&2
+  exit 2
+fi
+. "$RENDERING"
+
 refusals=0
 refuse() { printf '%s: refuse[%s]: %s\n' "${1#$ROOT/}" "$2" "$3" >&2; refusals=$((refusals + 1)); }
 
@@ -392,14 +402,19 @@ fi
 
 # declared -> one `name<TAB>contract path` per declaration, plus MALFORMED rows
 #
-# A fenced block declares nothing, for the fourth time in this repository: a fenced
-# `rests on: none`, a fenced `DECIDERS.md` row and a fenced `declared-empty` each
-# cost it a defect first. A contract showing a reader the form must not thereby
-# require a disclosure row.
-declared="$(cd "$CONTRACT_ROOT" && awk -v T="$TAB" '
-  FNR == 1 { fence = 0 }
-  /^[ \t]*(```|~~~)/ { fence = !fence; next }
-  fence { next }
+# A DISPLAYED DECLARATION DECLARES NOTHING. This covered fenced blocks and nothing
+# else, and the gap was a FALSE REFUSAL rather than a hole: a contract showing a
+# reader `<!-- declared-not-enforced: name — reason -->` inside an inline code span
+# was read as declaring a field called `name`, and this document was then refused for
+# not disclosing it. Reproduced on #116 — documenting the form broke the build, which
+# is the opposite of what a control document is for.
+#
+# The reading is bin/lib-rendering.sh, and this reads the SPAN projection because a
+# declaration is comment-shaped. The three earlier instances of the class — a fenced
+# `rests on: none`, a fenced `DECIDERS.md` row and a fenced `declared-empty` — are now
+# answered in the same place as this one.
+declared="$(cd "$CONTRACT_ROOT" && for c in $contracts; do
+  rendered_spans_file "$c" | awk -v T="$TAB" -v FN="$c" '
   /<!--[ \t]*declared-not-enforced:/ {
     line = $0
     while (match(line, /<!--[ \t]*declared-not-enforced:[^>]*-->/)) {
@@ -410,16 +425,17 @@ declared="$(cd "$CONTRACT_ROOT" && awk -v T="$TAB" '
       # name — reason. The em dash is the separator the dead-pointer and
       # corrected-claim declarations already use.
       i = index(body, "—")
-      if (i == 0) { printf "MALFORMED%s%s%s%d%sno separator\n", T, FILENAME, T, FNR, T; continue }
+      if (i == 0) { printf "MALFORMED%s%s%s%d%sno separator\n", T, FN, T, FNR, T; continue }
       name = substr(body, 1, i - 1); reason = substr(body, i + 3)
       gsub(/^[ \t`]+|[ \t`]+$/, "", name)
-      if (name == "")             { printf "MALFORMED%s%s%s%d%sno name\n", T, FILENAME, T, FNR, T; continue }
-      if (reason !~ /[A-Za-z]/)   { printf "MALFORMED%s%s%s%d%sno reason\n", T, FILENAME, T, FNR, T; continue }
-      printf "OK%s%s%s%s\n", T, name, T, FILENAME
+      if (name == "")             { printf "MALFORMED%s%s%s%d%sno name\n", T, FN, T, FNR, T; continue }
+      if (reason !~ /[A-Za-z]/)   { printf "MALFORMED%s%s%s%d%sno reason\n", T, FN, T, FNR, T; continue }
+      printf "OK%s%s%s%s\n", T, name, T, FN
     }
     next
   }
-' $contracts)"
+'
+done)"
 
 while IFS="$TAB" read -r kind a b c; do
   [ "${kind:-}" = MALFORMED ] || continue

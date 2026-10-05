@@ -21,6 +21,8 @@ TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$TEST_DIR/lib/assert.sh"
 
 ROOT="$(cd "$TEST_DIR/.." && pwd)"
+. "$ROOT/bin/lib-rendering.sh"
+. "$TEST_DIR/lib/retired-claim.sh"
 cd "$ROOT" || exit 2
 
 # The phrases that assert absence. Narrow on purpose: each is a form actually
@@ -210,45 +212,25 @@ assert_eq "no" "$fires" "a phase named away from the claim is a mention, not the
 # recorded. Same three rules as `dead-pointer` and `not-a-claim`.
 OVERCLAIM='all of it in git|everything is in git|entirely in git'
 
-# declared <keyword> <phrase pattern> <line text> -> 0 when the line declares the
-# claim it carries
+# THE PREDICATE MOVED TO tests/lib/retired-claim.sh. It was already parameterised by
+# keyword and pattern here, which was the right shape; what it lacked was the display
+# question, in both directions. A declaration written inside an inline code span
+# retired a live claim, and a document quoting the retired sentence inside a fence was
+# reported for making it. tests/test_cycle.sh held a second, looser copy of the same
+# three rules — it did not require the declaration to name the phrase — and that copy
+# is gone.
 #
-# One implementation, used for the real documents and for the fixtures below, so a
-# fixture proves the decision this makes rather than a second copy of it.
-#
-# The pattern and the declaration keyword are arguments rather than baked in. The
-# overclaim here and the stale authorship claim further down are one problem — a
-# line carrying a sentence that stopped being true, quoted by the line that
-# corrects it — and the three rules for retiring one are the same three rules for
-# retiring the other. Two copies of them would be two things to get wrong. The
-# keyword still differs, so a reader of a declaration can tell what kind of claim
-# it retires.
-declared() {
-  local kw="$1" pat="$2" text="$3" phrase decl rest
-  phrase="$(printf '%s' "$text" | grep -oiE "$pat" | head -1 | tr 'A-Z' 'a-z')"
-  [ -n "$phrase" ] || return 0                       # no such claim on the line
-  decl="$(printf '%s' "$text" \
-    | sed -n "s/.*<!--[[:space:]]*${kw}:\([^>]*\)-->.*/\1/p" \
-    | tr 'A-Z' 'a-z')"
-  case "$decl" in
-    *"$phrase"*) ;;
-    *) return 1 ;;                                   # names a different phrase, or none
-  esac
-  rest="${decl/$phrase/}"                            # what is left is the reason
-  case "$rest" in
-    *[a-z0-9]*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
+# `declared` is kept as a one-line alias so the fixtures below read as they did. They
+# pass a single line and carry no non-content, so one text answers both questions.
+declared() { retired_claim_declared "$1" "$2" "$3"; }
 
+# The real documents, walked per file so the two projections can be read. `git grep`
+# was the enumerator and the file list still comes from the index, so an untracked
+# scratch file cannot fail the suite.
 overclaim=""
-while IFS= read -r hit; do
-  [ -n "$hit" ] || continue
-  loc="${hit%%:*}:$(printf '%s' "${hit#*:}" | cut -d: -f1)"
-  declared corrected-overclaim "$OVERCLAIM" "${hit#*:}" || overclaim="$overclaim $loc"
-done <<EOF
-$(git grep -niIE "$OVERCLAIM" -- '*.md' ':(exclude)tests/*' 2>/dev/null || true)
-EOF
+for d in $(git -C "$ROOT" ls-files -- '*.md' ':(exclude)tests/*'); do
+  overclaim="$overclaim$(retired_claim_offenders corrected-overclaim "$OVERCLAIM" "$ROOT/$d")"
+done
 assert_eq "" "$overclaim" "no document claims the whole chain is in git"
 
 # --- and the exemption has to be able to refuse -------------------------------
@@ -772,17 +754,22 @@ claim_hits() { # <pattern> [files...] -> file:line:text
 
 # false_claims <keyword> <pattern> <the claim is false: yes|no> [files...]
 #   -> `file:line` for every undeclared line carrying a claim that is false
+#
+# The same reading as the overclaim sweep above: the CLAIM has to be on a line a reader
+# sees, and the DECLARATION has to be outside an inline code span. Without that, a
+# document quoting the retired sentence inside a fence was reported for making it, and
+# a document illustrating the declaration retired a claim that is still false.
 false_claims() {
-  local kw="$1" pat="$2" is_false="$3" out="" hit loc
+  local kw="$1" pat="$2" is_false="$3" out="" d
   shift 3
   [ "$is_false" = yes ] || return 0
-  while IFS= read -r hit; do
-    [ -n "$hit" ] || continue
-    loc="${hit%%:*}:$(printf '%s' "${hit#*:}" | cut -d: -f1)"
-    declared "$kw" "$pat" "${hit#*:}" || out="$out $loc"
-  done <<EOF
-$(claim_hits "$pat" "$@")
-EOF
+  if [ "$#" -gt 0 ]; then
+    out="$(retired_claim_offenders "$kw" "$pat" "$@")"
+  else
+    for d in $(git -C "$ROOT" ls-files -- '*.md' ':(exclude)tests/*'); do
+      out="$out$(retired_claim_offenders "$kw" "$pat" "$ROOT/$d")"
+    done
+  fi
   printf '%s' "${out# }"
 }
 

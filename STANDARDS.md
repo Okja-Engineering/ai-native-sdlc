@@ -4,17 +4,13 @@
 
 Every claim carries a grade. The grade is the point of this document — "accepted standard" and "one vendor's blog post" are not the same thing, and most published material on this subject right now is the second.
 
-<!-- not-a-claim-block: the rows below declare what each grade means, they do not grade anything -->
-
 | Grade | Means |
 |---|---|
-| **[E]** | Empirical — controlled experiment or large-scale observational study |
-| **[S]** | Standard — NIST, OWASP, SSDF, SLSA |
+| **[E]** | Empirical — controlled experiment or large-scale observational study <!-- not-a-claim: this row defines what the marker means, it does not use one --> |
+| **[S]** | Standard — NIST, OWASP, SSDF, SLSA <!-- not-a-claim: this row defines what the marker means, it does not use one --> |
 | **[V]** | Vendor methodology — a supplier describing their own practice. **Not outcome evidence.** |
 | **[P]** | Practitioner consensus — widely held, not measured |
 | **[O]** | Open — contested or unresolved |
-
-<!-- end-not-a-claim-block -->
 
 ---
 

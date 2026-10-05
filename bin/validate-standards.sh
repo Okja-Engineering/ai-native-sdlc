@@ -42,6 +42,17 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DOC="${STANDARDS_DOC:-$ROOT/STANDARDS.md}"
 REG="${SOURCES_DOC:-$ROOT/SOURCES.md}"
 
+# A document that DISPLAYS a declaration must not thereby SATISFY it. This gate
+# tracked fences for exactly one of its four declaration forms; the other three and
+# the other four display forms were open, and one of them switched CTRL-8 off.
+# bin/lib-rendering.sh holds the rule, the two projections and the cost of sharing it.
+RENDERING="${RENDERING_LIB:-$ROOT/bin/lib-rendering.sh}"
+if [ ! -f "$RENDERING" ]; then
+  printf 'validate-standards: no rendering library at %s — without it a declaration shown to a reader would exempt the claims it illustrates, so this gate will not run\n' "$RENDERING" >&2
+  exit 2
+fi
+. "$RENDERING"
+
 # documents -> every document whose graded claims and evidence pointers this gate
 # reads, relative to ROOT
 #
@@ -150,15 +161,40 @@ fi
 # A line is exempt only when it SAYS it is not a claim, in band, with a reason:
 #
 #   <!-- not-a-claim: reason -->          exempts the line it is on
-#   <!-- not-a-claim-block: reason -->    exempts every line until
+#
+# Each declaration sits where it applies, carries its reason, greps in one line, and
+# is counted in this gate's summary. The first-character skip it replaces was
+# unconditional, silent and uncounted. A marker carrying no reason does not exempt
+# anything, so a careless one produces a refusal rather than a hole.
+#
+# THE SPAN FORM IS GONE, AND IT WAS A CRITICAL. There was a second form:
+#
+#   <!-- not-a-claim-block: reason -->    exempted every line until
 #   <!-- end-not-a-claim-block -->
 #
-# This document declares three: the table that defines what each grade means,
-# and two sentences that are about the grading scheme rather than graded by it.
-# Each declaration sits where it applies, carries its reason, greps in one line,
-# and is counted in this gate's summary. The first-character skip it replaces was
-# unconditional, silent and uncounted. A marker carrying no reason does not
-# exempt anything, so a careless one produces a refusal rather than a hole.
+# The terminator was not required and the opener was honoured inside a fenced block.
+# Issue #116 reproduced the consequence: delete the one `end-not-a-claim-block` line
+# from STANDARDS.md and strip every `S-` citation, and this gate reported *20 not
+# currently cited* and EXITED 0. Twenty uncited graded claims, CTRL-8 switched off by
+# deleting one line. The form was disclosed nowhere — `grep -c not-a-claim-block
+# CONTROLS.md` returned 0 — while CONTROLS.md praised the per-line form against
+# *"what it replaced, which exempted every table row and every blockquote in the
+# document."* An unterminated span exemption is that, with a reason attached.
+#
+# IT IS DROPPED RATHER THAN REPAIRED, and the alternative was real: make the
+# terminator mandatory and read the opener in a rendering context. Dropped because
+# the span bought nothing the per-line form does not. It covered one thing — the five
+# rows of the grade table in STANDARDS.md, of which two carry a marker this gate
+# reads — and it cost three properties the per-line form has: each exempted line
+# carries its own reason, each is counted in the summary, and an exemption cannot
+# outrun the thing it was written for. The summary said *9 line(s) declared not a
+# claim* while the span was exempting eleven, which is why the reproduction was
+# invisible in the output. Fewer forms honestly enforced is this repository's standing
+# trade and this is the second time it has been the right answer.
+#
+# A document still carrying the retired form gets `uncited-claim` on the lines it
+# meant to exempt, and that refusal names the per-line form. tests/test_rendering.sh
+# pins that the retired opener exempts nothing, displayed or not.
 #
 # ONE DOCUMENT MAY DECLARE THAT ITS GRADED CLAIMS RESOLVE INLINE, with a reason:
 #
@@ -182,28 +218,53 @@ inline_docs=""
 for d in $(documents); do
   f="$ROOT/$d"
   [ -f "$f" ] || continue
-  # The fence is tracked for ONE purpose: a `graded-claims-cite-inline` declaration
-  # inside a fenced block declares nothing. Found by attacking this check after
-  # writing it — a document could show the reader what the form looks like and
-  # thereby exempt its own uncited claims, which is the fifth time this repository
-  # has paid for a fenced example being read as the real thing.
+  # TWO READINGS OF THE SAME FILE, AND THE ASYMMETRY IS THE POINT.
   #
-  # It deliberately does NOT gate the claim scan. A graded claim inside a fence is
-  # read today and some are declared `not-a-claim` on their own line; skipping fenced
-  # lines would be a loosening of a check that already works, made as a side effect
-  # of closing something else. The per-line `not-a-claim` form needs no fence rule for
-  # the same reason it was never vulnerable: it exempts only the line it sits on, so a
-  # fenced one exempts a fenced line and nothing above it.
+  # The EXEMPTIONS are read from the span projection: a declaration is an HTML comment,
+  # a whole HTML comment fits inside an inline code span, and a document showing a
+  # reader the form must not thereby exempt its own claims. This gate already tracked
+  # fences for `graded-claims-cite-inline` alone, which was the fifth time this
+  # repository paid for a fenced example being read as the real thing; the other four
+  # display forms were not known to it.
+  #
+  # The CLAIMS are read from the RAW file, and that is measured rather than assumed.
+  # A grade marker is written in backticks here — it is the house style, and
+  # AGENTS.md's four `[E]` claims are written that way — so sixteen lines carrying a
+  # real grade disappear from the span projection. Reading claims through it would
+  # hide four real claims in the one document this gate was widened to cover, which is
+  # a loosening of a check that works made as a side effect of closing something else.
+  #
+  # The consequence is stated rather than hidden: a graded claim written inside a fence
+  # is still read, and a `not-a-claim` written inside the same fence does not exempt
+  # it. A document wanting to show a reader an example graded claim cites it, or
+  # declares it on a line outside the fence.
+  #
+  # Both projections preserve line numbers, so the two are joined by FNR: the span
+  # projection is read first into E, then the raw file is read against it.
+  #
+  # Fed to awk through a here-document rather than `-v`, which runs backslash escape
+  # processing over the value — these documents carry `\b` and `\?` in prose, and an
+  # exemption line is not a place to be mangling text. Rather than a temp file, for the
+  # reason this gate's neighbour records: scratch state the verdict depends on is a
+  # failure mode, not a mechanism.
+  #
+  # THE VIEW IS CAPTURED AND ITS STATUS CHECKED BEFORE awk SEES IT. Written first as
+  # `<(rendered_spans_file "$f")`, whose failure is invisible: the first input came
+  # back empty, `NR == FNR` was then true for the FIRST LINE OF THE REAL FILE, and
+  # every exemption in that document vanished while the gate exited 0. A here-document
+  # always carries at least one line, so the join cannot slip.
+  exempt_view="$(rendered_spans_file "$f")" || {
+    printf 'validate-standards: could not read %s as rendered text\n' "$f" >&2; exit 2; }
   scan="$(awk '
-    /^[ \t]*(```|~~~)/ { fence = !fence }
-    /<!--[ \t]*end-not-a-claim-block[ \t]*-->/ { inblock = 0; next }
-    /<!--[ \t]*not-a-claim-block:[^>]*[A-Za-z][^>]*-->/ { inblock = 1; x++; next }
-    inblock { next }
-    !fence && /<!--[ \t]*graded-claims-cite-inline:[^>]*[A-Za-z][^>]*-->/ { inline = 1; next }
-    /<!--[ \t]*not-a-claim:[^>]*[A-Za-z][^>]*-->/ { x++; next }
+    NR == FNR { E[FNR] = $0; next }
+    E[FNR] ~ /<!--[ \t]*graded-claims-cite-inline:[^>]*[A-Za-z][^>]*-->/ { inline = 1; next }
+    E[FNR] ~ /<!--[ \t]*not-a-claim:[^>]*[A-Za-z][^>]*-->/ { x++; next }
     /\[E\]|\[S\]/ { printf "C%d:%s\n", FNR, $0 }
     END { printf "X%d\nI%d\n", x + 0, inline + 0 }
-  ' "$f")"
+  ' /dev/stdin "$f" <<SPANVIEW
+$exempt_view
+SPANVIEW
+)"
   exemptions=$((exemptions + $(printf '%s\n' "$scan" | sed -n 's/^X//p')))
   if [ "$(printf '%s\n' "$scan" | sed -n 's/^I//p')" = 1 ]; then
     inline_docs="${inline_docs:+$inline_docs }$d"
@@ -383,12 +444,28 @@ resolves() { # pointer -> 0 if this repository has it, as a path or in git
 # repository slugs. Widening further means recalibrating that heuristic, which is its
 # own change with prose churn in ten files. The surface is derived from the thing the
 # check is for instead.
+# A POINTER IS READ FROM THE RAW FILE AND ITS DECLARATION FROM THE SPAN PROJECTION,
+# which is the same split the claim scan above makes and for the same reason: a pointer
+# IS a backticked token, so the span projection does not contain one.
+#
+# READING THE POINTER SET FROM A PROJECTION WAS TRIED AND REVERTED, and the reason is
+# worth keeping. `grep -oE` pairs backticks left to right across the whole file, so
+# blanking fenced transcripts changes which tokens pair up: over CONTROLS.md the line
+# projection extracted `experiment/0.0.0` where the raw file did not, and line 272
+# then drew `dangling-ref` for naming it without a declaration. That is a real gap in
+# the extraction and it is NOT this change — nothing on #116 is evidence for it, and
+# closing it refuses a shipped document. It is reported to the owner instead.
+#
+# What stays open as a consequence: a dead pointer named only inside a fenced
+# transcript is still refused. No document does that today.
 pointer_docs="$(for d in $(documents); do
   grep -qE '`[0-9a-f]{7,40}(:[^` ]+)?`' "$ROOT/$d" 2>/dev/null && printf '%s\n' "$d"
 done)"
 for d in $pointer_docs; do
   f="$ROOT/$d"
   [ -f "$f" ] || continue
+  spanview="$(rendered_spans_file "$f")" || {
+    printf 'validate-standards: could not read %s as rendered text\n' "$f" >&2; exit 2; }
   refs="$(grep -oE '`[^` ]+`' "$f" 2>/dev/null | tr -d '`' | sort -u)"
   while IFS= read -r r; do
     [ -n "$r" ] || continue
@@ -417,7 +494,28 @@ for d in $pointer_docs; do
     # carrying nothing but the pointer does not exempt it either, because then
     # there is no reason recorded. Same shape as the not-a-claim declarations
     # above: explicit, greppable, and reviewable where a phrase match was a guess.
-    while IFS= read -r line; do
+    # WHICH LINES CARRY THE POINTER CLAIM, and the DECLARATION read from the span
+    # projection at the same line number — both projections preserve them.
+    #
+    # The lines are the ones carrying the token as a COMPLETE BACKTICKED TOKEN, which
+    # is the shape `refs` extracted it with. It was every line containing the token as
+    # a substring, and that was wrong in both directions at once:
+    #
+    #   a hole — CONTROLS.md shows a reader the form, `<!-- dead-pointer:
+    #   experiment/0.0.0 — reason -->` inside a code span, and the raw line was read,
+    #   so an illustration retired the pointer it was illustrating. Any document could
+    #   retire any pointer by showing what retiring one looks like.
+    #
+    #   a false refusal — reading the declaration from the span projection and the
+    #   mention as a substring then refuses that same illustration line, because the
+    #   mention survives and the declaration does not. Documenting the form would
+    #   break the build, which is the other half of #116.
+    #
+    # A mention inside a longer code span, or inside an HTML comment, is not a pointer
+    # a reader is being sent to. A bare `experiment/0.0.0` is, and that is the shape
+    # the three files that caused this check used.
+    while IFS= read -r hit; do
+      line="$(printf '%s\n' "$spanview" | sed -n "${hit%%:*}p")"
       decl="$(printf '%s' "$line" | sed -n 's/.*<!--[[:space:]]*dead-pointer:\([^>]*\)-->.*/\1/p')"
       case "$decl" in
         *"$r"*)
@@ -430,7 +528,7 @@ for d in $pointer_docs; do
         "points at \`$r\`, which this repository has neither as a path nor in git history: this is the defect that left STANDARDS.md with no reachable evidence. If it is somewhere else — another repository, a URL — link it rather than writing it in backticks, because a reader cannot open this. If it is named in order to record that it is dead, say so in band: <!-- dead-pointer: $r — reason -->"
       break
     done <<INNER
-$(grep -F "$r" "$f")
+$(grep -nF "\`$r\`" "$f")
 INNER
   done <<EOF
 $refs
