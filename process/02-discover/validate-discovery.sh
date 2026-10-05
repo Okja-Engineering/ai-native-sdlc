@@ -316,30 +316,54 @@ check_topic() {
     opensec="$(awk '/^#+.*could not .*establish/ { inside = 1; next }
                     inside && (substr($0, 1, 3) == "## " || $0 ~ /^---[[:space:]]*$/) { exit }
                     inside { print }' "$f")"
-    # AN OPEN ITEM IS A LIST ITEM CARRYING AN `[O]` GRADE — the form this
-    # contract asks for ("a mandatory section, listing [O] items explicitly") and
-    # the form both shipped topics use, one as `- **[O]` …`, the other as
-    # `**1. … [O]**`. Both markers are accepted because the contract says section
-    # form may differ between artifacts; what may not differ is that an item is
-    # an item.
+    # AN OPEN ITEM IS A LIST ITEM CARRYING ITS `[O]` GRADE. A list item is a line
+    # beginning, FLUSH LEFT, with a list marker — `-`, `*`, `+`, `1.` or `1)` —
+    # followed by a space. Nothing about emphasis: a bullet is what makes the line a
+    # list item, and "an item is a list item" is the whole of the rule.
     #
-    # This was `^[-*0-9]` OR an `[O]` anywhere in the body, as an alternation. So
-    # one line of prose carrying a grade marker counted as an open item, which is
-    # the second way a hollowed section passed: write the assertion, append the
-    # marker, and the emptiness check is skipped rather than satisfied.
+    # The rule is stated once, in discovery-contract.md under "What could not be
+    # established", and define-contract.md cites that statement for its Outliers
+    # section rather than restating it. This expression and the one in
+    # validate-define.sh are that rule in two places. They are not shared as a
+    # library for the reason #104 records — a shared helper would be a load-bearing
+    # script outside the enumeration in CONTROLS.md, which is #95's decision — so
+    # what stops them drifting is tests/test_item_rule.sh, which drives one
+    # candidate line through both gates and asserts the verdicts are equal.
     #
-    # The marker is FLUSH LEFT. An earlier version of this allowed leading
-    # whitespace, which counted an indented line as a nested item — and four
-    # spaces is a code block in Markdown, so a reader sees no item where the gate
-    # counted one. The tolerance bought nothing measurable: both shipped topics
-    # write their items flush left, and a genuinely nested item always sits under
-    # a parent that counts. Removed rather than kept in case, and the case is in
-    # the suite.
+    # THREE VERSIONS OF THIS WERE WRONG, each more narrowly than the last.
+    #
+    #   1. `^[-*0-9]` OR an `[O]` anywhere in the body, as an alternation, so one
+    #      line of prose carrying a grade marker was an item.
+    #   2. Leading whitespace tolerated, so an indented line counted — and four
+    #      spaces is a code block in Markdown, so a reader saw no item where the
+    #      gate counted one.
+    #   3. A bullet, a number OR ANY LINE BEGINNING `**`, with the `[O]` anywhere
+    #      after it. That accepted a bold-led SENTENCE as an item, including
+    #      `**Nothing remains open.** … the grade [O] is not used in this
+    #      artifact.` — a line that denies the grade satisfying a check for an item
+    #      carrying it. Reproduced on the shipped topic with all seven items
+    #      deleted: gate exit 0, suite green.
+    #
+    # WHY THE BOLD-LABEL FORM IS GONE RATHER THAN REPAIRED. The distinction the
+    # contract was reaching for — a label used as a label, versus a sentence that
+    # mentions the grade — can be drawn here, by requiring the `[O]` inside the
+    # label's own bold span. It cannot be drawn in the Define twin at all, because
+    # an outlier carries no grade and there is nothing there to anchor it to. A form
+    # only one of the two gates can police is how the two came to disagree, so the
+    # form both can police is the one that survives.
+    #
+    # WHY NOT NARROWER. `^- \*\*` was the obvious answer: it is what the Define gate
+    # already counted, what all three shipped artifacts write, and it loosens
+    # nothing. It was rejected because no sentence can say WHY bold — it would be
+    # this repository's own named failure of encoding today's markup as a rule, and
+    # a coverage fixture in tests/test_validate_discovery.sh had already written a
+    # plain bullet as an item without anyone thinking twice. A bullet has a reason
+    # behind it; two asterisks do not.
     seen=$(printf '%s\n' "$opensec" \
-      | grep -cE '^([-*+][[:space:]]|[0-9]+[.)][[:space:]]|\*\*).*\[O\]')
+      | grep -cE '^([-*+]|[0-9]+[.)])[[:space:]].*\[O\]')
     if [ "$seen" -eq 0 ] && ! declares_empty "$opensec"; then
       refuse "$f" "-" "silent-empty-open" \
-        "the open section lists no [O] item and does not declare itself empty: an artifact with nothing open is making a strong claim, and it has to make it as a declaration in the section — <!-- declared-empty: reason --> — not as a sentence. This was a search of the section's prose for a short word until 2026-10-04, and an artifact that deleted all seven of its items and asserted the opposite passed on the word \"nothing\""
+        "the open section lists no [O] item and does not declare itself empty. An item is a LIST ITEM carrying its own grade: a line starting flush left with \`-\`, \`*\`, \`+\`, \`1.\` or \`1)\` and a space, with its [O] on that line. A bold label is not a list marker, and a line of prose carrying an [O] somewhere in it is not an item — this is the same rule validate-define.sh counts in Outliers, stated in discovery-contract.md. An artifact with nothing open is making a strong claim, and it makes it as a declaration in the section — <!-- declared-empty: reason --> — not as a sentence. Two earlier versions of this check were weaker: a search of the section's prose for a short word, and then a count that accepted any bold-led line carrying an [O] anywhere, so a sentence denying the grade satisfied a check for an item carrying it"
     fi
   fi
 

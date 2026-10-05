@@ -16,6 +16,11 @@
 # was behind the audit question about where the process says it could not verify
 # something.
 #
+# Both moved to meet: Discover lost the bold-label form, which is the defect, and
+# Define lost a bold requirement nothing had ever stated. The rule is now "an item
+# is a list item", which is a sentence with a reason behind it; `- **` would have
+# been narrower and would have made one artifact's markup the rule.
+#
 # The rule is now stated once, in process/02-discover/discovery-contract.md, and
 # process/03-define/define-contract.md cites it. The two gates still hold their own
 # copies of the check rather than sharing a library, for the reason #104 records: a
@@ -101,30 +106,33 @@ check() { # <expected> <line>
   assert_eq "$1" "$d" "and the verdict is '$1': $2"
 }
 
-# Accepted: a hyphen bullet with a bold lead, flush left.
+# Accepted: a list marker, flush left. Emphasis plays no part — a bullet is what
+# makes the line a list item, which is the whole of the rule.
 check item        '- **Whether the thing holds. [O]**'
 check item        '- **Whether the thing holds.** [O]'
+check item        '- Whether the thing holds. [O]'
+check item        '* Whether the thing holds. [O]'
+check item        '+ Whether the thing holds. [O]'
+check item        '1. Whether the thing holds. [O]'
+check item        '1) Whether the thing holds. [O]'
 
 # Refused: a bold label with no list marker. This is the form the Discover gate
 # accepted and the Define gate never did, and it is the defect.
 check 'not an item' '**Whether the thing holds. [O]**'
 check 'not an item' '**Nothing remains open.** The two passes answered every question in scope; the grade [O] is not used in this artifact.'
 check 'not an item' '**Nothing remains open** ([O])'
-
-# Refused: the other markers the one rule drops.
-check 'not an item' '1. **Whether the thing holds. [O]**'
-check 'not an item' '1) **Whether the thing holds. [O]**'
-check 'not an item' '* **Whether the thing holds. [O]**'
-check 'not an item' '+ **Whether the thing holds. [O]**'
-check 'not an item' '- Whether the thing holds. [O]'
+check 'not an item' '**1. Whether the thing holds. [O]**'
 
 # Refused: not flush left. Four spaces is a code block in Markdown, so a reader sees
 # no item where a gate would have counted one.
 check 'not an item' '    - **Whether the thing holds. [O]**'
+check 'not an item' '  - Whether the thing holds. [O]'
 
-# Refused: prose, with and without the grade.
+# Refused: prose, with and without the grade, and a bare marker character that is
+# not a list marker because no space follows it.
 check 'not an item' 'Whether the thing holds. [O]'
 check 'not an item' 'The discovery was exhaustive and nothing of consequence remains outstanding.'
+check 'not an item' '-Whether the thing holds. [O]'
 
 # --- the rule is written down once --------------------------------------------
 # Two gates agreeing today is worth less if the rule they implement is written in
@@ -136,7 +144,7 @@ assert_contains "$(cat "$RULE")" 'An item is a list item' \
   "the Discover contract states what an item is"
 assert_contains "$(cat "$CITES")" 'discovery-contract.md' \
   "the Define contract points at the contract that states it"
-assert_contains "$(cat "$CITES")" 'what counts as an item' \
+assert_contains "$(cat "$CITES")" 'counts as an item is stated once' \
   "and says that is what it is pointing at"
 
 assert_done

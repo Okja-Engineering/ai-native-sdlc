@@ -206,19 +206,19 @@ A method note worth recording: the first three attempts at the 300-item classifi
 
 ## What could not be established
 
-**1. Whether GitHub intends an agent to be able to approve its own pull request. [O]** The behaviour is measured. The intent is undocumented, and the only statement that looks like an answer is scoped to a different actor.
+- **1. Whether GitHub intends an agent to be able to approve its own pull request. [O]** The behaviour is measured. The intent is undocumented, and the only statement that looks like an answer is scoped to a different actor.
 
-**2. Whether a machine approval can satisfy a separation-of-duties or four-eyes control in a regulated setting. [O]** This is the item that matters most for the asking context and it is open in both directions. NIST AC-5's text neither permits nor forbids it. The PCI DSS clause that would decide it could not be obtained. No authoritative SOC 2 guidance was found.
+- **2. Whether a machine approval can satisfy a separation-of-duties or four-eyes control in a regulated setting. [O]** This is the item that matters most for the asking context and it is open in both directions. NIST AC-5's text neither permits nor forbids it. The PCI DSS clause that would decide it could not be obtained. No authoritative SOC 2 guidance was found.
 
-**3. When this feature goes GA, and what happens to the default at that moment. [O]** The changelog says a preview opt-in is preserved at GA and is silent on enterprises that never opted in. The documentation says the policy governs features moving from preview to GA. These read differently and GitHub does not say which governs.
+- **3. When this feature goes GA, and what happens to the default at that moment. [O]** The changelog says a preview opt-in is preserved at GA and is silent on enterprises that never opted in. The documentation says the policy governs features moving from preview to GA. These read differently and GitHub does not say which governs.
 
-**4. Whether a Copilot approval satisfies `require_code_owner_review`. [O]** CODEOWNERS documentation admits only users and teams with explicit write access; apps and bots are not listed. Undocumented and untested.
+- **4. Whether a Copilot approval satisfies `require_code_owner_review`. [O]** CODEOWNERS documentation admits only users and teams with explicit write access; apps and bots are not listed. Undocumented and untested.
 
-**5. Whether a repository can disable approvals when its organization has selected "Enabled everywhere". [O]** Undocumented. GitHub's policy-conflicts reference table has no row for the approvals policy, so multi-organization resolution is also undocumented.
+- **5. Whether a repository can disable approvals when its organization has selected "Enabled everywhere". [O]** Undocumented. GitHub's policy-conflicts reference table has no row for the approvals policy, so multi-organization resolution is also undocumented.
 
-**6. Whether an approval is withheld when every changed file is excluded from review. [O]**
+- **6. Whether an approval is withheld when every changed file is excluded from review. [O]**
 
-**7. Whether any wrongful approval has occurred in practice. [O]** Searched: Hacker News via the Algolia API (four queries, 2025-09 onward), GitHub Community Discussions, and general web. **Nothing found.** The most substantive practitioner piece located (2026-09-13) contains no first-hand testing and independently catalogues the same documentation gaps found here. At roughly 30 days into an opt-in preview this is weak evidence in either direction, and is recorded as an absence with the searches that produced it rather than as reassurance.
+- **7. Whether any wrongful approval has occurred in practice. [O]** Searched: Hacker News via the Algolia API (four queries, 2025-09 onward), GitHub Community Discussions, and general web. **Nothing found.** The most substantive practitioner piece located (2026-09-13) contains no first-hand testing and independently catalogues the same documentation gaps found here. At roughly 30 days into an opt-in preview this is weak evidence in either direction, and is recorded as an absence with the searches that produced it rather than as reassurance.
 
 ---
 

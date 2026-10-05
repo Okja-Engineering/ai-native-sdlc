@@ -58,7 +58,25 @@ A mandatory section, listing `[O]` items explicitly. Not a footnote.
 
 This is the section a reader checks to find out whether the question was actually answered. In the worked artifact it carried the most consequential item of all — that the comparison the question implies *does not exist publicly and would have to be run.* An artifact with no `[O]` section is claiming completeness it has not earned.
 
-**An item is a list item carrying its `[O]` grade.** The marker may be a bullet, a number or a bold label — the two shipped topics differ on that and both are within the contract — but an item is an item. A line of prose carrying an `[O]` somewhere in it is not one.
+**An item is a list item carrying its `[O]` grade.** A list item is a line beginning, flush left, with a list marker — `-`, `*`, `+`, `1.` or `1)` — followed by a space. The grade goes on that line.
+
+```
+- **Whether a Copilot approval satisfies `require_code_owner_review`. [O]**
+- Whether a Copilot approval satisfies `require_code_owner_review`. [O]
+1. Whether a Copilot approval satisfies `require_code_owner_review`. [O]
+```
+
+All three are items. Emphasis is a matter of taste and plays no part in the rule.
+
+**A bold label is not a list marker**, so `**Whether … [O]**` with no bullet is not an item. Neither is an indented line — four spaces is a code block in Markdown, so a reader sees no item where a gate would have counted one — and neither is a line of prose carrying an `[O]` somewhere in it.
+
+**This is the one statement of the rule, and [`define-contract.md`](../03-define/define-contract.md) cites it** for its Outliers section rather than restating it. Two sections in two phases are held to the same shape and two gates count them, so a rule written down twice is a rule that can drift — and did.
+
+**Why the bold-label form was dropped on 2026-10-04.** This paragraph used to say the marker *"may be a bullet, a number or a bold label — the two shipped topics differ on that and both are within the contract"*, and in the next sentence that *"a line of prose carrying an `[O]` somewhere in it is not one."* The gate implemented the first sentence. So a bold-led sentence counted as an open item, including `**Nothing remains open.** … the grade [O] is not used in this artifact.` — a line denying the grade satisfying a check for an item carrying it, which emptied the section this contract calls the one a reader checks.
+
+The distinction the paragraph was reaching for is real: a bold label used *as a label*, with the grade inside it, is not a sentence that mentions the grade. It can be drawn mechanically here, because an item in this section carries a grade. **It cannot be drawn in the Outliers section at all**, because an outlier carries no grade and there is nothing there to anchor it to. A form only one of the two gates can police is how the two came to disagree, so the form both can police is the one that survives. One shipped topic wrote its seven items as bold labels and they now carry a bullet; no sentence in them changed.
+
+**Why the rule is not narrower than this.** `- **` was the obvious answer — it is what the Define gate already counted and what all three shipped artifacts write, and it loosens nothing. It was rejected because no sentence can say *why* bold, which would make one artifact's markup the rule for two gates. That is the failure this contract deferred its gate to avoid in the first place. A bullet has a reason behind it: it is what makes the line a list item.
 
 **An empty section is permitted, and it declares itself empty.** A phase that genuinely left nothing open is a real state. Saying so is a declaration in the section, naming the reason:
 

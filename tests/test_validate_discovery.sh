@@ -384,7 +384,7 @@ assert_contains "$out" "refuse[silent-empty-open]" \
 out="$(bash "$GATE" "$(topic '- **Whether JevBench seals its slice. [O]**' bolditem)" 2>&1)"; rc=$?
 assert_status 0 "$rc" "a bulleted item carrying its [O] grade is accepted"
 
-# --- one form, and a bold label is not it -------------------------------------
+# --- an item is a LIST ITEM, and a bold label is not a list marker -------------
 # The count accepted a third marker — any line beginning `**`, with the `[O]`
 # ANYWHERE after it. So a bold-led sentence of prose was an open item, including one
 # that explicitly denies using the grade. Reproduced on the shipped topic: all seven
@@ -394,11 +394,13 @@ assert_status 0 "$rc" "a bulleted item carrying its [O] grade is accepted"
 # The contract carried both halves of this in one paragraph — "the marker may be a
 # bullet, a number or a bold label" and "a line of prose carrying an [O] somewhere in
 # it is not one" — and the gate implemented the first. It now says one thing: an item
-# is a `- ` bullet with a bold lead, flush left, carrying its own grade. Fewer forms,
-# and the reason they are fewer is in the contract: the Define twin counts the same
-# shape in a section whose items carry NO grade, so there the grade cannot be the
-# anchor that tells a label from a sentence. A rule only one of the two gates can
-# enforce is the drift this closes.
+# is a list item, meaning a line that starts flush left with a list marker and a
+# space. Emphasis plays no part.
+#
+# The bold-label form is gone rather than repaired. The distinction it needs — a
+# label with the grade inside it, versus a sentence mentioning the grade — can be
+# drawn here and CANNOT be drawn in the Define twin, whose outliers carry no grade to
+# anchor it to. A form only one of the two gates can police is the drift this closes.
 BOLDPROSE='**Nothing remains open.** The two passes answered every question in scope; the grade [O] is not used in this artifact.'
 out="$(bash "$GATE" "$(topic "$BOLDPROSE" boldprose)" 2>&1)"; rc=$?
 assert_status 1 "$rc" "a bold-led sentence carrying an [O] is not an open item"
@@ -410,9 +412,9 @@ assert_contains "$out" "refuse[silent-empty-open]" \
 # above without reading the author's intent.
 out="$(bash "$GATE" "$(topic '**1. Whether JevBench seals its slice. [O]**' boldlabel)" 2>&1)"; rc=$?
 assert_status 1 "$rc" "a bold label with no list marker is not an item, whatever it carries"
-assert_contains "$out" '- **' "and the refusal names the one form it accepts"
+assert_contains "$out" 'LIST ITEM' "and the refusal says what an item is instead"
 
-# Four attacks that were not the reproduction. If any of these passed, the rule
+# Three attacks that were not the reproduction. If any of these passed, the rule
 # would still be shaped to the examples it was written from.
 out="$(bash "$GATE" "$(topic '**Nothing remains open** ([O])' paren)" 2>&1)"; rc=$?
 assert_status 1 "$rc" "a bold label with the grade in a trailing parenthesis is not an item"
@@ -423,20 +425,25 @@ assert_status 1 "$rc" "a bold label whose grade is on the next line is not an it
 out="$(bash "$GATE" "$(topic 'Whether JevBench seals its slice'$'\n'': [O] not resolvable from outside' deflist)" 2>&1)"; rc=$?
 assert_status 1 "$rc" "a definition-list form is not an item"
 
-out="$(bash "$GATE" "$(topic '- **Whether JevBench seals its slice.** [O]' gradeoutside)" 2>&1)"; rc=$?
-assert_status 0 "$rc" "a bullet whose grade sits after the bold lead is still an item"
+# A marker character with no space after it is not a list marker.
+out="$(bash "$GATE" "$(topic '-Whether JevBench seals its slice. [O]' nospace)" 2>&1)"; rc=$?
+assert_status 1 "$rc" "a hyphen with no space after it is not a list marker"
 
-# The three markers the contract no longer allows, each refused rather than quietly
-# counted. These are the COST of one rule and they are asserted so the cost is
-# visible: a number, a star bullet and a bullet with no bold lead.
+# And the positive half across every marker, so the rule is pinned as a rule and not
+# as the one example it was written from. A fixture in this very suite had already
+# written a plain bullet as an item without anyone thinking twice, which is why the
+# rule does not require emphasis.
 for form in \
-  '1. **Whether JevBench seals its slice. [O]**' \
-  '* **Whether JevBench seals its slice. [O]**' \
-  '+ **Whether JevBench seals its slice. [O]**' \
-  '- Whether JevBench seals its slice. [O]'
+  '- **Whether JevBench seals its slice. [O]**' \
+  '- **Whether JevBench seals its slice.** [O]' \
+  '- Whether JevBench seals its slice. [O]' \
+  '* Whether JevBench seals its slice. [O]' \
+  '+ Whether JevBench seals its slice. [O]' \
+  '1. Whether JevBench seals its slice. [O]' \
+  '1) Whether JevBench seals its slice. [O]'
 do
-  out="$(bash "$GATE" "$(topic "$form" dropped)" 2>&1)"; rc=$?
-  assert_status 1 "$rc" "a form the contract no longer allows is refused: $form"
+  out="$(bash "$GATE" "$(topic "$form" marker)" 2>&1)"; rc=$?
+  assert_status 0 "$rc" "a list item carrying its grade is accepted: $form"
 done
 
 # An empty section that DECLARES it, with a reason, is accepted — the repair must
