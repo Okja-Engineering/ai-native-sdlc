@@ -47,6 +47,39 @@
 # `bin/next.sh` is the standing proof in this repository. CONTROLS.md item 16 holds
 # it; widening the pattern is its own change and is not this one.
 #
+# Declared but unenforced: every `<!-- declared-not-enforced: name — reason -->` in
+# a contract is disclosed by a row in CONTROLS.md, and every row corresponds to a
+# declaration that still exists.
+#
+# WHY THIS FOURTH DIRECTION IS NOT LIKE THE OTHER THREE
+#
+# The three above all run through REFUSAL CODES. A field that is declared and
+# deliberately unenforced emits no code, so it was invisible to every one of them by
+# construction — not missed, unrepresentable. Four landed that way: `expires` on a
+# decision, `pass took` and a theme's own ids on a cycle, `compares:`/`criterion:` on
+# a comparison record. None appeared in CONTROLS.md, so the document got LESS
+# complete as the repository got more honest, and an assessor starting there could
+# not learn that those fields exist and are unguarded.
+#
+# The set is read from the contracts rather than kept here or kept in the document.
+# A hand-maintained list is what this repository keeps deleting, and this one was
+# already short before anybody maintained it: the issue that asked for this named
+# three of the four.
+#
+# A malformed declaration is REFUSED rather than ignored. The other in-band
+# declarations in this repository fail closed when malformed because a bad
+# declaration leaves the thing it would have exempted unexempted. This one is the
+# other way round — a marker the gate cannot parse would be a declaration with
+# nothing to disclose — so the marker is detected loosely and then checked, which is
+# what keeps it closed.
+#
+# NO NEW SCRIPT, DELIBERATELY. The issue behind this expected an enumerating script
+# and warned that it would itself be a load-bearing script outside the surface
+# `Sideways` builds — the gap CONTROLS.md item 16 records. There is no such script:
+# this is a fourth direction in the gate that already binds this document to the
+# tree, which is already in that surface and already in the exception table. The
+# surface is not widened, so nothing here touches that decision.
+#
 # WHAT THIS DOES NOT CHECK AT ALL
 #
 # That a control's prose describes what its refusal does. This establishes the
@@ -64,6 +97,9 @@ DOC="${1:-$ROOT/CONTROLS.md}"
 CI_FILE="$ROOT/.github/workflows/ci.yml"
 LISTER="$ROOT/bin/list-refusals.sh"
 TAB="$(printf '\t')"
+# Overridable so tests/test_controls.sh can add a declaration to a copy of the
+# contract tree and prove the set is read from there rather than written here.
+CONTRACT_ROOT="${CONTRACT_ROOT:-$ROOT}"
 
 [ -f "$DOC" ] || { printf 'validate-controls: no controls document at %s\n' "$DOC" >&2; exit 2; }
 [ -x "$LISTER" ] || { printf 'validate-controls: cannot run %s\n' "$LISTER" >&2; exit 2; }
@@ -108,6 +144,8 @@ parsed="$(awk -v T="$TAB" '
       sec = "ctrl"; printf "BLK%s%s\n", T, id
     } else if ($0 ~ /^## Refusals and gates no control covers/) {
       sec = "exc"; id = ""
+    } else if ($0 ~ /^## Declarations no gate enforces/) {
+      sec = "dne"; id = ""
     } else {
       sec = ""; id = ""
     }
@@ -137,6 +175,19 @@ parsed="$(awk -v T="$TAB" '
       printf "PRO%s%s%s%s\n", T, id, T, substr(line, RSTART + 1, RLENGTH - 2)
       line = substr(line, RSTART + RLENGTH)
     }
+    next
+  }
+
+  # The disclosure table. Three cells: the declaration, the contract declaring it,
+  # and what is not checked. The separator row has no backtick in its first cell, so
+  # the same guard that keeps it out of the exception table keeps it out of this one.
+  sec == "dne" && /^\|[ \t]*`/ {
+    n = split($0, cell, "|")
+    if (n < 4) next
+    d = trim(cell[2]); gsub(/`/, "", d)
+    p = trim(cell[3]); gsub(/`/, "", p)
+    r = trim(cell[4])
+    printf "DNE%s%s%s%s%s%s\n", T, d, T, p, T, (r ~ /[A-Za-z]/ ? "1" : "0")
     next
   }
 
@@ -329,6 +380,95 @@ done <<EOF
 $(printf '%s\n' "$sites" | awk -F: '{ print $1 ":" $3 }' | sort -u)
 EOF
 
+# --- declared but unenforced: the contracts' set reaches this document ---------
+# Enumerated from the contracts in the tree, the same way the gate surface is, so a
+# declaration added to a contract is read without editing anything here.
+contracts="$(cd "$CONTRACT_ROOT" && ls process/*/*-contract.md 2>/dev/null)"
+if [ -z "$contracts" ]; then
+  printf 'validate-controls: no contracts under %s/process, so the declared-not-enforced set could not be read\n' \
+    "${CONTRACT_ROOT#$ROOT/}" >&2
+  exit 2
+fi
+
+# declared -> one `name<TAB>contract path` per declaration, plus MALFORMED rows
+#
+# A fenced block declares nothing, for the fourth time in this repository: a fenced
+# `rests on: none`, a fenced `DECIDERS.md` row and a fenced `declared-empty` each
+# cost it a defect first. A contract showing a reader the form must not thereby
+# require a disclosure row.
+declared="$(cd "$CONTRACT_ROOT" && awk -v T="$TAB" '
+  FNR == 1 { fence = 0 }
+  /^[ \t]*(```|~~~)/ { fence = !fence; next }
+  fence { next }
+  /<!--[ \t]*declared-not-enforced:/ {
+    line = $0
+    while (match(line, /<!--[ \t]*declared-not-enforced:[^>]*-->/)) {
+      body = substr(line, RSTART, RLENGTH)
+      line = substr(line, RSTART + RLENGTH)
+      sub(/^<!--[ \t]*declared-not-enforced:[ \t]*/, "", body)
+      sub(/[ \t]*-->$/, "", body)
+      # name — reason. The em dash is the separator the dead-pointer and
+      # corrected-claim declarations already use.
+      i = index(body, "—")
+      if (i == 0) { printf "MALFORMED%s%s%s%d%sno separator\n", T, FILENAME, T, FNR, T; continue }
+      name = substr(body, 1, i - 1); reason = substr(body, i + 3)
+      gsub(/^[ \t`]+|[ \t`]+$/, "", name)
+      if (name == "")             { printf "MALFORMED%s%s%s%d%sno name\n", T, FILENAME, T, FNR, T; continue }
+      if (reason !~ /[A-Za-z]/)   { printf "MALFORMED%s%s%s%d%sno reason\n", T, FILENAME, T, FNR, T; continue }
+      printf "OK%s%s%s%s\n", T, name, T, FILENAME
+    }
+    next
+  }
+' $contracts)"
+
+while IFS="$TAB" read -r kind a b c; do
+  [ "${kind:-}" = MALFORMED ] || continue
+  refuse "$DOC" "declaration-malformed" \
+    "$a line $b carries a declared-not-enforced marker this gate cannot read ($c): the form is <!-- declared-not-enforced: name — why nothing enforces it -->, and a marker that cannot be read would be a declaration with nothing to disclose"
+done <<EOF
+$declared
+EOF
+
+disclosed="$(field DNE)"
+
+# Forward: a declaration in a contract is disclosed here, against the contract that
+# declares it. A row naming a different contract is reported as that, because the
+# fix differs from a missing row.
+while IFS="$TAB" read -r kind name path; do
+  [ "${kind:-}" = OK ] || continue
+  if printf '%s\n' "$disclosed" | awk -F"$TAB" -v n="$name" -v p="$path" '$1 == n && $2 == p { f = 1 } END { exit !f }'; then
+    continue
+  fi
+  if printf '%s\n' "$disclosed" | awk -F"$TAB" -v n="$name" '$1 == n { f = 1 } END { exit !f }'; then
+    refuse "$DOC" "declaration-undisclosed" \
+      "\`$name\` is declared not-enforced in $path, and the row disclosing it names a different contract: an assessor following the row reads the wrong file"
+  else
+    refuse "$DOC" "declaration-undisclosed" \
+      "$path declares \`$name\` not enforced and this document does not disclose it. A declared field emits no refusal code, so the other three directions cannot see it — add a row under 'Declarations no gate enforces' naming the declaration, the contract and what is not checked"
+  fi
+done <<EOF
+$declared
+EOF
+
+# Backward: a row here corresponds to a declaration that still exists. This is the
+# failure a hand-maintained list has — it outlives the thing it describes, and a
+# reader cannot tell a stale gap from a real one.
+while IFS="$TAB" read -r name path hasreason; do
+  [ -n "${name:-}" ] || continue
+  [ "${hasreason:-0}" = 1 ] || refuse "$DOC" "declaration-no-reason" \
+    "the row disclosing \`$name\` says nothing about what is not checked: a gap listed without that is the silent exclusion this table exists to replace"
+  printf '%s\n' "$declared" | awk -F"$TAB" -v n="$name" -v p="$path" '$1 == "OK" && $2 == n && $3 == p { f = 1 } END { exit !f }' && continue
+  if [ ! -f "$CONTRACT_ROOT/$path" ]; then
+    refuse "$DOC" "declaration-stale" \
+      "the row disclosing \`$name\` names \`$path\`, which is not a contract in this repository"
+  else
+    refuse "$DOC" "declaration-stale" \
+      "the row disclosing \`$name\` names \`$path\`, and that contract carries no declared-not-enforced marker for it: either the declaration was removed, the field is now enforced, or the name drifted"
+  fi
+done <<EOF
+$disclosed
+EOF
+
 # --- summary ------------------------------------------------------------------
 # The denominator, printed. A gate that checked nothing would also exit 0, and this
 # whole repair is about a check that could not fail.
@@ -336,11 +476,12 @@ nsites="$(printf '%s\n' "$sites" | grep -c .)"
 ncited="$(printf '%s\n' "$parsed" | grep -c "^TAB$TAB")"
 nctrl="$(printf '%s\n' "$controls" | grep -c .)"
 nexc="$(printf '%s\n' "$exceptions" | grep -c .)"
+ndne="$(printf '%s\n' "$declared" | awk -F"$TAB" '$1 == "OK"' | grep -c .)"
 
 if [ "$refusals" -ne 0 ]; then
   printf 'validate-controls: %d refusal(s) across %d controls\n' "$refusals" "$nctrl" >&2
   exit 1
 fi
 
-printf 'validate-controls: %d controls, %d cited refusals, %d emission sites read, %d exception(s)\n' \
-  "$nctrl" "$ncited" "$nsites" "$nexc"
+printf 'validate-controls: %d controls, %d cited refusals, %d emission sites read, %d exception(s), %d declared-not-enforced across %d contract(s)\n' \
+  "$nctrl" "$ncited" "$nsites" "$nexc" "$ndne" "$(printf '%s\n' $contracts | grep -c .)"

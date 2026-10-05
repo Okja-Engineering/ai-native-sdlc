@@ -225,6 +225,11 @@ Two further parts of a cycle are **declared and not yet enforced**, which is a d
 
 A reporting tool is not a gate. `bin/cycle.sh` printing a duration means a reader can see it; nothing refuses a cycle that leaves it out, and the report says so in those words rather than printing a blank.
 
+<!-- declared-not-enforced: pass took — the field exists and the scaffold produces it; no gate reads the value and none refuses a cycle that omits it -->
+<!-- declared-not-enforced: a theme's own ids — the scaffold produces the block and nothing reads it; a finding moved between themes still leaves the accounting set unchanged -->
+
+**The two declarations above are read by `bin/validate-controls.sh`**, which refuses when a declaration here is absent from `CONTROLS.md`. The three other directions of that gate run through refusal codes, and a field nothing enforces emits none — so until 2026-10-04 an honestly declared, deliberately unenforced field could not appear in the document an assessor is told to start from, and none of these did.
+
 ### The problem gate
 
 `validate-define.sh` reads problems as well as cycles, and enforces one check on a problem — the Discover-to-Define edge:
@@ -263,6 +268,11 @@ Each of those is a defensible line and they do not agree with each other. Pickin
 ### Declared, not yet enforced
 
 Nothing checks that a record named `<cycle>.<method>.md` carries `compares:` or `criterion:`, and nothing checks that `compares:` resolves to a cycle over the same source. The four cycle checks do apply, because the gate reads the directory. **What would make gating it right:** one comparison record. The checks worth building are then the ones that follow from the shape it turns out to have — `compares:` resolving to a cycle, both records naming the same `from:` source, and `criterion:` set to something other than empty — and each of those is a guess until there is a record to generalise from.
+
+<!-- declared-not-enforced: compares — nothing checks that a comparison record carries the field, and nothing checks that it resolves to a cycle over the same source -->
+<!-- declared-not-enforced: criterion — the field is declared and has no value here or in any record, and nothing checks either -->
+
+These two are declared the same way as `pass took` above, and for the same reason: `bin/validate-controls.sh` enumerates them so `CONTROLS.md` cannot be short of them.
 
 ### One gap, recorded rather than fixed
 

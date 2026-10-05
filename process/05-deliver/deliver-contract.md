@@ -132,6 +132,10 @@ Eleven of the twenty-three emission sites are the `amends` family — seven dist
 
 **`expires` is declared and not yet enforced**, which is a different state from deferred: the field exists, `bin/next.sh` scaffolds it, `bin/cycle.sh` reports days to the nearest expiry, and no gate reads it. What would make gating it right is a second record carrying it, and the reasoning is above under *`expires`, and why a date in prose was not a tripwire*. A reporting tool is not a gate: the report makes the date visible to a person and refuses nothing.
 
+<!-- declared-not-enforced: expires — no gate reads the field and none refuses a decision whose expiry has passed; bin/cycle.sh reports days to the nearest expiry and a report refuses nothing -->
+
+**The declaration above is read by `bin/validate-controls.sh`.** Until 2026-10-04 the sentence before it was the only record of this anywhere, and `CONTROLS.md` — the document an assessor is told to start from — did not carry it at all. The binding between that document and the gates runs through refusal codes, and a field nothing enforces emits none, so an honest disclosure in prose was unrepresentable there. The marker makes it enumerable; the gate refuses when a declaration here is absent from that document, and when a row there names a declaration this contract no longer carries.
+
 ## Open
 
 1. **Whether a decision needs a review period** before it binds, or takes effect when written.

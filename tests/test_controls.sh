@@ -58,6 +58,137 @@ nctrl="$(printf '%s\n' "$out" | sed -n 's/validate-controls: \([0-9]*\) controls
 [ "${nctrl:-0}" -ge 9 ] && ok=yes || ok=no
 assert_eq "yes" "$ok" "it found every control block (reported ${nctrl:-none})"
 
+ndecl="$(printf '%s\n' "$out" | sed -n 's/.*exception(s), \([0-9]*\) declared-not-enforced.*/\1/p')"
+[ "${ndecl:-0}" -ge 4 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "it found the contracts' declared-not-enforced set (reported ${ndecl:-none})"
+
+# --- the fourth direction: a declaration with no enforcement is still disclosed -
+# The other three directions run through REFUSAL CODES, so anything declared and
+# deliberately unenforced emits no code and is invisible to all three by
+# construction. Three structural declarations landed that way — `expires` on a
+# decision, `pass took` on a cycle, the comparison record's fields — and none
+# appeared in this document. It got less complete as the repository got more honest.
+#
+# A fourth was found while writing this: a theme's own ids, declared in
+# define-contract.md and absent from the hand-written list in the issue. That is the
+# argument for deriving the set rather than keeping it: the hand list was already
+# short before anybody maintained it.
+#
+# So the set is enumerated from the contracts, from an in-band declaration — the
+# `declared-empty` / `not-a-claim` / `dead-pointer` shape this repository already
+# uses — and checked against this document in both directions.
+CONTRACTS="$(ls "$ROOT"/process/*/*-contract.md 2>/dev/null | grep -c .)"
+[ "$CONTRACTS" -ge 4 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "the contracts the gate reads are in the tree (found $CONTRACTS)"
+
+# A declaration this document does not carry is refused. The row is removed from the
+# derived document, so the contract still declares it and nothing discloses it.
+awk '
+  /^\|[ \t]*`expires`[ \t]*\|/ { next }
+  { print }
+' "$DOC" > "$TMP/no-decl-row.md"
+assert_eq "1" "$(( $(grep -c '^|' "$DOC") - $(grep -c '^|' "$TMP/no-decl-row.md") ))" \
+  "the derived document is short exactly one table row"
+out="$(run "$TMP/no-decl-row.md")"; st=$?
+assert_status 1 "$st" "a declared-not-enforced field this document omits is refused"
+assert_contains "$out" "refuse[declaration-undisclosed]" "and the refusal is declaration-undisclosed"
+assert_contains "$out" "expires" "and it names the declaration that is undisclosed"
+
+# And the other direction: a row for something no contract declares is stale. This is
+# the failure a hand-maintained list has — it outlives the thing it describes.
+awk '
+  { print }
+  /^\|[ \t]*`expires`[ \t]*\|/ {
+    print "| `review period` | `process/05-deliver/deliver-contract.md` | nothing reads it |"
+  }
+' "$DOC" > "$TMP/stale-decl-row.md"
+out="$(run "$TMP/stale-decl-row.md")"; st=$?
+assert_status 1 "$st" "a row for a declaration no contract carries is refused"
+assert_contains "$out" "refuse[declaration-stale]" "and the refusal is declaration-stale"
+
+# A row whose `Declared in` cell names the wrong contract is refused, and refused
+# with its own message, because the fix differs from a missing row: an assessor
+# following that row opens a file that says nothing about the field. Both halves of
+# the pair are checked — the forward direction sees a declaration with no matching
+# row, the backward direction sees a row with no matching declaration — so without
+# this case a check comparing names and ignoring paths would pass.
+awk '
+  /^\|[ \t]*`expires`[ \t]*\|/ {
+    n = split($0, c, "|")
+    printf "|%s| `process/03-define/define-contract.md` |%s\n", c[2], c[4]; next
+  }
+  { print }
+' "$DOC" > "$TMP/decl-wrong-contract.md"
+out="$(run "$TMP/decl-wrong-contract.md")"; st=$?
+assert_status 1 "$st" "a disclosure row naming the wrong contract is refused"
+assert_contains "$out" "refuse[declaration-undisclosed]" "the declaration reads as undisclosed"
+assert_contains "$out" "names a different contract" "and the message says that is the problem"
+assert_contains "$out" "refuse[declaration-stale]" "and the row reads as stale against the contract it names"
+
+# A row with no statement of what is unchecked is the silent exclusion this table
+# exists to replace, the same rule the exception table is held to.
+awk '
+  /^\|[ \t]*`expires`[ \t]*\|/ {
+    n = split($0, c, "|"); printf "|%s|%s|   |\n", c[2], c[3]; next
+  }
+  { print }
+' "$DOC" > "$TMP/decl-no-reason.md"
+out="$(run "$TMP/decl-no-reason.md")"; st=$?
+assert_status 1 "$st" "a disclosure row carrying no reason is refused"
+assert_contains "$out" "refuse[declaration-no-reason]" "and the refusal is declaration-no-reason"
+
+# Renaming the heading away does not switch the direction off. The table is found by
+# its heading, so without this the whole direction is disabled by an edit that looks
+# like tidying — the shape of a control an author turns off by omission, which
+# AGENTS.md rules against. Found by attacking this check after writing it.
+sed 's/^## Declarations no gate enforces/## Things worth knowing/' "$DOC" > "$TMP/decl-no-heading.md"
+assert_eq "0" "$(grep -c '^## Declarations no gate enforces' "$TMP/decl-no-heading.md")" \
+  "the derived document no longer carries the heading"
+out="$(run "$TMP/decl-no-heading.md")"; st=$?
+assert_status 1 "$st" "renaming the disclosure heading away refuses rather than disabling the check"
+assert_contains "$out" "refuse[declaration-undisclosed]" \
+  "and every declaration reads as undisclosed"
+
+# --- the declaration is read from the contracts, not from a list here ----------
+# Pinned by adding one to a COPY of the contract tree. The live document cannot
+# disclose it, so it must be refused — which is what shows the set is derived.
+CTR="$TMP/contracts"
+rm -rf "$CTR"; mkdir -p "$CTR"; cp -R "$ROOT/process" "$CTR/"
+printf '\n<!-- declared-not-enforced: review period — nothing reads it, and no record carries one -->\n' \
+  >> "$CTR/process/05-deliver/deliver-contract.md"
+out="$(CONTRACT_ROOT="$CTR" run "$DOC")"; st=$?
+assert_status 1 "$st" "a declaration added to a contract has to reach this document"
+assert_contains "$out" "refuse[declaration-undisclosed]" "and until it does the gate refuses"
+assert_contains "$out" "review period" "and names the new declaration rather than a hardcoded one"
+
+# The converse, so this is not "always refuse": with the declaration removed again
+# the same document passes. Reverting the fixture is the revert step, in the suite.
+rm -rf "$CTR"; mkdir -p "$CTR"; cp -R "$ROOT/process" "$CTR/"
+out="$(CONTRACT_ROOT="$CTR" run "$DOC")"; st=$?
+assert_status 0 "$st" "and with the contract tree unmodified the document passes"
+
+# A declaration inside a FENCED BLOCK declares nothing — the fourth time this
+# repository pays for the same class. A contract showing a reader what the form looks
+# like must not thereby require a disclosure row.
+rm -rf "$CTR"; mkdir -p "$CTR"; cp -R "$ROOT/process" "$CTR/"
+{
+  printf '\n```\n'
+  printf '<!-- declared-not-enforced: review period — this is an example of the form -->\n'
+  printf '```\n'
+} >> "$CTR/process/05-deliver/deliver-contract.md"
+out="$(CONTRACT_ROOT="$CTR" run "$DOC")"; st=$?
+assert_status 0 "$st" "a declaration shown inside a fenced block declares nothing"
+
+# And a malformed declaration fails CLOSED. Without this the direction is open by
+# construction in the other sense: an author who wants no disclosure row writes the
+# marker badly and the gate finds nothing to disclose.
+rm -rf "$CTR"; mkdir -p "$CTR"; cp -R "$ROOT/process" "$CTR/"
+printf '\n<!-- declared-not-enforced: review period -->\n' \
+  >> "$CTR/process/05-deliver/deliver-contract.md"
+out="$(CONTRACT_ROOT="$CTR" run "$DOC")"; st=$?
+assert_status 1 "$st" "a declaration carrying no reason is refused rather than ignored"
+assert_contains "$out" "refuse[declaration-malformed]" "and the refusal is declaration-malformed"
+
 # --- a code emitted by a DIFFERENT gate does not satisfy the control ----------
 # The invariant, stated as the assertion. `undecided-by` is emitted by the deliver
 # gate, so the document-wide union this replaces passed the derived document below.

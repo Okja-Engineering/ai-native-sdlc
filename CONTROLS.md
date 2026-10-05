@@ -6,11 +6,12 @@
 
 **Derived, not designed.** Every control below describes a gate that already exists. None was written as a requirement first.
 
-**What keeps this document in step with the code.** `bin/validate-controls.sh` checks the wiring between the two in three directions, and `tests/test_controls.sh` drives it against this document and against documents built to break it.
+**What keeps this document in step with the code.** `bin/validate-controls.sh` checks the wiring between the two in four directions, and `tests/test_controls.sh` drives it against this document and against documents built to break it.
 
 - **Forward.** Every refusal code a control cites is emitted at an **emission site** — a `refuse` call carrying that code as an argument — in a script that control's own **Enforced by** line names. A code in a comment does not satisfy it, and neither does a code some other gate emits.
 - **Backward.** Every refusal code any gate **in that surface** emits is cited by a control that names that gate, or is listed under *Refusals and gates no control covers* with a reason. The surface is the one *Sideways* describes below, so this direction inherits its limit.
 - **Sideways.** Every script whose **filename matches** `process/*/validate-*.sh` or `bin/validate-*.sh`, plus the two git hooks named literally, is either named by a control or listed there. **The surface is that pattern over the tree, not the tree**, so a gate this document forgets is refused *if it is named like one* — and a script that refuses things under any other name is read by nothing in any of the three directions. This said *"the surface comes from the tree"* until 2026-10-04, which is the sentence an adopter adding a script of their own would rely on. The gap is *what is not controlled*, item 16; widening the enumeration is tracked as an open issue and is not done here.
+- **Declared but unenforced.** Every `<!-- declared-not-enforced: name — reason -->` in `process/*/*-contract.md` is disclosed by a row under *Declarations no gate enforces*, and every row there corresponds to a declaration that still exists. **This direction was missing until 2026-10-04 and its absence was structural, not an oversight:** the three above all run through refusal codes, and a field declared and deliberately unenforced emits no code, so it could not appear in this document at all. Four had landed that way and none was here. The limit is *what is not controlled*, item 17.
 
 **It checks the wiring, not the claim.** That a control cites `not-a-person` and that `process/05-deliver/validate-decision.sh` emits `not-a-person` says nothing about whether the condition behind that code is the condition the Condition column describes. That is a reader's job, and it is where an assessor's time is now worth spending, because everything mechanical about this document is checked and this is not. *What is not controlled*, item 12, states that and four narrower limits.
 
@@ -357,6 +358,26 @@ Two shapes of entry. `the gate itself` means the gate needs no control and none 
 
 ---
 
+## Declarations no gate enforces
+
+**A field a contract declares and nothing checks.** Different from a refusal no control covers, and different again from a check that is deferred: the field exists, the scaffold writes it, a report may print it, and no gate reads it. Each row is a real gap and is here so that an assessor starting at this document learns the field exists and is unguarded.
+
+**Why this table exists rather than the prose it replaces.** The three directions at the top of this document all run through **refusal codes**. A field that is declared and deliberately unenforced emits no code, so it was invisible to every one of them by construction — not overlooked, unrepresentable. Four landed that way across three changes, every one of them honestly marked in its own contract, and not one reached this document. **So this document got less complete as the repository got more honest**, and that is what made question 5 of the self-audit move backwards after it had been answered.
+
+**It is derived, not maintained here.** A contract marks a declaration in band, `<!-- declared-not-enforced: name — why nothing enforces it -->`, and `bin/validate-controls.sh` enumerates them from `process/*/*-contract.md` and refuses in both directions: a declaration this table omits, and a row naming a declaration a contract no longer carries. A hand-kept list is what this repository keeps deleting, and this one was short before anyone kept it — the issue that asked for the table named three of the four.
+
+| Declaration | Declared in | What is not checked |
+|---|---|---|
+| `expires` | `process/05-deliver/deliver-contract.md` | Nothing refuses a decision record that omits the field, and nothing refuses one whose expiry has passed. `bin/cycle.sh` reports days to the nearest expiry, which puts the date in front of a person and refuses nothing. CTRL-1 and CTRL-2 are unaffected: both read a decided record regardless. |
+| `pass took` | `process/03-define/define-contract.md` | Nothing refuses a cycle that omits it and nothing reads the value, so a cycle can claim any duration or none. Deliberate: no artifact carries the field yet, and gating an invented shape is designing the contract up front. |
+| `a theme's own ids` | `process/03-define/define-contract.md` | The scaffold writes the block and nothing reads it. This is the mechanism CTRL-4's item 1b gap would need: a finding moved between themes leaves the accounting set unchanged, so CTRL-4 cannot see it. |
+| `compares` | `process/03-define/define-contract.md` | Nothing refuses a comparison record that omits the field, and nothing checks that it resolves to a cycle over the same source — so two records could claim to compare and read different findings files. |
+| `criterion` | `process/03-define/define-contract.md` | The field is declared and has no value, here or in any record, and nothing checks either. What *"closely"* means is the owner's to set; the two readings the decision names point at opposite answers. |
+
+**What this table does not establish.** That the list of gaps is complete — only that the gaps the contracts *declare* are all here. A field nobody declared anywhere is outside this the same way a script nobody named like a gate is outside *Sideways*; see *what is not controlled*, items 16 and 17.
+
+---
+
 ## What is not controlled
 
 The section an assessor should read first. Each of these is a real gap, not a formality.
@@ -498,16 +519,26 @@ The surface is `ls process/*/validate-*.sh bin/validate-*.sh` plus two hooks nam
 
 ```
 $ bash bin/list-refusals.sh bin/next.sh
-bin/next.sh:149:?
+bin/next.sh:163:?
 $ n=validate-next.sh; cp bin/next.sh "bin/$n"
 $ bash bin/validate-controls.sh 2>&1 | sed -n 's/.*\(refuse\[[a-z-]*\]\).*/\1/p'
 refuse[site-unreadable]
 refuse[uncontrolled-gate]
 ```
 
+**That transcript said `bin/next.sh:149:?` until 2026-10-04, and the command prints `:163`.** Line 149 is `wrap_ids "$5"`; 163 is the `refuse` call the item is about. It is in the one section this document invites a reader to verify by running, and an auditor found it rather than a test. `tests/test_doc_claims.sh` now runs every transcribed `bin/list-refusals.sh` command in every tracked document and compares its output to what the document shows, so a drifted transcript is a test failure. Nothing is pinned in the suite — the expected value is produced by running the command.
+
 Nothing about the file changed, and the copy is named through a variable above so this document does not claim a path it does not have. Three more tracked scripts sit outside the surface — `bin/cycle.sh`, `bin/list-refusals.sh` and `process/01-scan/findings-ids.sh` — and the last two are load-bearing: `validate-define.sh` exits 2 without the harvester, and this gate exits 2 without the lister. Neither is named by a control or listed in the exception table.
 
 **The two denominators also disagree.** `bin/list-refusals.sh`'s own header says the document check and the mutation sweep have to agree about what a site is, because a guard invisible to both at once is how an untested refusal shipped. The sweep's surface carries `bin/list-refusals.sh` and this gate's does not, so they differ by one script today.
 
 **Both directions are asserted in `tests/test_controls.sh`**, so this is recorded as a gap and cannot be read as coverage: a refusing script outside the pattern is not noticed, the same file inside it is refused, and the refusal lister reads both — which is what shows that the enumeration rather than the lister is what excludes it. Widening the enumeration is a deliberate change tracked as its own open issue and is not done here: a wider surface makes every tracked script something this document has to account for. **Fewer claims honestly enforced is the trade.**
+
+**17. Whether a gap nobody declared is a gap at all.** *Declarations no gate enforces* is complete with respect to the declarations the contracts **make**. A field that exists, is unenforced, and that nobody marked in band is outside it — the same shape as item 16, one level up: there the enumeration is a filename pattern, here it is an author writing a marker.
+
+**The enumeration is `process/*/*-contract.md` and nothing else**, which is the narrower half of the same limit and is checkable rather than inferred: a `declared-not-enforced` marker written into a topic, a findings file, a README or this document is read by nothing. That boundary is deliberate — a contract is where a field's shape is declared, so it is where the absence of a check belongs — and it means a declaration in the wrong file is silent rather than refused.
+
+What this is not is the state it replaced. Before 2026-10-04 an honest prose disclosure in a contract could not reach this document at all, because the binding ran through refusal codes and an unenforced field emits none; four declarations sat in two contracts and none was here. So the gap moved from *structurally unrepresentable* to *dependent on an author marking it*, which is a weaker claim than enforcement and a stronger one than nothing. The closing move would be to require a declaration for every field a contract names and no gate reads — which means enumerating the fields a contract names, and that is a shape no gate here reads today. It is not done, and saying so is the point of this item.
+
+The same limit as the other declarations in this repository applies, and *what is not controlled*, item 15, already states it for two of them: the gate checks that a declaration is present and carries a reason, never that the reason is true.
 
