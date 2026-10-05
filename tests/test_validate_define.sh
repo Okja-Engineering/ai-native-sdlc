@@ -690,6 +690,29 @@ assert_contains "$out" "refuse[invented-accounting]" "an invented id over a quie
 assert_not_contains "$out" "not accounted for:  " \
   "and no refusal fires naming nothing"
 
+# Three attacks on the repaired check rather than on the finding, none of which got
+# through — recorded because each is a way the declaration could have been reached by
+# accident, and the first two are the class this repository has paid for repeatedly.
+cyc="$(define_fixture "$TMP/fencedacct" "" 0)"
+mutate "$cyc" 's|<!-- accounting:ids -->\n(.*?)\n<!-- /accounting:ids -->|<!-- accounting:ids -->\n```\n$1\n```\n<!-- /accounting:ids -->|s' \
+  "put the declared-empty accounting set inside a fenced block"
+assert_contains "$(anchor_gate "$cyc")" "refuse[no-accounting]" \
+  "a declared-empty set inside a fenced block declares nothing"
+
+cyc="$(define_fixture "$TMP/outsideacct" "" 0)"
+mutate "$cyc" 's|<!-- accounting:ids -->\n<!-- declared-empty:[^>]*-->\n<!-- /accounting:ids -->|<!-- declared-empty: a declaration outside the block -->\n\n<!-- accounting:ids -->\n<!-- /accounting:ids -->|s' \
+  "move the declaration out of the accounting block into the section around it"
+assert_contains "$(anchor_gate "$cyc")" "refuse[no-accounting]" \
+  "a declaration beside the block does not declare the set inside it empty"
+
+# And a declaration next to a real set changes nothing: the ids are present and
+# complete, so there is nothing for the declaration to excuse.
+cyc="$(define_fixture "$TMP/declplusids" "3 2" 1)"
+mutate "$cyc" 's|(<!-- accounting:ids -->\n)|$1<!-- declared-empty: a declaration beside a real set -->\n|s' \
+  "add a declared-empty declaration alongside a complete id set"
+out="$(anchor_gate "$cyc")"; rc=$?
+assert_status 0 "$rc" "a declaration beside a complete set leaves the record within the contract"
+
 # The baseline. Nothing below means anything if this does not pass.
 cyc="$(define_fixture "$TMP/anchor_base" "3 2" 1)"
 out="$(anchor_gate "$cyc")"; rc=$?

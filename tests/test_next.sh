@@ -407,17 +407,19 @@ assert_file_exists "$t/process/03-define/cycles/2026-12-01.md" "the tree now hol
 assert_file_exists "$t/process/03-define/problems/agent-pr-approval.md" \
   "and cycle one's problem for that slug is still there"
 
-out="$(run "$t" 2026-12-01 agent-pr-approval)"; rc=$?
-assert_not_contains "$out" "Nothing missing" \
-  "a slug whose artifacts belong to another cycle is not complete for this one"
-
 # The two tools have to agree, which is the assertion that stops them diverging again.
+# `cycle.sh` is read BEFORE `next.sh` runs, because next.sh writes: reading it after
+# would be comparing the two tools across a change to the tree.
 cyc_out="$( cd "$t" && /bin/bash bin/cycle.sh 2>&1 )"
 section="$(printf '%s\n' "$cyc_out" | awk '/^2026-12-01$/ { i = 1; next } i && /^[0-9]{4}-/ { exit } i')"
 assert_contains "$section" "problems  0 stated" \
   "bin/cycle.sh reports no problem stated for the second cycle"
+
+out="$(run "$t" 2026-12-01 agent-pr-approval)"; rc=$?
 assert_not_contains "$out" "Nothing missing" \
-  "and bin/next.sh agrees rather than contradicting it"
+  "a slug whose artifacts belong to another cycle is not complete for this one"
+assert_not_contains "$out" "Nothing missing" \
+  "so bin/next.sh agrees with bin/cycle.sh rather than contradicting it"
 
 # And it produces the artifact, qualified by the cycle so it cannot collide.
 made="$t/process/03-define/problems/2026-12-01.agent-pr-approval.md"
@@ -446,5 +448,25 @@ assert_contains "$out" "2026-12-01.agent-pr-approval.md" \
 out="$(run "$t" 2026-09-29 producing-themes)"; rc=$?
 assert_status 0 "$rc" "the first cycle is still complete"
 assert_contains "$out" "Nothing missing" "and still says so"
+
+# A slug that exists for no cycle keeps the PLAIN name. The qualifier is added only
+# when it is needed to say which of two things this is, so nothing in the tree is
+# renamed and a first occurrence reads the way the two shipped problems do.
+t="$(second_cycle newslug)"
+out="$(run "$t" 2026-12-01 brand-new-theme)"
+assert_file_exists "$t/process/03-define/problems/brand-new-theme.md" \
+  "a slug new to the tree is written under its plain name"
+assert_eq "0" "$(ls "$t"/process/03-define/problems/2026-12-01.brand-new-theme.md 2>/dev/null | grep -c .)" \
+  "and not under a cycle-qualified one"
+
+# And asking for the other cycle's slug does not resolve to it. Found by attacking the
+# repaired resolution: matching the cycle alone returns whichever of that cycle's
+# problems sorts first, which is a different wrong answer from the one being fixed.
+t="$(second_cycle crossslug)"
+out="$(run "$t" 2026-09-29 producing-themes)"
+assert_contains "$out" "problems/producing-themes.md" \
+  "a request for one slug resolves to that slug and not to a sibling of the same cycle"
+assert_not_contains "$out" "problems/agent-pr-approval.md" \
+  "which is a different wrong answer from the one this replaces"
 
 assert_done

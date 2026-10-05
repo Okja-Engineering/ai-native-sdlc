@@ -281,12 +281,74 @@ if [ -z "$slug" ]; then
   exit 0
 fi
 
-problem="process/03-define/problems/$slug.md"
-options="process/04-develop/options/$slug.md"
-decision="process/05-deliver/decisions/$slug.md"
+# --- AN ARTIFACT BELONGS TO A (CYCLE, SLUG), NOT TO A SLUG ---------------------
+#
+# These three paths were `problems/$slug.md`, `options/$slug.md` and
+# `decisions/$slug.md`. With a second cycle on disk, `bin/next.sh <new-cycle>
+# <existing-slug>` reported "Nothing missing" because cycle one's three artifacts
+# satisfied the chain — while `bin/cycle.sh` reported `problems 0 stated` for the same
+# cycle at the same moment. Two tools contradicting each other, and the one a person
+# follows was the wrong one.
+#
+# It is the normal path rather than a contrivance. `define-contract.md` open question 2
+# contemplates a theme recurring next month as the same theme, and the
+# `producing-themes` decision schedules a successor for 2026-11-30 — which was
+# unrepresentable for the same reason. Neither is reachable at n=1.
+#
+# RESOLVED BY THE DECLARED LINKS, NOT BY A NAME. A problem belongs to this cycle when
+# its `from:` names this cycle — the test the problem count above already uses, and the
+# one bin/cycle.sh uses. Options belong to that problem when their `problem:` links
+# that file, and a decision likewise. So the chain is followed rather than guessed from
+# a filename, which is what makes the two tools agree.
+#
+# A RECURRENCE IS WRITTEN CYCLE-QUALIFIED. The first occurrence of a slug keeps the
+# plain name, so the two shipped problems are untouched and nothing changes until a
+# theme actually recurs; a second one is `<cycle>.<slug>.md`. That is the same
+# qualifier `cycles/<cycle>.<method>.md` already uses for a comparison cycle: added
+# only when it is needed to say which of two things this is.
 
-if [ ! -f "$problem" ]; then
+# belongs_to <artifact> <field> <target> -> 0 if the field's link names the target
+#
+# Matched on the path fragment rather than on the bare basename, because a mention is
+# not a link — the lesson the `amends` check paid for twice.
+belongs_to() { grep -q "$2: .*$3" "$1" 2>/dev/null; }
+
+# find_for <dir> <field> <target fragment> -> the one artifact in dir that links it
+find_for() {
+  local a
+  for a in "$1"/*.md; do
+    [ -f "$a" ] || continue
+    belongs_to "$a" "$2" "$3" && { printf '%s' "$a"; return 0; }
+  done
+  return 1
+}
+
+# problem_for <cycle> <slug> -> the problem belonging to that PAIR
+#
+# Both halves are required. Matching the cycle alone returns whichever problem is
+# alphabetically first among that cycle's — `agent-pr-approval` for a request about
+# `producing-themes` — and matching the slug alone is the defect this replaces.
+problem_for() {
+  local a b
+  for a in process/03-define/problems/*.md; do
+    [ -f "$a" ] || continue
+    b="$(basename "$a" .md)"
+    [ "$b" = "$2" ] || [ "$b" = "$1.$2" ] || continue
+    belongs_to "$a" from "cycles/$1.md" && { printf '%s' "$a"; return 0; }
+  done
+  return 1
+}
+
+# new_path <dir> <slug> -> where a new artifact for this cycle goes
+new_path() {
+  if [ -e "$1/$2.md" ]; then printf '%s/%s.%s.md' "$1" "$cycle" "$2"
+  else printf '%s/%s.md' "$1" "$2"; fi
+}
+
+problem="$(problem_for "$cycle" "$slug" || true)"
+if [ -z "$problem" ]; then
   c="process/03-define/define-contract.md"
+  problem="$(new_path process/03-define/problems "$slug")"
   write_once "$problem" emit "$c" "Problem — $slug" \
 "from: [\`$define\`](../cycles/$cycle.md)
 status: defined, not solved" \
@@ -295,25 +357,34 @@ status: defined, not solved" \
 fi
 
 # --- develop ------------------------------------------------------------------
-if [ ! -f "$options" ]; then
+pbase="$(basename "$problem")"
+options="$(find_for process/04-develop/options problem "problems/$pbase" || true)"
+if [ -z "$options" ]; then
   c="process/04-develop/develop-contract.md"
+  options="$(new_path process/04-develop/options "$slug")"
   write_once "$options" emit "$c" "Develop — $slug" \
-"problem: [\`$problem\`](../../03-define/problems/$slug.md)
+"problem: [\`$problem\`](../../03-define/problems/$pbase)
 status: options developed, none chosen"
   exit 0
 fi
 
 # --- deliver ------------------------------------------------------------------
-if [ ! -f "$decision" ]; then
+obase="$(basename "$options")"
+decision="$(find_for process/05-deliver/decisions problem "problems/$pbase" || true)"
+if [ -z "$decision" ]; then
   c="process/05-deliver/deliver-contract.md"
+  decision="$(new_path process/05-deliver/decisions "$slug")"
   write_once "$decision" emit "$c" "Decision — $slug" \
-"problem: [\`$problem\`](../../03-define/problems/$slug.md)
-options: [\`$options\`](../../04-develop/options/$slug.md)
+"problem: [\`$problem\`](../../03-define/problems/$pbase)
+options: [\`$options\`](../../04-develop/options/$obase)
 chosen: pending"
   exit 0
 fi
 
-printf 'Nothing missing for %s/%s.\n' "$cycle" "$slug"
+# The files are NAMED, because "Nothing missing" over another cycle's artifacts is
+# exactly the failure this section exists to stop, and a reader could not see it.
+printf 'Nothing missing for %s/%s:\n' "$cycle" "$slug"
+printf '  %s\n  %s\n  %s\n' "$problem" "$options" "$decision"
 chosen=$(sed -n 's/^chosen:[[:space:]]*//p' "$decision" | head -1)
 case "$chosen" in
   ""|pending|none) printf '\n%s is AWAITING A HUMAN. That one is not mine to write.\n' "$decision" ;;

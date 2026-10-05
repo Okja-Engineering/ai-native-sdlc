@@ -396,7 +396,16 @@ assert_not_contains "$OUT" "would be a first run" \
 
 # And the count it reports is the number of files, with the wording to match. The
 # plural helper is a comparison too, and nothing read its output.
-assert_contains "$OUT" "2 files within the contract" \
+#
+# DERIVED FROM THE DIRECTORY, not written out. This asserted the literal "2 files"
+# and went red the first time a third cycle existed — a suite pinned to the current
+# size of the tree, which is the thing that makes recording the next cycle look like
+# a defect. It is exactly the state #109 is about: a quiet month is a normal thing to
+# record, and a test that refuses it is worse than no test.
+nfind="$(ls "$ROOT"/process/01-scan/findings/*.md 2>/dev/null | grep -c .)"
+[ "$nfind" -ge 2 ] && ok=yes || ok=no
+assert_eq "yes" "$ok" "the real findings directory holds cycles to count (found $nfind)"
+assert_contains "$OUT" "$nfind files within the contract" \
   "the summary counts the files it checked and agrees with itself about the plural"
 one="$TMP/one-cycle"
 mkdir -p "$one" && cp "$WITH_FINDINGS" "$one/"

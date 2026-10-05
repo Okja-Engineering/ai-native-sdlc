@@ -126,7 +126,7 @@ Signing for decision commits is **not configured**, and configuring it belongs t
 
 | Refusal | Condition |
 |---|---|
-| `no-accounting` | no `accounting:ids` block, so there is nothing to compare |
+| `no-accounting` | no `accounting:ids` block at all, or a block that declares no ids and does not declare itself empty |
 | `unaccounted` | a finding in the source the block does not list |
 | `invented-accounting` | an id accounted for that is not in the source |
 | `duplicate-accounting` | an id listed twice |
@@ -143,6 +143,8 @@ Signing for decision commits is **not configured**, and configuring it belongs t
 **Evidence.** The counts reconcile against the source artifact, which is linked and resolvable. This control caught a real defect before it was mechanised: a draft that grouped 54 of 64 findings and reported three wrong counts, where the ten strays included a pattern nobody had named.
 
 **Evidence note.** The accounting is a **set comparison by id**, not arithmetic. It was a total until 2026-10-03, when an external audit broke it two ways — lowercasing a finding's first letter removed it from the denominator, and two theme counts could move in opposite directions with the total reconciling.
+
+**Evidence note, a quiet cycle.** A cycle over a scan marked `nothing found: yes` accounts for **zero** findings, and until 2026-10-05 that record had no passing state at all: this gate read an empty declared id set and an absent block as the same thing, so every body for the block drew `no-accounting`, and the only route to a non-empty set was to invent an id. `.github/workflows/ci.yml` runs this gate over the directory, so **recording one quiet month would have made every branch red permanently** — the control would have forbidden a state the scan contract protects deliberately. A set of zero now declares itself in band inside the block, `<!-- declared-empty: reason -->`, the same form CTRL-7 and the outlier section use; an absent block is still refused and the message says which of the two it is. The declaration does not excuse a cycle that has findings: a zero set against a source of sixty-four leaves all sixty-four named by `unaccounted`, so nothing about this control is weaker. It was found by building the second cycle, not by reading the gate.
 
 **Evidence note, the outlier section.** `define-contract.md` calls Outliers the load-bearing section, and the refusal that makes it load-bearing was a search of the section's prose for one of three short words until 2026-10-04. The section's own explanation of why outliers matter uses one of those words twice, so for cycle `2026-09-29` that refusal could never fire: deleting all three outliers left the section satisfying its own emptiness check. An empty section now declares itself empty in band and with a reason, `<!-- declared-empty: reason -->`, the same form CTRL-7 requires of an empty open section. The limit of it is *What is not controlled*, item 15.
 
