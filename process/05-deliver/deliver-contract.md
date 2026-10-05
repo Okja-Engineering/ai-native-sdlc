@@ -2,7 +2,7 @@
 
 **Status:** derived alongside the first decision record. This said the record was drafted first; git shows the contract committed one second earlier, so the two were produced as one batch and the order is unverifiable from the repository. Stated that way rather than left as a claim git contradicts.
 
-**The one gate the contract named is now built.** See *The gate* at the end.
+**The one gate the contract named is now built, and one field is declared and not yet enforced.** See *The gate* at the end.
 
 ## What Deliver is for
 
@@ -27,7 +27,22 @@ Not "the team." Not "it was agreed." A name. This is the one place in four phase
 | `chosen` | the option id, or `pending` while it waits for a person |
 | `decided_by` | a named human. **Not an agent, not a role, not "the team"** |
 | `dated` | when the person decided, not when the record was drafted |
+| `expires` | when this decision expires, as `YYYY-MM-DD` — or `none` with the reason it does not. **Declared, not yet enforced** |
 | `amends` | the claim this decision changes — the document, **linked**, carrying the `#anchor` of the heading that holds the claim — or `none` with the reason nothing changed |
+
+### `expires`, and why a date in prose was not a tripwire
+
+**Added because the only open decision in this repository set itself a deadline that nothing could read.** `producing-themes` chose to wait and measure, and the record is explicit that what makes that a choice rather than drift is the tripwire attached to it — *"F without one is indistinguishable from the thing it fails at."* The date was in one prose sentence. No contract declared an expiry, no script read the date, and the condition the record relied on to stay honest was going to be remembered or lost. *What would reverse this* was already a required section; what it lacked was a field.
+
+**The form is a plain `YYYY-MM-DD` date.** Not a duration, not "in two cycles": a date is what a person can check against a calendar without knowing when the record was written, and it is what the only record that has one already says. `none` plus the reason is the other valid value, and it is expected to be the ordinary one, because most decisions are not waiting on anything. Bare `none` is refused by the same reasoning as `amends: none` and `rests on: none`: on its own it cannot be told apart from the field being forgotten.
+
+**Only one of the two shipped records carries the field.** `producing-themes` was backfilled, because its expiry was already stated in its own prose and the field only makes that readable — the same move as adding the `id` column to a findings file. `agent-pr-approval` carries nothing: whether that decision expires, and the reason if it does not, is the decider's judgement and not a structural edit, so it is left for them rather than guessed at here. A reader should not take the absence as a declaration.
+
+**An expiry is not the only reversal condition, and it is not meant to be.** The `producing-themes` record also reverses on a missed cycle and on the finding rate roughly doubling, neither of which is a date. This field makes the dated part machine-readable; *What would reverse this* goes on carrying the rest in prose, because a condition like "the comparison test comes back strongly either way" is a judgement and writing it as a field would be pretending otherwise.
+
+**Declared, not yet enforced.** `bin/next.sh` scaffolds it — it reads this table, so it needed no edit — and `bin/cycle.sh` reports days to the nearest expiry alongside days since the last scan, which is the part that puts the tripwire in front of a person. Nothing refuses a decision that omits the field, and nothing refuses one whose expiry has passed.
+
+**What would make gating it right.** A second decision carrying the field. One record cannot show whether `expires` is a field every decision wants or a field this decision wanted: `agent-pr-approval` would write `none` and the next real expiry has not been written yet. When two records carry it, the gate worth building is the one in the same shape as the rest of this contract's checks — the field is declared, a date parses, and a bare `none` is refused — and a report that an expiry has passed is a separate question, because refusing an expired decision would refuse the record that is telling the truth about itself.
 
 ### `amends`, and why Update is not a sixth phase
 
@@ -100,6 +115,8 @@ That is mechanical, cheap, and guards the only thing in the repository that cann
 **Built**, as `validate-decision.sh`, with two companions that are equally shape-independent: a chosen option must exist in the option set it claims to choose from, and a decided record must be dated. A `decided_by` naming a role, a team or a model is refused as not a person.
 
 Every refusal carries its own message and is asserted by that message in `tests/test_validate_decision.sh`. Everything else about Deliver's shape still waits for a second decision.
+
+**`expires` is declared and not yet enforced**, which is a different state from deferred: the field exists, `bin/next.sh` scaffolds it, `bin/cycle.sh` reports days to the nearest expiry, and no gate reads it. What would make gating it right is a second record carrying it, and the reasoning is above under *`expires`, and why a date in prose was not a tripwire*. A reporting tool is not a gate: the report makes the date visible to a person and refuses nothing.
 
 ## Open
 
