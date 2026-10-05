@@ -203,9 +203,10 @@ assert_status 1 "$st" "a code cited by a control naming a different gate is refu
 assert_contains "$out" 'emits refusal `no-method`' "and the gate that emits it is reported as unclaimed"
 
 # --- sideways: a gate no control names ----------------------------------------
-# The surface is enumerated from the tree. Both hooks were missing from this
-# document until an external audit found them, and nothing reading only the
-# document could have noticed.
+# The surface is a filename pattern over the tree — see the cases further down for
+# what that does and does not cover. Both hooks were missing from this document
+# until an external audit found them, and nothing reading only the document could
+# have noticed.
 awk '{ gsub(/`process\/02-discover\/validate-discovery.sh`/, "`process/02-discover/validate-discovery.sh `"); print }' \
   "$DOC" > "$TMP/unnamed-gate.md"
 out="$(run "$TMP/unnamed-gate.md")"; st=$?
@@ -243,6 +244,68 @@ assert_contains "$out" "refuse[uncontrolled-gate]" "and the gate it was meant to
 nexc="$(printf '%s\n' "$(run "$DOC")" | sed -n 's/.*read, \([0-9]*\) exception.*/\1/p')"
 [ "${nexc:-0}" -ge 1 ] && ok=yes || ok=no
 assert_eq "yes" "$ok" "the document declares at least one exception (reported ${nexc:-none})"
+
+# --- what the Sideways surface actually is ------------------------------------
+# CONTROLS.md used to say *"the surface comes from the tree"*. It is
+# `ls process/*/validate-*.sh bin/validate-*.sh` plus two hooks named literally, so
+# the filename is what decides whether a script is asked about at all. A reviewer
+# added a script emitting a refusal no control claims, under a name outside the
+# pattern, and every suite stayed green.
+#
+# Both directions are asserted, and the pair is the point. The limit on its own
+# would be satisfied by a gate that checks nothing; the rename on its own would read
+# as coverage. Recording a limit as a limit is the same move that keeps
+# bin/validate-claims.sh from being mistaken for enforcement of the speed rule.
+#
+# A TREE COPY, because the gate resolves its surface relative to its own location
+# and nothing can point it elsewhere. That is itself part of what is being recorded.
+tree="$TMP/tree"
+mkdir -p "$tree"
+for d in bin process .githooks .github; do cp -R "$ROOT/$d" "$tree/"; done
+cp "$ROOT/CONTROLS.md" "$tree/CONTROLS.md"
+sideways() { /bin/bash "$tree/bin/validate-controls.sh" 2>&1; }
+
+# The control first: the shipped document passes against the copied tree, so a
+# refusal below is the script that was added and not the copy.
+sideways >/dev/null 2>&1
+assert_status 0 "$?" "the copied tree passes, so the cases below are about what is added to it"
+
+# A script ALREADY IN THE TREE, under a name the pattern matches. Nothing about the
+# file changes — bin/next.sh carries a `refuse` call at line 149 today — so the
+# filename is demonstrably the only thing that decided.
+cp "$tree/bin/next.sh" "$tree/bin/validate-next.sh"
+out="$(sideways)"; st=$?
+assert_status 1 "$st" "a script already in the tree is refused once its name matches the pattern"
+assert_contains "$out" "refuse[uncontrolled-gate]" "and it is reported as a gate no control names"
+assert_contains "$out" "refuse[site-unreadable]" "and its refusal call is reported as unreadable"
+rm -f "$tree/bin/validate-next.sh"
+
+# And the gap, asserted as a gap. The same kind of script under any other name is
+# not noticed, however loudly it refuses.
+cat > "$tree/bin/check-smuggled.sh" <<'SMUG'
+#!/usr/bin/env bash
+set -u
+refuse() { printf '%s: refuse[%s]: %s\n' "$1" "$2" "$3" >&2; }
+refuse "$0" "smuggled-guard" "a refusal no control in this document claims"
+exit 1
+SMUG
+chmod +x "$tree/bin/check-smuggled.sh"
+out="$(sideways)"; st=$?
+assert_status 0 "$st" \
+  "a refusing script named outside the pattern is not noticed — the gap, recorded as one"
+assert_not_contains "$out" "smuggled-guard" "and its refusal is reported by nothing"
+
+# What excludes it is the surface and not the lister, which reads it perfectly well.
+# Without this the two assertions above would not say where the gap is.
+assert_contains "$(bash "$ROOT/bin/list-refusals.sh" "$tree/bin/check-smuggled.sh")" \
+  "smuggled-guard" "the refusal lister does read it, so the enumeration is what excludes it"
+
+# The same file renamed, so the two halves differ by nothing but the name.
+mv "$tree/bin/check-smuggled.sh" "$tree/bin/validate-smuggled.sh"
+out="$(sideways)"; st=$?
+assert_status 1 "$st" "the same file renamed into the pattern is refused"
+assert_contains "$out" "smuggled-guard" "and its refusal is now reported as claimed by no control"
+rm -f "$tree/bin/validate-smuggled.sh"
 
 # --- a document the gate cannot read must not report clean -------------------
 # Exit 2 is "could not run". Exit 0 on a document with no controls would make every
