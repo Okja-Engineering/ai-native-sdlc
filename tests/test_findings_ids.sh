@@ -184,4 +184,51 @@ assert_eq "$accounted" "$(printf '%s' "$live_ids" | tr ' ' '\n' | sort | tr '\n'
 [ -n "$accounted" ] && any=yes || any=no
 assert_eq "yes" "$any" "and that comparison ran against a non-empty set"
 
+# --- a displayed declaration declares nothing, and this harvester decides which cell
+#
+# This script reads the contract's `columns` block to learn which cell an id comes out
+# of, and it had no fence awareness at all. Three loosenings of it — reading the
+# contract raw, unioning a second block, reading the findings table raw — were caught
+# by NOTHING, which is how these cases came to exist.
+#
+# The stakes here are higher than in the gate it feeds: the answer is a column
+# POSITION, so a displayed block that reorders the columns moves every id silently.
+CONTRACT="$ROOT/process/01-scan/findings-contract.md"
+
+# One real row, and a second `columns` block displayed four ways, each declaring a
+# different order. The harvest must be unchanged by all four.
+write_findings "$TMP/disp.md" "$(row F01 'a thing')"
+expected="$(ids "$TMP/disp.md")"
+assert_eq "F01" "$expected" "the baseline harvest reads the id from the declared cell"
+
+for form in backtick-fence tilde-fence html-comment indented-block; do
+  c="$TMP/contract-$form.md"
+  cp "$CONTRACT" "$c"
+  { printf '\nFor a reader, the block looks like this:\n\n'
+    case "$form" in
+      backtick-fence) printf '```\n<!-- contract:columns -->\n- `what`\n- `id`\n<!-- /contract:columns -->\n```\n' ;;
+      tilde-fence)    printf '~~~\n<!-- contract:columns -->\n- `what`\n- `id`\n<!-- /contract:columns -->\n~~~\n' ;;
+      html-comment)   printf '<!-- the block, for a reader:\n<!-- contract:columns -->\n- `what`\n- `id`\n<!-- /contract:columns -->\nand no more. -->\n' ;;
+      indented-block) printf '\n    <!-- contract:columns -->\n    - `what`\n    - `id`\n    <!-- /contract:columns -->\n\n' ;;
+    esac
+  } >> "$c"
+  assert_eq "F01" "$(FINDINGS_CONTRACT="$c" ids "$TMP/disp.md")" \
+    "a columns block displayed in a $form does not move which cell an id comes from"
+done
+
+# A SECOND REAL BLOCK IS A REFUSAL TO RUN, not a merge. Two declarations of one column
+# order cannot both be the rule, and the union of them is nobody's declaration.
+c="$TMP/contract-two.md"; cp "$CONTRACT" "$c"
+printf '\n<!-- contract:columns -->\n- `what`\n- `id`\n<!-- /contract:columns -->\n' >> "$c"
+out="$(FINDINGS_CONTRACT="$c" /bin/bash "$HARVEST" "$TMP/disp.md" 2>&1)"; rc=$?
+assert_status 2 "$rc" "a second columns block makes the harvester refuse to run"
+assert_contains "$out" "more than one block" "and the message says which problem it is"
+
+# The findings TABLE is read in a rendering context too, or a fenced example row
+# donates ids that are not in the record.
+write_findings "$TMP/fencedrow.md" "$(row F01 'a thing')"
+printf '\n```\n| F99 | an example row | https://example.com | 2026-01-01 | practice-change | build (guess) | low |\n```\n' \
+  >> "$TMP/fencedrow.md"
+assert_eq "F01" "$(ids "$TMP/fencedrow.md")" "a fenced example row donates no id"
+
 assert_done

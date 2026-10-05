@@ -519,7 +519,54 @@ assert_contains "$(cat "$ROOT/process/03-define/define-contract.md")" '<!-- scaf
   'the Define contract still carries the scaffold marker next.sh substitutes'
 
 # ==============================================================================
-# 10 · the denominator, printed
+# 10 · the reading itself, where the loosening sweep found nothing watching
+# ==============================================================================
+# Five sites in bin/lib-rendering.sh survived a loosening with every suite green, so
+# they are pinned here. Each is a line of that file whose repair nothing proved.
+
+# A NESTED `<!--` INSIDE A KEPT COMMENT. HTML comments do not nest, so in
+# `<!-- see <!-- declared-empty: x --> -->` the comment a browser ends at the FIRST
+# `-->` and everything after it is text. A per-line regex reads the inner part as a
+# real declaration unless the second opener is neutralised.
+assert_eq 'not honoured' \
+  "$(p_discover_open '<!-- an aside about the form, which mentions <!-- declared-empty: a reason --> and stops there -->')" \
+  'a declaration nested inside another comment declares nothing'
+
+# A CLOSING FENCE CARRIES NOTHING BUT ITS OWN RUN. Loosening that closes the block at
+# the first line that merely starts with the fence character, so the lines below it
+# become content again — which is the direction that opens a hole.
+assert_eq 'not honoured' \
+  "$(p_discover_open "$(printf '```\n```markdown is not a closing fence\n%s\n```\n' "$DECL_EMPTY")")" \
+  'a fence is not closed by a line that carries an info string'
+
+# BOTH PROJECTIONS PRESERVE THE LINE COUNT, over a file carrying a multibyte
+# character, which is what broke the macOS CI leg: macOS awk under a UTF-8 locale cuts
+# inside a multibyte character and aborts, and a 105-line view came back as 5 lines.
+MB="$TMP/multibyte.md"
+printf '# A record\n\nrests on: none — a reason with an em dash in it\n\nand a line after it.\n' > "$MB"
+assert_eq 5 "$(rendered_lines_file "$MB" | awk 'END { print NR }')" \
+  'the line projection of a file carrying a multibyte character keeps every line'
+assert_eq 5 "$(rendered_spans_file "$MB" | awk 'END { print NR }')" \
+  'and so does the span projection'
+assert_contains "$(rendered_lines_file "$MB")" 'rests on: none' \
+  'and the field on the line with the em dash is still readable'
+
+# AND THE LINE-COUNT GUARD ITSELF REFUSES. It is the thing that turned that abort into
+# a refusal instead of a document with every declaration below line 6 missing, so it
+# needs a case of its own. Driven by replacing the program the two readers share,
+# which is a variable, and putting it back.
+_KEEP_AWK="$_RENDERING_AWK"
+_RENDERING_AWK='NR <= 2 { print }'
+rendered_lines_file "$MB" >/dev/null 2>&1
+assert_eq 2 "$?" 'a view with the wrong number of lines is refused rather than returned'
+assert_contains "$(rendered_lines_file "$MB" 2>&1 >/dev/null)" 'is not 5 lines' \
+  'and the message names how many lines the file holds'
+_RENDERING_AWK="$_KEEP_AWK"
+assert_eq 5 "$(rendered_lines_file "$MB" | awk 'END { print NR }')" \
+  'and the real program is back, so the cases above measured the real one'
+
+# ==============================================================================
+# 11 · the denominator, printed
 # ==============================================================================
 # Fifteen declaration forms, enumerated from the tree rather than from this file, so
 # a sixteenth is a failure here rather than a cell nobody wrote.

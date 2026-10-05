@@ -531,4 +531,37 @@ assert_status 0 "$rc" "a findings file written from the contract's own example p
 assert_eq "" "$(printf '%s' "$out" | grep 'refuse\[' || true)" \
   "with no refusal of any kind"
 
+# --- a displayed field, heading or table row is not one ------------------------
+#
+# This gate reads a findings file in a rendering context, and the loosening that
+# made it read the raw file instead was caught by NOTHING. Four display forms, over
+# the three shapes it reads out of a record: a `key: value` field, a `## ` heading
+# and a table row.
+#
+# The direction that matters here is a FALSE REFUSAL as much as a hole. The section
+# set is closed, so a findings file quoting `## What this means` inside a fence — to
+# record that the heading is refused — was itself refused for carrying it.
+for form in backtick-fence tilde-fence html-comment indented-block; do
+  f="$(prepare "$WITH_FINDINGS" 2026-10-01.md)"
+  {
+    printf '\nFor a reader, a stage 2 heading and a second since: field look like this:\n\n'
+    case "$form" in
+      backtick-fence) printf '```\n## What this means\nsince: 2025-01-01\n| F99 | an example | https://example.com | 2026-01-01 | practice-change | build (guess) | low |\n```\n' ;;
+      tilde-fence)    printf '~~~\n## What this means\nsince: 2025-01-01\n| F99 | an example | https://example.com | 2026-01-01 | practice-change | build (guess) | low |\n~~~\n' ;;
+      html-comment)   printf '<!-- what they look like:\n## What this means\nsince: 2025-01-01\nand no more. -->\n' ;;
+      indented-block) printf '\n    ## What this means\n    since: 2025-01-01\n\n' ;;
+    esac
+  } >> "$f"
+  gate "$f"
+  assert_status 0 "$STATUS" "a heading, a field and a row displayed in a $form draw no refusal"
+done
+
+# And the same heading written plainly is still refused, or the four cases above pass
+# because the gate stopped reading rather than because the text is displayed.
+f="$(prepare "$WITH_FINDINGS" 2026-10-01.md)"
+printf '\n## What this means\n\nStage 2 arriving in a stage 1 file.\n' >> "$f"
+gate "$f"
+assert_status 1 "$STATUS" "the same heading written plainly is refused"
+assert_contains "$OUT" "refuse[sections]" "and the refusal is sections"
+
 assert_done

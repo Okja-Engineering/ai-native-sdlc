@@ -131,6 +131,21 @@
 # Portability: bash 3.2, BSD and GNU userland. No -P, no in-place sed, no awk
 # IGNORECASE, no interval expressions — BSD awk does not support `{3,}`, so a fence
 # run is counted by hand rather than matched.
+#
+# LC_ALL=C ON EVERY awk CALL, AND THAT IS NOT TIDINESS. This reads a line by taking
+# `substr` at offsets `index` produced, and macOS awk under a UTF-8 locale mixes byte
+# and character semantics there: it cuts inside a multibyte character and then ABORTS
+# with `towc: multibyte conversion failure`. Over a problem record carrying one em dash
+# the 105-line view came back as 5 lines, so every declaration below line 6 disappeared.
+#
+# It passed on Linux and in a C locale and failed only on the macOS CI leg, which is
+# the fourth time this repository has paid for a platform difference that is silent on
+# one side — after `\?` in sed, `\b` in git grep and awk's IGNORECASE. In the C locale
+# awk is byte-oriented, so `index`, `substr` and `length` agree, and blanking a
+# three-byte character with three spaces leaves text the caller can still read as UTF-8.
+#
+# The line-count check below is what turned that into a refusal rather than a silent
+# hole, and it is the reason this was found by CI rather than by an auditor.
 
 # _RENDERING_AWK is the whole of it, in one variable, so the two projections cannot
 # drift from each other: they are the same program run with SPANS set or unset.
@@ -303,11 +318,12 @@ FNR == 1 { fence = 0; fchar = ""; incomment = 0; listopen = 0 }
 }
 '
 
-# rendered_spans — for a comment-shaped construct. Reads stdin.
-rendered_spans() { awk -v SPANS=1 "$_RENDERING_AWK"; }
-
-# rendered_lines — for a line-shaped construct. Reads stdin.
-rendered_lines() { awk -v SPANS=0 "$_RENDERING_AWK"; }
+# There were two stdin filters here, `rendered_spans` and `rendered_lines`. Nothing
+# called them — every caller has a path and wants the line-count check — and the
+# loosening sweep proved it: making `rendered_spans` ignore its own mode broke no
+# suite, because no suite reached it. Deleted rather than tested, because a second way
+# to read the same thing is a second thing to get wrong and this file is already a
+# single point of failure. The filter mode at the bottom covers reading by hand.
 
 # _rendered_file <spans> <path> — a projection over a file, with the line count
 # checked. A truncated view would make every declaration below the cut disappear,
@@ -329,10 +345,10 @@ rendered_lines() { awk -v SPANS=0 "$_RENDERING_AWK"; }
 _rendered_file() {
   local raw view out
   [ -f "$2" ] || return 1
-  raw="$(awk 'END { print NR + 0 }' "$2")"
+  raw="$(LC_ALL=C awk 'END { print NR + 0 }' "$2")"
   [ "$raw" = 0 ] && return 0
-  view="$(awk -v SPANS="$1" "$_RENDERING_AWK" "$2"; printf '.\n')"
-  if [ "$(( $(printf '%s\n' "$view" | awk 'END { print NR + 0 }') - 1 ))" != "$raw" ]; then
+  view="$(LC_ALL=C awk -v SPANS="$1" "$_RENDERING_AWK" "$2"; printf '.\n')"
+  if [ "$(( $(printf '%s\n' "$view" | LC_ALL=C awk 'END { print NR + 0 }') - 1 ))" != "$raw" ]; then
     printf 'lib-rendering: the view of %s is not %s lines, which is what the file holds\n' \
       "$2" "$raw" >&2
     return 2
@@ -351,7 +367,7 @@ case "${0##*/}" in
   lib-rendering.sh)
     _spans=1
     if [ "${1:-}" = --lines ]; then _spans=0; shift; fi
-    if [ "$#" -gt 0 ]; then awk -v SPANS="$_spans" "$_RENDERING_AWK" "$@"
-    else awk -v SPANS="$_spans" "$_RENDERING_AWK"; fi
+    if [ "$#" -gt 0 ]; then LC_ALL=C awk -v SPANS="$_spans" "$_RENDERING_AWK" "$@"
+    else LC_ALL=C awk -v SPANS="$_spans" "$_RENDERING_AWK"; fi
     ;;
 esac
